@@ -265,7 +265,7 @@ Make_gif_landscape=function(path="../Figures/"){
 # Step 2 : CA & mean-field -----
 
 set.seed(3)
-params=Get_classical_param(r = 0,d = .1,c = .2,delta = .1,f = .9,z = 4,m = .2,b = .57)
+params=Get_classical_param(r = 0,d = .1,c = .1,delta = .1,f = .9,z = 4,m = .2,b = .57)
 
 ini_land=  Get_initial_lattice(frac = c(.8,.1,.1),size=25)
 
@@ -292,10 +292,10 @@ Plot_dynamics(d_tot,different_sim =T)
 
 # Diag bifu de Kefi et al., 2007 Theo. Ecol.
 
-d2=tibble();params=Get_classical_param(r = 0.05,d = .2,c = .3,delta = .1,f = .9,z = 4,m = .1,b = .57);state=c(.9,.05)
+d2=tibble();params=Get_classical_param(r = 0.05,d = .2,c = .6,delta = .1,f = .9,z = 4,m = .1,b = .57);state=c(.9,.05)
 
 for (b in seq(.2,.8,length.out=30)){
-  for (f in c(.1,.3,.9)){
+  for (f in c(.9)){
     params$b=b;params$f=f
     d=Compute_ode(state,params)
     d=d[nrow(d),-1]
