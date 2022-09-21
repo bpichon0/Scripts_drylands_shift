@@ -1,4 +1,4 @@
-x=c("tidyverse","ggpubr","latex2exp","deSolve","reshape2","JuliaCall","diffeqr")
+x=c("tidyverse","ggpubr","latex2exp","deSolve","reshape2","JuliaCall","diffeqr","simecol","tseries","phaseR","ggquiver","scales")
 lapply(x, require, character.only = TRUE)
 
 
@@ -9,10 +9,29 @@ the_theme=theme_classic()+theme(legend.position = "bottom",
                                 legend.text = element_text(size = 10),text = element_text(family = "NewCenturySchoolbook"))
 
 
+color_rho=c("coexistence"="#D8CC7B","competitive"="#ACD87B","desert"="#696969","stress_tol"="#7BD8D3")
 
 # A) Mean field analysis ----
 
-#Ode 
+Get_MF_parameters=function(){
+  
+  return(c(
+    r = 0.05, d = 0.1, f = 0.9, beta = .8, m = 0.1, e = .1, emax = 1.2, cintra = .1,
+    cinter1 = .1, cinter2 = .1, S = 0
+  )
+  
+  )
+}
+
+Get_MF_initial_state=function(){
+  state <- c(rho_1 = 0.4, rho_2 = 0.4, rho_m = 0.1,rho_0=.1)
+  names(state) <- c("rho_1", "rho_2", "rho_0")
+  return(state)
+}
+
+
+
+#normal function
 MF_two_species_julia = julia_eval("
 
 function MF_two_species(du,u,p,t)
@@ -29,13 +48,64 @@ function MF_two_species(du,u,p,t)
 end")
 
 
+#function of press perturbation
+MF_two_species_julia_press = julia_eval(" 
+
+function MF_two_species_press(du,u,p,t)
+
+  r,d,f,beta1,beta2,m,e,emax,cintra,cinter1,cinter2,S=p
+  rho_1,rho_2,rho_d,rho_0=u
+
+  du[1] = rho_0 * ( beta1 * rho_1 *  (emax *( 1 -S*(1-e)) - (cintra*rho_1 + cinter1*rho_2))) - rho_1 * m
+  du[2] = rho_0 * ( beta2 * rho_2 *  (emax *( 1 -S) - (cintra*rho_2 + cinter2*rho_1))) - rho_2 * m
+  du[3] = d*rho_0 - rho_d*(r+f*(rho_1))
+  du[4] = -d*rho_0 + rho_d*(r+f*(rho_1))-rho_0 * ( beta1 * rho_1 *  (emax *( 1 -S*(1-e)) - (cintra*rho_1 + cinter1*rho_2)))  -
+      rho_0 * ( beta2 * rho_2 *  (emax *( 1 -S) - (cintra*rho_2 + cinter2*rho_1))) + rho_2 * m + rho_1 * m
+
+end")
+
+
+
+
+MF_two_species_julia_SGH = julia_eval(" 
+
+function MF_two_species_SGH(du,u,p,t)
+
+  r,d,f,beta1,beta2,m,e,emax,cintra,cinter1,cinter2,S=p
+  rho_1,rho_2,rho_d,rho_0=u
+
+  du[1] = rho_0 * ( beta * rho_1 *  (emax *( 1 -S*(1-e)) - (cintra*rho_1 + cinter1*rho_2))) - rho_1 * m
+  du[2] = rho_0 * ( beta * rho_2 *  (emax *( 1 -S) - (cintra*rho_2 + cinter2*rho_1))) - rho_2 * m
+  du[3] = d*rho_0 - rho_d*(r+S*f*(rho_1))
+  du[4] = -d*rho_0 + rho_d*(r+S*f*(rho_1))-rho_0 * ( beta * rho_1 *  (emax *( 1 -S*(1-e)) - (cintra*rho_1 + cinter1*rho_2)))  -
+      rho_0 * ( beta * rho_2 *  (emax *( 1 -S) - (cintra*rho_2 + cinter2*rho_1))) + rho_2 * m + rho_1 * m
+
+end")
+
+
+MF_two_species_julia_SGH_press = julia_eval(" 
+
+function MF_two_species_SGH_press(du,u,p,t)
+
+  r,d,f,beta1,beta2,m,e,emax,cintra,cinter1,cinter2,S=p
+  rho_1,rho_2,rho_d,rho_0=u
+
+  du[1] = rho_0 * ( beta1 * rho_1 *  (emax *( 1 -S*(1-e)) - (cintra*rho_1 + cinter1*rho_2))) - rho_1 * m
+  du[2] = rho_0 * ( beta2 * rho_2 *  (emax *( 1 -S) - (cintra*rho_2 + cinter2*rho_1))) - rho_2 * m
+  du[3] = d*rho_0 - rho_d*(r+S*f*(rho_1))
+  du[4] = -d*rho_0 + rho_d*(r+S*f*(rho_1))-rho_0 * ( beta1 * rho_1 *  (emax *( 1 -S*(1-e)) - (cintra*rho_1 + cinter1*rho_2)))  -
+      rho_0 * ( beta2 * rho_2 *  (emax *( 1 -S) - (cintra*rho_2 + cinter2*rho_1))) + rho_2 * m + rho_1 * m
+
+end")
+
+
 #Analysis and ploting figs
 
 Post_processing_MF=function(d2,name,C_seq=c_seq){
   
-  write.table(d2,paste0("../Table/2_species/2_species_",name,".csv"),sep=";")
+  # write.table(d2,paste0("../Table/2_species/2_species_",name,".csv"),sep=";")
   
-  
+
   d2$state=sapply(1:nrow(d2),function(x){
     
     if (d2[x,1]>0 & d2[x,2]>0) return("coexistence")
@@ -45,7 +115,7 @@ Post_processing_MF=function(d2,name,C_seq=c_seq){
     
   })
   
-  c_values_bifu=C_seq[c(round(length(C_seq)/10),round(length(C_seq)/2),length(C_seq))]
+  c_values_bifu=C_seq[c(1,round(length(C_seq)/2),length(C_seq))]
   
   
   color_rho=c("coexistence"="#D8CC7B","competitive"="#ACD87B","desert"="#696969","stress_tol"="#7BD8D3")
@@ -53,7 +123,8 @@ Post_processing_MF=function(d2,name,C_seq=c_seq){
   #state at equilibrium
   p1=ggplot(d2)+geom_tile(aes(x=S,y=cinter1/param["cinter2"],fill=state))+
     theme_classic()+scale_fill_manual(values=color_rho)+
-    theme(legend.position = "bottom")+labs(x="Stress",y="Relative competitive ability",fill="")+
+    annotate("text",x=rep(1.02,3),y= (c_values_bifu/param["cinter2"])+0.1,label=c("A","B","C"),color="black")+
+    theme(legend.position = "bottom")+labs(x="Stress (S)",y=TeX(r'(Relative competitive ability \ $\frac{c_{2,1}}{c_{1,2}})'),fill="")+
     geom_hline(yintercept = c_values_bifu/param["cinter2"],lwd=.1,color="gray40")+
     theme(legend.text = element_text(size=11))
   
@@ -62,30 +133,28 @@ Post_processing_MF=function(d2,name,C_seq=c_seq){
   density_col=colorRampPalette(c("red","white","blue"))
   p2= ggplot(d2)+geom_tile(aes(x=S,y=cinter1/param["cinter2"],fill=rho_plus))+
     theme_classic()+scale_fill_gradientn(colours=density_col(100))+
-    theme(legend.position = "bottom")+labs(x="Stress",y="Relative competitive ability",fill="Global vegetation density")
+    theme(legend.position = "bottom")+labs(x="Stress (S)",y=TeX(r'(Relative competitive ability \ $\frac{c_{2,1}}{c_{1,2}})'),
+                                           fill=TeX(r'(Global vegetation \ $\rho_1 + \rho_2$)'))
   
   
   #some bifurcation diagrams
   
   c_values_bifu=c_seq[c(1,round(length(c_seq)/2),length(c_seq))]
-  d_bifu=filter(d2,cinter1 %in% c_values_bifu)
+  d_bifu=filter(d2,round(cinter1,4) %in% round(c_values_bifu,4))
   for (c_bifu in 1:3){
     assign(paste0("p3_",c_bifu),
-           ggplot(d_bifu %>% filter(.,cinter1==c_values_bifu[c_bifu]) %>% melt(.,measure.vars=c("rho_1","rho_2"))%>%
+           ggplot(d_bifu %>% filter(.,round(cinter1,4)==round(c_values_bifu[c_bifu],4)) %>% melt(.,measure.vars=c("rho_1","rho_2"))%>%
                     mutate(.,variable=recode_factor(variable,"rho_1"="stress_tol","rho_2"="competitive")))+
-             geom_point(aes(x=S,y=value,color=variable))+labs(x="Stress (S)",y="Density")+
-             the_theme+ scale_color_manual(values=color_rho[c(2,4)])+  theme(legend.text = element_text(size=11))
+             geom_point(aes(x=S,y=value,color=variable),size=.5)+labs(x="Stress (S)",y="Density",color="")+
+             the_theme+ scale_color_manual(values=color_rho[c(2,4)])+  theme(legend.text = element_text(size=12))
     )
   }
-  p3=ggarrange(p3_3,p3_2,p3_1,nrow=3,common.legend = T,legend = "bottom")
+  p3=ggarrange(p3_3,p3_2,p3_1,nrow=3,common.legend = T,legend = "bottom",labels = LETTERS[1:3])
   
   
   p_tile=ggarrange(p1,p2,ncol=2)
   p_tot=ggarrange(p_tile,p3,ncol=2,widths = c(3,1))
-  ggsave(paste0("../Figures/2_species/2_species_",name,".pdf"),width = 14,height = 6)
-  
-  
-  
+  ggsave(paste0("../Figures/2_species/2_species_",name,".pdf"),width = 14,height = 6)  
   
 }
 
@@ -198,14 +267,18 @@ Compute_hysteresis=function(d,n_species=2){
       }
       
       hysteresis=sum(biomass_D[,1]-rev(biomass_R[,1]))
-      d_hysteresis=rbind(d_hysteresis,tibble(Hysteresis=hysteresis,Species=sp))
+      if (max(abs(diff(biomass_D[,1])))>.1){
+        # #now tipping points
+        Tipping_D=biomass_D$S[which(abs(diff(biomass_D[,1]))==max(abs(diff(biomass_D[,1]))))]
+        Tipping_R=biomass_R$S[which(abs(diff(biomass_R[,1]))==max(abs(diff(biomass_R[,1]))))]
+        
+      } else{
+        Tipping_D=0
+        Tipping_R=0
+      }
       
-      # #now tipping points
-      # Tipping_D=((i-1)*n)+which(abs(diff(biomass_D))==max(abs(diff(biomass_D))))
-      # size_shift_D=abs(diff(biomass_D))[which(abs(diff(biomass_D))==max(abs(diff(biomass_D))))]
-      # 
-      # point_5_restoration=((i-1)*n)+which(abs(diff(biomass_R))==max(abs(diff(biomass_R))))
-      # size_shift_R=abs(diff(biomass_R))[which(abs(diff(biomass_R))==max(abs(diff(biomass_R))))]
+      d_hysteresis=rbind(d_hysteresis,tibble(Hysteresis=hysteresis,Species=sp,Tipping_D=Tipping_D,Tipping_R=Tipping_R))
+      
       
     }
   }
@@ -217,7 +290,7 @@ Compute_hysteresis=function(d,n_species=2){
 plot_dynamics=function(d){
   
   color_rho=c("fertile"="#D8CC7B","competitive"="#ACD87B","desert"="#696969","stress_tol"="#7BD8D3")
-  
+  colnames(d)=c("rho_1",'rho_2',"rho_0",'rho_d')
   if ('time' %in% colnames(d) | 'Time' %in% colnames(d)){
     return(ggplot(d%>%melt(.,id.vars=colnames(d)[ncol(d)])%>%
                     mutate(.,variable=recode_factor(variable,"rho_1"="stress_tol","rho_2"="competitive","rho_0"="fertile","rho_d"="desert")))+
@@ -236,13 +309,44 @@ plot_dynamics=function(d){
 }
 
 
+# Recruitment rate
+
+Get_recruitment_rates=function(eq,param){
+  
+  recruit_rate = c(
+    r1 =  (1-eq$rho_1-eq$rho_2-eq$rho_d) * param["beta"]  *  eq$rho_1  *   (param["emax"] *( 1 -param["S"]  * (1-param["e"])) - (param["cintra"]*eq$rho_1 + param["cinter1"]*eq$rho_2)) - eq$rho_1*param["m"],
+    r2 =  (1-eq$rho_1-eq$rho_2-eq$rho_d) * param["beta"]  *  eq$rho_2  *   (param["emax"] *( 1 -param["S"])                   - (param["cintra"]*eq$rho_2 + param["cinter2"]*eq$rho_1)) - eq$rho_2*param["m"]  )
+  
+  names(recruit_rate)=c("r1","r2")
+  return(recruit_rate)
+
+}
 
 
 # B) Pair approximation analysis ----
 
+Get_PA_parameters=function(){
+  
+  return(c(    r = 0.05, d = 0.1, f = .9, beta = 0.8, m = 0.1, e = .9, emax = 1.2, cg = .1, alpha11 = .1,
+    alpha12 = .1, alpha21 = .1, alpha22 = .1, S = 0, delta = .1, z = 4
+  )
+  )
+}
+
+Get_PA_initial_state=function(){
+  state <- c(rho_1 = 0.4, rho_2 = 0.4, rho_m = 0.1)
+  state_pair <- c(
+    rho_12 = state[1] * state[2], rho_1m = state[1] * state[3], rho_2m = state[2] * state[3],
+    rho_11 = state[1] * state[1], rho_22 = state[2] * state[2], rho_mm = state[3] * state[3]
+  )
+  state <- c(state, state_pair)
+  names(state) <- c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
+  return(state)
+}
+
 get_mean_densities=function(d){
   
-  length_transient=2000
+  length_transient=3000
   d=d[(length_transient+1):nrow(d),]
   return(colMeans(d))
   
@@ -253,49 +357,94 @@ PA_two_species_julia = julia_eval("
 
 function PA_two_species(du,u,p,t)
 
-    r,d,f,beta,m,e,emax,cintra,cinter1,cinter2,S,delta,z=p
-    rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
-    
-    #rho_1
-    du[1] =  (1- rho_1-rho_2-rho_m) * beta * (delta * rho_1 + (1 - delta) * ((rho_1 - rho_11 - rho_12 - rho_1m) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S * (1 - e) ) - (cintra * rho_1 + cinter1 * rho_2)) - rho_1 * m
-    
-    #rho_2
-    du[2] =  (1- rho_1-rho_2-rho_m) * beta * (delta * rho_2 + (1 - delta) * ((rho_2 - rho_22 - rho_12 - rho_2m) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S) - (cintra * rho_2 + cinter2 * rho_1)) - rho_2 * m
-    
-    #rho_m
-    du[3] =  (1- rho_1-rho_2-rho_m) * d - rho_m * (r + f * ((rho_1 - rho_11 - rho_12 - rho_1m) / (1- rho_1-rho_2-rho_m)))
-    
-    #rho_12
-    du[4] = (rho_1 - rho_11 - rho_12 - rho_1m) *  (delta * rho_2 + (1 - delta) * ((z - 1) / z) * ((rho_2 - rho_22 - rho_12 - rho_2m) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S ) - (cintra * rho_2 + cinter2 * rho_1))  +
-            (rho_2 - rho_22 - rho_12 - rho_2m) *  (delta * rho_1 + (1 - delta) * ((z - 1) / z) * ((rho_1 - rho_11 - rho_12 - rho_1m) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S * (1 - e) ) - (cintra * rho_1 + cinter1 * rho_2))-
-            2 * rho_12 * m
-    
-    #rho_1m
-    du[5] = (rho_1 - rho_11 - rho_12 - rho_1m) * d + (rho_m - rho_mm - rho_1m - rho_2m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * ((rho_1 - rho_11 - rho_12 - rho_1m) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S * (1 - e) ) - (cintra * rho_1 + cinter1 * rho_2)) -
-            rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * ((rho_1 - rho_11 - rho_12 - rho_1m) / (1- rho_1-rho_2-rho_m)) ))
-    
-    #rho_2m
-    du[6] = (rho_2 - rho_22 - rho_12 - rho_2m) * d + (rho_m - rho_mm - rho_1m - rho_2m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * ((rho_2 - rho_22 - rho_12 - rho_2m) / (1- rho_1-rho_2-rho_m)) * (emax * (1 - S * (1 - e) ) - (cintra * rho_2 + cinter2 * rho_1))) -
-            rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * ((rho_1 - rho_11 - rho_12 - rho_1m) / (1- rho_1-rho_2-rho_m) )))
-    
-    #rho_11
-    du[7] = (rho_1 - rho_11 - rho_12 - rho_1m) * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * ((rho_1 - rho_11 - rho_12 - rho_1m) / (1- rho_1-rho_2-rho_m) )) * (emax * (1 - S * (1 - e) ) - (cintra * rho_1 + cinter1 * rho_2)) -
-            2 * rho_11 * m
-    
-    #rho_22
-    du[8] = (rho_2 - rho_22 - rho_12 - rho_2m) * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * ((rho_2 - rho_22 - rho_12 - rho_2m) / (1- rho_1-rho_2-rho_m) )) * (emax * (1 - S ) - (cintra * rho_2 + cinter2 * rho_1)) -
-            2 * rho_22 * m
-    
-    #rho_mm
-    du[9] = 2 * (rho_m - rho_mm - rho_1m - rho_2m) * d - 2* rho_mm * (r + f * ((z - 1) / z) * ((rho_1 - rho_11 - rho_12 - rho_1m) / (1- rho_1-rho_2-rho_m)))
+r,d,f,beta,m,e,emax,cg,alpha11,alpha12,alpha21,alpha22,S,delta,z=p
+rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
+
+#rho_1
+du[1] =  (1- rho_1-rho_2-rho_m) * beta * (delta * rho_1 + (1 - delta) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S * e ) - (cg *(rho_1 + rho_2) + (alpha11 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) + alpha21 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) )) - rho_1 * m
+
+#rho_2
+du[2] =  (1- rho_1-rho_2-rho_m) * beta * (delta * rho_2 + (1 - delta) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S)  - (cg *(rho_1 + rho_2) + (alpha22 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) + alpha12 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) )) - rho_2 * m
+
+#rho_m
+du[3] =  (1- rho_1-rho_2-rho_m) * d - rho_m * (r + f * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m)))
+
+#rho_12
+du[4] = ((rho_1 - rho_11 - rho_12 - rho_1m)) * beta * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S ) - (cg *(rho_1 + rho_2) + (alpha22 *((z - 1) / z)*((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) + (alpha12/z) + alpha12 *((z - 1) / z)*((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) ))  +
+        ((rho_2 - rho_22 - rho_12 - rho_2m)) * beta * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S * e ) - (cg *(rho_1 + rho_2) + (alpha11 * ((z - 1) / z) * ((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) + (alpha21/z) + alpha21 * ((z - 1) / z) *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) ))-
+        2 * rho_12 * m
+
+#rho_1m
+du[5] = ((rho_1 - rho_11 - rho_12 - rho_1m)) * d + (rho_m - rho_mm - rho_1m - rho_2m) * beta * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S * e ) - (cg *(rho_1 + rho_2) + (alpha11 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) + alpha21 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) )) -
+        rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m)) ))
+
+#rho_2m
+du[6] = ((rho_2 - rho_22 - rho_12 - rho_2m)) * d + (rho_m - rho_mm - rho_1m - rho_2m) * beta * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m)) * (emax * (1 - S  ) - (cg *(rho_1 + rho_2) + (alpha22 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) + alpha12 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) ))) -
+        rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m) )))
+
+#rho_11
+du[7] = 2* ((rho_1 - rho_11 - rho_12 - rho_1m)) *  beta * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m) )) * (emax * (1 - S * e ) - (cg *(rho_1 + rho_2) + (alpha11 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) * ((z - 1) / z) + (alpha11/z) + alpha21 * ((z - 1) / z) * ((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) )) -
+        2 * rho_11 * m
+
+#rho_22
+du[8] = 2* ((rho_2 - rho_22 - rho_12 - rho_2m)) * beta * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m) )) * (emax * (1 - S ) - (cg *(rho_1 + rho_2) + (alpha22 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) * ((z - 1) / z) + (alpha22/z) + alpha12 * ((z - 1) / z) * ((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) )) -
+        2 * rho_22 * m
+
+#rho_mm
+du[9] = 2 * (rho_m - rho_mm - rho_1m - rho_2m) * d - 2* rho_mm * (r + f * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m)))
   
-  end
+end
+  
+
+")
+
+PA_two_species_julia_press = julia_eval("
+
+function PA_two_species_press(du,u,p,t)
+
+r,d,f,beta1,beta2,m,e,emax,cg,alpha11,alpha12,alpha21,alpha22,S,delta,z=p
+rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
+
+#rho_1
+du[1] =  (1- rho_1-rho_2-rho_m) * beta1 * (delta * rho_1 + (1 - delta) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S * e ) - (cg *(rho_1 + rho_2) + (alpha11 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) + alpha21 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) )) - rho_1 * m
+
+#rho_2
+du[2] =  (1- rho_1-rho_2-rho_m) * beta2 * (delta * rho_2 + (1 - delta) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S)  - (cg *(rho_1 + rho_2) + (alpha22 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) + alpha12 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) )) - rho_2 * m
+
+#rho_m
+du[3] =  (1- rho_1-rho_2-rho_m) * d - rho_m * (r + f * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m)))
+
+#rho_12
+du[4] = ((rho_1 - rho_11 - rho_12 - rho_1m)) * beta2 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S ) - (cg *(rho_1 + rho_2) + (alpha22 *((z - 1) / z)*((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) + (alpha12/z) + alpha12 *((z - 1) / z)*((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) ))  +
+        ((rho_2 - rho_22 - rho_12 - rho_2m)) * beta1 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S * e ) - (cg *(rho_1 + rho_2) + (alpha11 * ((z - 1) / z) * ((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) + (alpha21/z) + alpha21 * ((z - 1) / z) *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) ))-
+        2 * rho_12 * m
+
+#rho_1m
+du[5] = ((rho_1 - rho_11 - rho_12 - rho_1m)) * d + (rho_m - rho_mm - rho_1m - rho_2m) * beta1 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S * e ) - (cg *(rho_1 + rho_2) + (alpha11 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) + alpha21 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) )) -
+        rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m)) ))
+
+#rho_2m
+du[6] = ((rho_2 - rho_22 - rho_12 - rho_2m)) * d + (rho_m - rho_mm - rho_1m - rho_2m) * beta2 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m)) * (emax * (1 - S  ) - (cg *(rho_1 + rho_2) + (alpha22 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) + alpha12 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) ))) -
+        rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m) )))
+
+#rho_11
+du[7] = 2* ((rho_1 - rho_11 - rho_12 - rho_1m)) *  beta1 * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m) )) * (emax * (1 - S * e ) - (cg *(rho_1 + rho_2) + (alpha11 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) * ((z - 1) / z) + (alpha11/z) + alpha21 * ((z - 1) / z) * ((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) )) -
+        2 * rho_11 * m
+
+#rho_22
+du[8] = 2* ((rho_2 - rho_22 - rho_12 - rho_2m)) * beta2 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m) )) * (emax * (1 - S ) - (cg *(rho_1 + rho_2) + (alpha22 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) * ((z - 1) / z) + (alpha22/z) + alpha12 * ((z - 1) / z) * ((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) )) -
+        2 * rho_22 * m
+
+#rho_mm
+du[9] = 2 * (rho_m - rho_mm - rho_1m - rho_2m) * d - 2* rho_mm * (r + f * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m)))
+  
+end
   
 
 ")
 
 
-post_processing_2species_PA=function(d2,C_seq=c_seq,S_seq=s_seq){
+post_processing_2species_PA=function(d2,Alpha_seq=alpha_seq,S_seq=s_seq,title=F,title_name=""){
   
   
   d2$state=sapply(1:nrow(d2),function(x){
@@ -307,51 +456,53 @@ post_processing_2species_PA=function(d2,C_seq=c_seq,S_seq=s_seq){
     
   })
   
-  c_values_bifu=c_seq[c(1,round(length(c_seq)/2),length(c_seq))]
+  c_values_bifu=Alpha_seq[c(1,round(length(Alpha_seq)/2),length(Alpha_seq))]
   
   
   color_rho=c("coexistence"="#D8CC7B","competitive"="#ACD87B","desert"="#696969","stress_tol"="#7BD8D3")
   
   #state at equilibrium
-  p1=ggplot(d2)+geom_tile(aes(x=S,y=c1/param["cinter2"],fill=state))+
+  p1=ggplot(d2)+geom_tile(aes(x=S,y=alpha21/param["alpha12"],fill=state))+
     theme_classic()+scale_fill_manual(values=color_rho)+
-    theme(legend.position = "bottom")+labs(x="Stress",y="Relative competitive ability",fill="")+
-    geom_hline(yintercept = c_values_bifu/param["cinter2"],lwd=.1,color="gray40")+
+    theme(legend.position = "bottom")+labs(x="Stress (S)",y=TeX(r'(Relative competitive ability \ $\frac{\alpha_{2,1}}{\alpha_{1,2}})'),fill="")+
+    geom_hline(yintercept = c_values_bifu/param["alpha12"],lwd=.1,color="gray40")+
     theme(legend.text = element_text(size=11))
   
   
-  #density of global vegetation
-  density_col=colorRampPalette(c("red","white","blue"))
-  p2= ggplot(d2)+geom_tile(aes(x=S,y=c1/param["cinter2"],fill=rho_plus))+
-    theme_classic()+scale_fill_gradientn(colours=density_col(100))+
-    theme(legend.position = "bottom")+labs(x="Stress",y="Relative competitive ability",fill="Global vegetation density")
+  # #density of global vegetation
+  # density_col=colorRampPalette(c("red","white","blue"))
+  # p2= ggplot(d2)+geom_tile(aes(x=S,y=alpha21/param["alpha12"],fill=rho_plus))+
+  #   theme_classic()+scale_fill_gradientn(colours=density_col(100))+
+  #   theme(legend.position = "bottom")+labs(x="Stress (S)",y=TeX(r'(Relative competitive ability \ $\frac{\alpha_{2,1}}{\alpha_{1,2}})'),fill="Global vegetation density")
   
   #pair 12
   density_pair=colorRampPalette(c("yellow","#CE7604"))
   d2$rho_12[which(d2$rho_1==0 | d2$rho_2==0)]=NA
-  p4= ggplot(d2)+geom_tile(aes(x=S,y=c1/param["cinter2"],fill=rho_12))+
+  p4= ggplot(d2)+geom_tile(aes(x=S,y=alpha21/param["alpha12"],fill=rho_12))+
     theme_classic()+scale_fill_gradientn(colours=density_pair(100),na.value = "grey")+
-    theme(legend.position = "bottom")+labs(x="Stress",y="Relative competitive ability",fill="Pair sp1 & sp2")
+    theme(legend.position = "bottom")+labs(x="Stress (S)",y=TeX(r'(Relative competitive ability \ $\frac{\alpha_{2,1}}{\alpha_{1,2}})'),fill="Pair sp1 & sp2")
   
   #some bifurcation diagrams
   
-  c_values_bifu=c_seq[c(1,round(length(c_seq)/2),length(c_seq))]
-  d_bifu=filter(d2,c1 %in% c_values_bifu)
-  for (c_bifu in 1:3){
-    assign(paste0("p3_",c_bifu),
-           ggplot(d_bifu %>% filter(.,c1==c_values_bifu[c_bifu]) %>% melt(.,measure.vars=c("rho_1","rho_2"))%>%
+  a_values_bifu=Alpha_seq[c(1,round(length(Alpha_seq)/2),length(Alpha_seq))]
+  d_bifu=filter(d2,round(alpha21,4) %in% round(a_values_bifu,4))
+  for (a_bifu in 1:3){
+    assign(paste0("p3_",a_bifu),
+           ggplot(d_bifu %>% filter(.,round(alpha21,4)==round(a_values_bifu[a_bifu],4)) %>% melt(.,measure.vars=c("rho_1","rho_2"))%>%
                     mutate(.,variable=recode_factor(variable,"rho_1"="stress_tol","rho_2"="competitive")))+
-             geom_point(aes(x=S,y=value,color=variable))+labs(x="Stress (S)",y="Density")+
+             geom_point(aes(x=S,y=value,color=variable),size=.75)+labs(x="Stress (S)",y="Density",color="")+
              the_theme+ scale_color_manual(values=color_rho[c(2,4)])+  theme(legend.text = element_text(size=11))
     )
   }
   p3=ggarrange(p3_3,p3_2,p3_1,nrow=3,common.legend = T,legend = "bottom")
-  
+  if (title){
+    p1=p1+ggtitle(title_name)
+  }
   
   p_tile=ggarrange(p1,p4,ncol=2)
   p_tot=ggarrange(p_tile,p3,ncol=2,widths = c(3,1))
   ggsave("../Figures/2_species/PA.pdf",width = 14,height = 6)
-  
+  return(p_tot)
 }
 
 
@@ -363,8 +514,8 @@ CA_2_species=function(landscape, param){
   # Variables : 1 = stress_tol, 2 = competitive, 0 = fertile, -1 = degraded   
   rho_1 = length(which((landscape == 1)))   / length(landscape) #fraction stress_tol
   rho_2 = length(which((landscape == 2)))   / length(landscape) #fraction competitive
-  rho_f = length(which((landscape == 0)))   / length(landscape) #fraction fertile
-  rho_d = 1-rho_1-rho_2-rho_f # fraction degraded
+  rho_0 = length(which((landscape == 0)))   / length(landscape) #fraction fertile
+  rho_d = 1-rho_1-rho_2-rho_0 # fraction degraded
   
   # Neighbors :
   
@@ -377,39 +528,39 @@ CA_2_species=function(landscape, param){
   
   r=param[1];d=param[2];f=param[3];beta=param[4];m=param[5];e=param[6]
   emax=param[7];cintra=param[8];cinter1=param[9];cinter2=param[10];S=param[11];delta=param[12]
-  dt=param[13];z=param[14]
+  z=param[13]
   
-  colonization_1 = beta*(delta * rho_1 + (1 - delta) * neigh_1 / z) * (emax* ( 1 - S * (1-e)) - (cintra*rho_1+cinter1*rho_2) ) * dt
-  colonization_2 = beta*(delta * rho_2 + (1 - delta) * neigh_2 / z) * (emax* ( 1 - S ) - (cintra*rho_2+cinter2*rho_1) ) * dt
+  colonization_1 = beta*(delta * rho_1 + (1 - delta) * neigh_1 / z) * (emax* ( 1 - S * (1-e)) - (cintra*rho_1+cinter1*rho_2) ) 
+  colonization_2 = beta*(delta * rho_2 + (1 - delta) * neigh_2 / z) * (emax* ( 1 - S ) - (cintra*rho_2+cinter2*rho_1) ) 
   
   
   # calculate regeneration, degradation & mortality rate
-  death = m *dt
-  regeneration = (r + f * neigh_1 / z)*dt
-  degradation = d*dt 
+  death = m 
+  regeneration = (r + f * (neigh_1) / z)
+  degradation = d
   
   # Apply rules
   rnum = runif(length(landscape))# one random number between 0 and 1 for each cell
   landscape_update=landscape
   
   ## New stress_tol
-  landscape_update[which((landscape ==0) & (rnum <= colonization_1))] = 1
+  landscape_update[which(landscape ==0 & rnum <= colonization_1)] = 1
   
   ## New competitive
-  landscape_update[which((landscape ==0) & (rnum > (colonization_1) & rnum <= (colonization_2 + colonization_1)))] = 2
+  landscape_update[which(landscape ==0 & rnum > colonization_1 & rnum <= colonization_2 + colonization_1)] = 2
   
   ## New fertile
-  landscape_update[which((landscape == 1) & (rnum <= death))] = 0
-  landscape_update[which((landscape == 2) & (rnum <= death))] = 0
-  landscape_update[which((landscape == -1) & (rnum <= regeneration))] = 0
+  landscape_update[which(landscape == 1 & rnum <= death)] = 0
+  landscape_update[which(landscape == 2 & rnum <= death)] = 0
+  landscape_update[which(landscape == -1 & rnum <= regeneration)] = 0
   
   ## New degraded 
-  landscape_update[which((landscape == 0) & (rnum > (colonization_2 + colonization_1)) & (rnum <= (colonization_2 + colonization_1 + degradation)))] = -1
+  landscape_update[which(landscape == 0 & rnum > colonization_2 + colonization_1 & rnum <= colonization_2 + colonization_1 + degradation)] = -1
   
   rho_1 = length(which((landscape == 1)))   / length(landscape) #fraction stress_tol
   rho_2 = length(which((landscape == 2)))   / length(landscape) #fraction competitive
-  rho_f = length(which((landscape == 0)))    / length(landscape) #fraction fertile
-  rho_d = 1-rho_1-rho_2-rho_f # fraction degraded
+  rho_0 = length(which((landscape == 0)))    / length(landscape) #fraction fertile
+  rho_d = 1-rho_1-rho_2-rho_0 # fraction degraded
   
   # print(max(colonization_1))
   # print(max(colonization_2))
@@ -429,29 +580,29 @@ CA_2_species=function(landscape, param){
   }
   
   
-  return(list(State=c(rho_1, rho_2, rho_f, rho_d),Landscape=landscape_update))
+  return(list(State=c(rho_1, rho_2, rho_0, rho_d),Landscape=landscape_update))
   
 }
 
 
 
-Run_CA_2_species=function(time=seq(1,1000,1),params,ini){
+Run_CA_2_species=function(time=seq(1,1000,1),param,landscape){
   
-  d=tibble(rho_1=sum(ini == 1) / length(ini),rho_2=sum(ini == 2) / length(ini),
-           rho_0=sum(ini == 0) / length(ini),rho_d=sum(ini == -1) / length(ini),time=1)
+  d=tibble(rho_1=sum(landscape == 1) / length(landscape),rho_2=sum(landscape == 2) / length(landscape),
+           rho_0=sum(landscape == 0) / length(landscape),rho_d=sum(landscape == -1) / length(landscape),time=1)
   
   for (k in 2:length(time)){
     
-    params["dt"]=time[k]-time[k-1]
-    output_CA=CA_2_species(ini,param = params)
-    ini=output_CA$Landscape
+    param["dt"]=time[k]-time[k-1]
+    output_CA=CA_2_species(landscape,param = param)
+    landscape=output_CA$Landscape
     d=rbind(d,tibble(rho_1=output_CA$State[1],rho_2=output_CA$State[2],
                      rho_0=output_CA$State[3],rho_d=output_CA$State[4],
                      time=k))
     
   }
   
-  return(list(d=d,State=ini))
+  return(list(state=d,landscape=landscape))
   
 }
 
@@ -476,22 +627,23 @@ Plot_landscape=function(landscape){
 
 
 
-# D) Gillespie
+# D) Gillespie ----
 
 
-Gillespie_tau_leaping_R=function(landscape,time_step,param){
+Gillespie_tau_leaping_R=function(landscape,time,param){
   
-  d=tibble()
+  d2=tibble()
   #param
   r=param[1];d=param[2];f=param[3];beta=param[4];m=param[5];e=param[6]
   emax=param[7];cintra=param[8];cinter2=param[9];cinter1=param[10];S=param[11];delta=param[12]
   z=param[13];leap=param[14]
   
-  death = matrix(m,nrow(landscape),ncol(landscape)) 
-  degradation = matrix(d,nrow(landscape),ncol(landscape)) 
+  Rate_landscape=array(0,c(nrow(landscape),ncol(landscape),6))
   
+  rules_change=matrix(c(0,1,0,2,0,-1,1,0,2,0,-1,0),ncol=2,nrow=6,byrow = T)
+
   
-  for (dt in 1:length(time_step)){ #for each time step
+  for (dt in 1:length(time)){ #for each time step
     
     #calculate all rates in the lattice
     
@@ -504,45 +656,59 @@ Gillespie_tau_leaping_R=function(landscape,time_step,param){
     #global densities
     rho_1 = length(which((landscape == 1)))   / length(landscape) #fraction stress_tol
     rho_2 = length(which((landscape == 2)))   / length(landscape) #fraction competitive
-    rho_f = length(which((landscape == 0)))   / length(landscape) #fraction fertile
-    rho_d = 1-rho_1-rho_2-rho_f # fraction degraded
+    rho_0 = length(which((landscape == 0)))   / length(landscape) #fraction fertile
+    rho_d = 1-rho_1-rho_2-rho_0 # fraction degraded
     
     # calculate the rates
-    colonization_1 = beta*(delta * rho_1 + (1 - delta) * neigh_1 / z) * (emax* ( 1 - S * (1-e)) - (cintra*rho_1+cinter1*rho_2) ) 
-    colonization_2 = beta*(delta * rho_2 + (1 - delta) * neigh_2 / z) * (emax* ( 1 - S ) - (cintra*rho_2+cinter2*rho_1) ) 
-    regeneration = (r + f * neigh_1 / z)*dt
-    
+    Rate_landscape[,,1] = beta*(delta * rho_1 + (1 - delta) * neigh_1 / z) * (emax* ( 1 - S * (1-e)) - (cintra*rho_1+cinter1*rho_2) ) 
+    Rate_landscape[,,2] = beta*(delta * rho_2 + (1 - delta) * neigh_2 / z) * (emax* ( 1 - S ) - (cintra*rho_2+cinter2*rho_1) ) 
+    Rate_landscape[,,3] = d
+    Rate_landscape[,,4] = m
+    Rate_landscape[,,5] = m
+    Rate_landscape[,,6] = (r + f * neigh_1 / z)
     
     #calculate their propensity (i.e. sum of type of events)
-    Propensity = c(sum(colonization_1[which(landscape==0)]), #colonization stress tol
-                   sum(colonization_2[which(landscape==0)]), #colonization competitive
-                   sum(death[which(landscape==1)]),          #death stress_tol
-                   sum(death[which(landscape==2)]),          #death competitive
-                   sum(regeneration[which(landscape==-1)]),  #regeneration
-                   sum(degradation[which(landscape==0)])     #degradation
+    Propensity = c(sum(Rate_landscape[,,1][which(landscape==0)]), #colonization stress tol
+                   sum(Rate_landscape[,,2][which(landscape==0)]), #colonization competitive
+                   sum(Rate_landscape[,,3][which(landscape==0)]), #degradation
+                   sum(Rate_landscape[,,4][which(landscape==1)]), #death stress_tol
+                   sum(Rate_landscape[,,5][which(landscape==2)]), #death competitive
+                   sum(Rate_landscape[,,6][which(landscape==-1)]) #regeneration
     )
     
     nb_events=sapply(1:length(Propensity),function(x){
       rpois(1,lambda = Propensity[x]*leap)
     }) #number of events per event type
     
-    type_cell=c(0,0,1,2,-1,0);change=c(1,2,0,0,0,-1)
     
     for (ev in 1:length(nb_events)){ #for each type of events
-      landscape[sample( which(landscape==type_cell[ev]),nb_events[ev],replace = T)] = change[ev]
+      
+      patches=which(landscape==rules_change[ev,1])
+      
+      if (nb_events[ev] != 0 & length(patches) >= nb_events[ev]){
+        
+        if (length(Rate_landscape[,,ev][patches])==1){
+          proba_sample=rep(Rate_landscape[,,ev][patches],length(patches))
+        } else {
+          proba_sample=Rate_landscape[,,ev][patches]
+        }
+        
+        landscape[sample( patches,
+                          #in prob we account that mortality is constant thus, we repeat the same proba to give to sample
+                          prob = ,
+                          nb_events[ev],replace = T)] = rules_change[ev,2]
+      }
+      
     }
     
     
-    d=rbind(d,tibble(  rho_1 = length(which((landscape == 1)))   / length(landscape), #fraction stress_tol
+    d2=rbind(d2,tibble(  rho_1 = length(which((landscape == 1)))   / length(landscape), #fraction stress_tol
                        rho_2 = length(which((landscape == 2)))   / length(landscape), #fraction competitive
-                       rho_f = length(which((landscape == 0)))   / length(landscape), #fraction fertile
-                       rho_d = 1-rho_1-rho_2-rho_f # fraction degraded
+                       rho_0 = length(which((landscape == 0)))   / length(landscape), #fraction fertile
+                       rho_d = 1-rho_1-rho_2-rho_0 # fraction degraded
     ))
   }
 
-  return(list(state=d,landscape=landscape))
+  return(list(state=d2,landscape=landscape))
 
 }
-
-
-
