@@ -1,4 +1,6 @@
-x = c("tidyverse", "ggpubr", "latex2exp", "deSolve", "reshape2", "JuliaCall", "diffeqr", "simecol", "tseries", "phaseR", "ggquiver", "scales","boot")
+x = c("tidyverse", "ggpubr", "latex2exp", "deSolve", "reshape2", 
+      "JuliaCall", "diffeqr", "simecol", "tseries","phaseR",
+      "ggquiver", "scales","boot","spatialwarnings")
 lapply(x, require, character.only = TRUE)
 
 
@@ -17,6 +19,9 @@ color_rho = c("coexistence" = "#D8CC7B", "competitive" = "#ACD87B", "desert" = "
 #creating folders
 dir.create("../",showWarnings = F)
 dir.create("../Table",showWarnings = F)
+dir.create("../Table/2_species",showWarnings = F)
+dir.create("../Table/2_species/PL_summary",showWarnings = F)
+dir.create("../Table/2_species/EWS_spatial",showWarnings = F)
 dir.create("../Figures",showWarnings = F)
 dir.create("../Figures/2_species",showWarnings = F)
 dir.create("../Figures/2_species/CA",showWarnings = F)

@@ -1,4 +1,4 @@
-# Other) Recruitment rate ----
+# Other) Recruitment rate & 4 grid matrices----
 rm(list = ls())
 library(tidyverse)
 d = expand_grid(emax = 1, e = .5, S = seq(0, 1, length.out = 200), psi = c(0, .5, 1))
@@ -1342,8 +1342,8 @@ d_PL_lambda_sp=d_PL%>%
   summarise(.groups = "keep",Alpha_expo=mean(Alpha_expo))
 
 p3=ggplot(NULL)+
-  geom_line(data=d_PL_lambda_sp,aes(x=Stress,Alpha_expo,color=Species),lwd=.9)+
-  geom_point(data=d_PL,aes(x=Stress,Alpha_expo,color=Species),size=.5,alpha=.3)+
+  geom_line(data=d_PL_lambda_sp,aes(x=Stress,-Alpha_expo,color=Species),lwd=.9)+
+  geom_point(data=d_PL,aes(x=Stress,-Alpha_expo,color=Species),size=.5,alpha=.3)+
   the_theme+labs(x="Stress (S)",  y = TeX(r'(PL exponent \ \  $\lambda)'),color="")+
   facet_wrap(.~a21,labeller = as_labeller(appender, default = label_parsed))+
   scale_color_manual(values=color_sp,
@@ -1367,8 +1367,8 @@ d_PL2=transform(d_PL,
                                                               "frac(alpha[0,1],alpha[1,0]) : 4")),
                 Species=factor(Species,levels=c("+","1","2"),labels=c("psi[0] + psi[1]","psi[1]","psi[0]")))
 p4=ggplot(NULL)+
-  geom_line(data=d_PL_lambda_class,aes(x=Stress,Alpha_expo,color=Class,group=interaction(Class,Species,a21)),lwd=.9)+
-  geom_point(data=d_PL2%>%mutate(., a21=as.character(a21)),aes(x=Stress,Alpha_expo,color=Class),alpha=.3,size=.5)+
+  geom_line(data=d_PL_lambda_class,aes(x=Stress,-Alpha_expo,color=Class,group=interaction(Class,Species,a21)),lwd=.9)+
+  geom_point(data=d_PL2%>%mutate(., a21=as.character(a21)),aes(x=Stress,-Alpha_expo,color=Class),alpha=.3,size=.5)+
   the_theme+labs(x="Stress (S)", y = TeX(r'(PL exponent \ \  $\lambda)'),color="")+
   facet_grid(Species~a21,labeller=label_parsed)+
   scale_color_manual(values=color_class_PL,
@@ -1443,7 +1443,141 @@ ggsave("../Figures/2_species/CA/Species_dynamics_CA_inter=intra.pdf",p,width = 7
 
 
 #
-# Step 4) Testing EWS on dynamics ----
+# Step 4) Testing EWS on spatial dynamics ----
+rm(list = ls())
+source("./2_Species_analysis_functions.R")
+
+# Here we test the spatial EWS on the whole dynamics. We used the previous simulations of the PL exponent
+# For each replicate, we compute the slope of variance, skewness and near-neighbor correlation (Moran I) along stress gradient
+
+
+mapping(100,100)
+S_seq = seq(0, 0.8, length.out=30)
+n_save = 25
+relativ_comp = c("1.0", "2.5", "4.0")
+
+
+Spatial_EWS=tibble()
+for (scena in c(1)){
+  
+  for (n in 1:n_save){
+
+    for (rela_c in relativ_comp){
+      
+      for (sp in c(1,2,"+")){
+        all_landscape=list()
+        u=1
+        for (stress in S_seq){
+          
+          
+          stress=round(stress, 2)
+          
+          if (stress == 0){
+            stress="0.0"
+          }
+          if (stress == 1){
+            stress="1.0"
+          }
+          
+          #get landscape
+          landscape=as.matrix(read.table(paste0("../Table/2_species/Patch_size/Big_sim/Landscape_l_S_",stress,
+                                                "_a21_", rela_c,"_nsave_", n , ".csv"),sep=","))
+          
+          if (sp=="+"){
+            landscape[landscape %in% c(1,2)]=1
+            landscape[landscape<1]=0
+            landscape=landscape>0
+          } else {
+            landscape[landscape != as.numeric(sp)]=0
+            landscape[landscape == as.numeric(sp)]=1
+            landscape=landscape>0
+          }
+          
+          all_landscape[[u]] = landscape # putting all landscapes in a list in order to use spatial warnings patckage
+          
+          u=u+1
+        } #end loop stress
+        
+        # Getting the spatial EWS using spatialwarning package
+        generic_sp=as_tibble(as.data.frame(generic_sews(all_landscape,subsize = 5,moranI_coarse_grain = T)))%>%
+          mutate(.,matrixn=rep(S_seq,each=4))%>%
+          rename(., Stress=matrixn)%>%
+          add_column(., Rela_comp=as.numeric(rela_c),
+                     replicate=n,Species=sp)
+        
+        fit_spatial_ews=tibble()
+        
+        # Applying linear regression along stress gradient and saving the slope for each measure
+        for (measure in unique(generic_sp$indic)[-4]){ #deleting the mean
+          
+          generic_sp_measure=filter(generic_sp,indic==measure)
+          slope_measure=lm(value~Stress,data=generic_sp_measure)$coefficients[2] #getting the slope
+          
+          fit_spatial_ews=rbind(fit_spatial_ews,tibble(Slope=slope_measure,Metric=measure, #merging data
+                                                       Rela_comp=unique(generic_sp$Rela_comp),Rep=unique(generic_sp$replicate),
+                                                       Species=sp))
+          
+        }
+        
+        Spatial_EWS=rbind(Spatial_EWS,fit_spatial_ews) #merging to the main df
+        
+      }#end species loop
+      
+    } #end loop a12
+  
+  } # end loop replicate
+  
+} #end loop scenarios competition
+
+write.table(Spatial_EWS,"../Table/2_species/Spatial_EWS.csv",sep=";")
+
+
+
+#Analysing data and ploting graphs
+
+Spatial_EWS=read.table("../Table/2_species/Spatial_EWS.csv",sep=";")
+Spatial_EWS=as_tibble(mutate(Spatial_EWS,Metric=recode_factor(Metric,"skewness"="Skewness","moran"="Moran's I","variance"="Variance"),
+                   Species=as.character(Species),
+                   Rela_comp=as.numeric(Rela_comp),
+                   Metric=as.character(Metric)))
+
+Spatial_EWS_replicate=Spatial_EWS%>%
+  group_by(Species,Rela_comp,Metric)%>%
+  summarise(.groups = "keep",Mean_slope=mean(Slope),Sd_slope=sd(Slope))
+
+
+
+color_sp=c("gray70",as.character(color_rho[4]),as.character(color_rho[2]))
+
+p=ggplot(NULL)+
+  geom_jitter(data=Spatial_EWS,aes(x=as.numeric(Rela_comp),y=Slope,color=Species,fill=Species),alpha=.5,width = 0.1,height = 0)+
+  geom_errorbar(data=Spatial_EWS_replicate,aes(x=as.numeric(Rela_comp),y=Mean_slope,
+                                               ymin=Mean_slope-Sd_slope,
+                                               ymax=Mean_slope+Sd_slope,fill=Species), shape=21,width=0,color="black") +
+  geom_point(data=Spatial_EWS_replicate,aes(x=as.numeric(Rela_comp),y=Mean_slope,fill=Species),color="black",shape=21,size=3)+
+  scale_color_manual(values=color_sp,
+                     labels=c("+"=TeX("$\\psi_0 + \\psi_1$"),
+                              "1"=TeX("$\\psi_1$"),
+                              "2"=TeX("$\\psi_{0}$")))+
+  scale_fill_manual(values=color_sp,
+                    labels=c("+"=TeX("$\\psi_0 + \\psi_1$"),
+                             "1"=TeX("$\\psi_1$"),
+                             "2"=TeX("$\\psi_{0}$")))+
+  facet_wrap(.~Metric,scales = "free")+the_theme+
+  labs(y="Slope",x=TeX(r'(Relative competitive ability \ $\frac{\alpha_{0,1}}{\alpha_{1,0}})'))+
+  geom_hline(yintercept = 0,linetype=9,lwd=.1)+
+  scale_x_continuous(breaks = c(1,2.5,4))
+
+ggsave("../Figures/2_species/CA/Spatial_EWS.pdf",width = 8,height = 4)
+
+  
+  
+
+
+
+
+
+# Old) Testing EWS on temporal dynamics ----
 
 rm(list = ls())
 source("./2_Species_analysis_functions.R")
@@ -1452,32 +1586,32 @@ de = diffeq_setup()
 
 
 the_theme = theme_classic() + theme(
-    legend.position = "bottom",
-    strip.background = element_rect(fill = "#CCE8D8"),
-    strip.text.y = element_text(size = 10, angle = -90),
-    strip.text.x = element_text(size = 8), axis.text = element_text(size = 11), axis.title = element_text(size = 13),
-    legend.text = element_text(size = 10), text = element_text(family = "NewCenturySchoolbook")
+  legend.position = "bottom",
+  strip.background = element_rect(fill = "#CCE8D8"),
+  strip.text.y = element_text(size = 10, angle = -90),
+  strip.text.x = element_text(size = 8), axis.text = element_text(size = 11), axis.title = element_text(size = 13),
+  legend.text = element_text(size = 10), text = element_text(family = "NewCenturySchoolbook")
 )
 
 plot_dynamics = function(d) {
-    color_rho = c("fertile" = "#D8CC7B", "competitive" = "#ACD87B", "desert" = "#696969", "stress_tol" = "#7BD8D3")
-
-    if ("time" %in% colnames(d) | "Time" %in% colnames(d)) {
-        return(ggplot(d %>% melt(., id.vars = colnames(d)[ncol(d)]) %>%
-            mutate(., variable = recode_factor(variable, "rho_1" = "stress_tol", "rho_2" = "competitive", "rho_0" = "fertile", "rho_d" = "desert"))) +
-            geom_line(aes(x = time, y = value, color = variable), lwd = 1) +
-            the_theme +
-            scale_color_manual(values = color_rho) +
-            labs(x = "Time", y = "Densities", color = ""))
-    } else {
-        d$time = 1:nrow(d)
-        return(ggplot(d %>% melt(., id.vars = colnames(d)[ncol(d)]) %>%
-            mutate(., variable = recode_factor(variable, "rho_1" = "stress_tol", "rho_2" = "competitive", "rho_0" = "fertile", "rho_d" = "desert"))) +
-            geom_line(aes(x = time, y = value, color = variable), lwd = 1) +
-            the_theme +
-            scale_color_manual(values = color_rho) +
-            labs(x = "Time", y = "Densities", color = ""))
-    }
+  color_rho = c("fertile" = "#D8CC7B", "competitive" = "#ACD87B", "desert" = "#696969", "stress_tol" = "#7BD8D3")
+  
+  if ("time" %in% colnames(d) | "Time" %in% colnames(d)) {
+    return(ggplot(d %>% melt(., id.vars = colnames(d)[ncol(d)]) %>%
+                    mutate(., variable = recode_factor(variable, "rho_1" = "stress_tol", "rho_2" = "competitive", "rho_0" = "fertile", "rho_d" = "desert"))) +
+             geom_line(aes(x = time, y = value, color = variable), lwd = 1) +
+             the_theme +
+             scale_color_manual(values = color_rho) +
+             labs(x = "Time", y = "Densities", color = ""))
+  } else {
+    d$time = 1:nrow(d)
+    return(ggplot(d %>% melt(., id.vars = colnames(d)[ncol(d)]) %>%
+                    mutate(., variable = recode_factor(variable, "rho_1" = "stress_tol", "rho_2" = "competitive", "rho_0" = "fertile", "rho_d" = "desert"))) +
+             geom_line(aes(x = time, y = value, color = variable), lwd = 1) +
+             the_theme +
+             scale_color_manual(values = color_rho) +
+             labs(x = "Time", y = "Densities", color = ""))
+  }
 }
 
 
@@ -1530,49 +1664,54 @@ d2 = tibble()
 
 # pdf("../Figures/2_species/EWS_dynamics.pdf",width = 6,height = 3)
 for (S in C_seq) {
-    d3 = tibble()
-    for (rep in 1:20) {
-        param[11] = S
-        julia_assign("p", param)
-
-        prob = julia_eval("SDEProblem(MF_two_species,Noise_MF_2_species, state, tspan, p)")
-        prob = julia_eval("ODEProblem(MF_two_species, state, tspan, p)")
-        sol = de$solve(prob, de$Tsit5(), saveat = t)
-        d = as.data.frame(t(sapply(sol$u, identity)))
-        colnames(d) = c("rho_1", "rho_2", "rho_d", "rho_0")
-        plot_dynamics(d)
-        d$rho_plus = d$rho_1 + d$rho_2
-
-        d = d[((nrow(d) - 100):nrow(d)), ]
-
-        # print(plot_dynamics(d))
-
-        # getting the variance of species abundances
-        d3 = rbind(d3, tibble(
-            S = S, acf_1 = acf(d$rho_1, lag = 1, pl = F)$acf[2],
-            acf_2 = acf(d$rho_2, lag = 1, pl = F)$acf[2],
-            acf_tot = acf(d$rho_plus, lag = 1, pl = F)$acf[2],
-            var_1 = mean(d$rho_1) / var(d$rho_1),
-            var_2 = mean(d$rho_2) / var(d$rho_2),
-            var_plus = mean(d$rho_plus) / var(d$rho_plus)
-        ))
-    }
-    d2 = rbind(d2, colMeans(d3))
-
-    # Just to check if there is a shift
-    #
-    #   prob = julia_eval("ODEProblem(MF_two_species, state, tspan, p)")
-    #   sol = de$solve(prob,de$Tsit5(),saveat=t)
-    #   d=as.data.frame(t(sapply(sol$u,identity)))
-    #   d$rho_plus=d[,1]+d[,2] # sum species
-    #   colnames(d)=c("rho_1","rho_2","rho_d","rho_0","rho_plus")
-    #   d2=rbind(d2,d[nrow(d),]%>%add_column(S=S))
+  d3 = tibble()
+  for (rep in 1:20) {
+    param[11] = S
+    julia_assign("p", param)
+    
+    prob = julia_eval("SDEProblem(MF_two_species,Noise_MF_2_species, state, tspan, p)")
+    prob = julia_eval("ODEProblem(MF_two_species, state, tspan, p)")
+    sol = de$solve(prob, de$Tsit5(), saveat = t)
+    d = as.data.frame(t(sapply(sol$u, identity)))
+    colnames(d) = c("rho_1", "rho_2", "rho_d", "rho_0")
+    plot_dynamics(d)
+    d$rho_plus = d$rho_1 + d$rho_2
+    
+    d = d[((nrow(d) - 100):nrow(d)), ]
+    
+    # print(plot_dynamics(d))
+    
+    # getting the variance of species abundances
+    d3 = rbind(d3, tibble(
+      S = S, acf_1 = acf(d$rho_1, lag = 1, pl = F)$acf[2],
+      acf_2 = acf(d$rho_2, lag = 1, pl = F)$acf[2],
+      acf_tot = acf(d$rho_plus, lag = 1, pl = F)$acf[2],
+      var_1 = mean(d$rho_1) / var(d$rho_1),
+      var_2 = mean(d$rho_2) / var(d$rho_2),
+      var_plus = mean(d$rho_plus) / var(d$rho_plus)
+    ))
+  }
+  d2 = rbind(d2, colMeans(d3))
+  
+  # Just to check if there is a shift
+  #
+  #   prob = julia_eval("ODEProblem(MF_two_species, state, tspan, p)")
+  #   sol = de$solve(prob,de$Tsit5(),saveat=t)
+  #   d=as.data.frame(t(sapply(sol$u,identity)))
+  #   d$rho_plus=d[,1]+d[,2] # sum species
+  #   colnames(d)=c("rho_1","rho_2","rho_d","rho_0","rho_plus")
+  #   d2=rbind(d2,d[nrow(d),]%>%add_column(S=S))
 }
 dev.off()
 
 ggplot(d2 %>% add_column(., S = C_seq) %>% melt(., id.vars = "S")) +
-    geom_line(aes(x = S, y = value, color = variable)) +
-    theme_classic()
+  geom_line(aes(x = S, y = value, color = variable)) +
+  theme_classic()
+
+
+
+
+
 
 
 

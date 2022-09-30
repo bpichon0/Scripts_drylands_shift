@@ -211,7 +211,7 @@ end
 "Function for faster computing of CA using Gillespie Tau leeping method"
 function Gillespie_tau_leeping(; landscape, param, time)
 
-    d2 = zeros(length(time), 5) #Allocating
+    d2 = zeros(time, 5) #Allocating
     r = param["r"]
     d = param["d"]
     f = param["f"]
@@ -244,32 +244,31 @@ function Gillespie_tau_leeping(; landscape, param, time)
     Rate_landscape = zeros(nb_cell, nb_cell, 6)
 
 
-    for t in time
+    for t in 1:time
 
 
         @rput landscape
         R"neigh_1= simecol::neighbors(x =landscape,state = 1, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
         R"neigh_2= simecol::neighbors(x =landscape,state = 2, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
-        R"neigh_f= simecol::neighbors(x =landscape,state = 0, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
-        R"neigh_d= simecol::neighbors(x =landscape,state = -1, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
 
         @rget neigh_1
         @rget neigh_2
-        @rget neigh_f
-        @rget neigh_d
 
         Rate_landscape[:, :, 1] .= @. beta * (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(emax * (1 - S * (1 - e)) - (cg * (rho_1 + rho_2) + (alpha11 * (neigh_1 / z) + alpha21 * (neigh_2 / z))))
+        Rate_landscape[:, :, 1] .= Rate_landscape[:, :, 1] .* (landscape .== 0)
+
         Rate_landscape[:, :, 2] .= @. beta * (delta * rho_2 + (1 - delta) * neigh_2 / z) * @.(emax * (1 - S) - (cg * (rho_1 + rho_2) + (alpha22 * (neigh_2 / z) + alpha12 * (neigh_1 / z))))
+        Rate_landscape[:, :, 2] .= Rate_landscape[:, :, 2] .* (landscape .== 0)
 
         # calculate regeneration, degradation & mortality rate
-        Rate_landscape[:, :, 3] .= d
-        Rate_landscape[:, :, 4] .= m
-        Rate_landscape[:, :, 5] .= m
-        Rate_landscape[:, :, 6] .= @.(r + f * neigh_1 / z)
+        Rate_landscape[:, :, 3] .= d .* (landscape .== 0)
+        Rate_landscape[:, :, 4] .= m .* (landscape .== 1)
+        Rate_landscape[:, :, 5] .= m .* (landscape .== 2)
+        Rate_landscape[:, :, 6] .= @.(r + f * neigh_1 / z) .* (landscape .== -1)
 
         #calculate propensity
 
-        propensity = [sum(Rate_landscape[:, :, k][findall(landscape .== rules_change[k, 1])]) for k in 1:size(Rate_landscape)[3]]
+        propensity = [sum(Rate_landscape[:, :, k]) for k in 1:size(Rate_landscape)[3]]
 
         nb_events = map(x -> rand(Poisson(x)), propensity * tau_leap)
 
@@ -297,7 +296,7 @@ function Gillespie_tau_leeping(; landscape, param, time)
     end
 
 
-    return landscape, d2
+    return d2, landscape
 
 
 end
@@ -322,7 +321,7 @@ end
 #endregion
 
 #
-#region : Step 1-- Clustering coefficient
+#region : Step 1-- Clustering along competitive gradient
 
 
 
@@ -404,42 +403,7 @@ CSV.write("../Table/2_species/Clustering_species_interspe_compet_gradient.csv", 
 #endregion
 
 #
-#region : Step 2-- Gillespie vs normal
-
-p = Get_classical_param();
-push!(p, 0.5); #tau leap
-size_landscape = 25
-init = Get_initial_lattice(size_mat=size_landscape)
-time = range(1, 5000, step=1)
-
-
-@time for k in 1:10
-    Gillespie_tau_leeping(; landscape=init, param=p, time)
-end
-
-@time land, dynamics = Gillespie_tau_leeping(; landscape=init, param=p, time)
-plot(dynamics[:, 1], dynamics[:, 2], seriescolor=:lightgreen, label="stress_tol")
-plot!(dynamics[:, 1], dynamics[:, 3], seriescolor=:blue, label="competitive")
-plot!(dynamics[:, 1], dynamics[:, 4], seriescolor=:orange, label="fertile")
-plot!(dynamics[:, 1], dynamics[:, 5], seriescolor=:grey, label="degraded")
-
-
-
-@time for k in 1:10
-    Run_CA_2_species(time_sim=time, param=p, landscape=init)
-end
-
-@time d, state = Run_CA_2_species(time_sim=time, param=p, landscape=init)
-plot(d[:, 1], d[:, 2], seriescolor=:lightgreen, label="stress_tol")
-plot!(d[:, 1], d[:, 3], seriescolor=:blue, label="competitive")
-plot!(d[:, 1], d[:, 4], seriescolor=:orange, label="fertile")
-plot!(d[:, 1], d[:, 5], seriescolor=:grey, label="degraded")
-
-
-#endregion
-
-#
-#region : Step 3-- Drivers of species clusters 
+#region : Step 2-- Clustering along stress gradient 
 
 # My intuition is that interspecific clusters of species is observed when (i) stress_tol -> competitive is low but competitive -> stress_tol high
 # Facilitation must be high, stress_tol intraspecific competition is high so that we insure that only competitive can recruit near adult facilitators
@@ -527,6 +491,40 @@ end
 
 
 CSV.write("../Table/2_species/Clustering_species_stress_gradient.csv", Tables.table(d2), writeheader=false)
+
+#endregion
+
+#
+#region : Step 3-- Gillespie vs normal
+
+p = Get_classical_param();
+size_landscape = 25
+init = Get_initial_lattice(size_mat=size_landscape)
+time = range(1, 5000, step=1)
+
+
+@time for k in 1:10
+    Gillespie_tau_leeping(; landscape=init, param=p, time)
+end
+
+@time land, dynamics = Gillespie_tau_leeping(; landscape=init, param=p, time)
+plot(dynamics[:, 1], dynamics[:, 2], seriescolor=:lightgreen, label="stress_tol")
+plot!(dynamics[:, 1], dynamics[:, 3], seriescolor=:blue, label="competitive")
+plot!(dynamics[:, 1], dynamics[:, 4], seriescolor=:orange, label="fertile")
+plot!(dynamics[:, 1], dynamics[:, 5], seriescolor=:grey, label="degraded")
+
+
+
+@time for k in 1:10
+    Run_CA_2_species(time_sim=time, param=p, landscape=init)
+end
+
+@time d, state = Run_CA_2_species(time_sim=time, param=p, landscape=init)
+plot(d[:, 1], d[:, 2], seriescolor=:lightgreen, label="stress_tol")
+plot!(d[:, 1], d[:, 3], seriescolor=:blue, label="competitive")
+plot!(d[:, 1], d[:, 4], seriescolor=:orange, label="fertile")
+plot!(d[:, 1], d[:, 5], seriescolor=:grey, label="degraded")
+
 
 #endregion
 
@@ -655,7 +653,7 @@ end
 #endregion
 
 #
-#region : Step 6-- Testing the parameter to get Patagonian steppe structure
+#region : Step 6-- Patagonian steppe structure
 
 
 function Ca_2_species2(; landscape, param)
@@ -753,23 +751,39 @@ function Run_CA_2_species2(; time_sim, param, landscape)
 
 end
 
-S_seq = collect(range(0, stop=1, length=6))
-param = Get_classical_param()
-param["alpha11"] = 1.5
+#two examples for influence of dispersal range
+param["alpha11"] = 0.3
 param["alpha12"] = 0.01
-param["alpha21"] = 0.01
+param["alpha21"] = 0.2
 param["alpha22"] = 0.01
 param["cg"] = 0.01
-param["S"] = 0.6
+param["S"] = 0.2
 param["tau_leap"] = 0.1
 size_landscape = 100
 ini = Get_initial_lattice(size_mat=size_landscape)
-max_time = 2000
+max_time = 1000
 rep = 3
-state, d = Run_CA_2_species2(time_sim=range(1, max_time, step=1), param=copy(param), landscape=copy(ini))
-Plot_dynamics(d)
+
+#similar dispersal
+state, d = Run_CA_2_species(time_sim=range(1, max_time, step=1), param=copy(param), landscape=copy(ini),
+    save=false, burning=10, name_save="", N_snap=0)
 Plot_landscape(state)
 savefig("../Figures/2_species/CA/Patagonian_type_same_disp.png")
 
+
+#different dispersal
+state, d = Run_CA_2_species2(time_sim=range(1, max_time, step=1), param=copy(param), landscape=copy(ini))
+Plot_landscape(state)
+Plot_dynamics(d)
+savefig("../Figures/2_species/CA/Patagonian_type_different_disp.png")
+
+
+
+@time state, d = Gillespie_tau_leeping(landscape=copy(ini), param=copy(param), time=range(1, max_time, step=1))
+Plot_dynamics(d)
+
+S_seq = collect(range(0, stop=8, length=25))
+a_seq = collect(range(0.1, stop=1.5, length=25))
+param = Get_classical_param()
 
 #endregion
