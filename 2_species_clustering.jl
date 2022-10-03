@@ -18,7 +18,7 @@ function Get_classical_param()
     f = 0.9
     beta = 0.8
     m = 0.1
-    e = 0
+    e = 0.1
     emax = 1.2
     cg = 0.1
     alpha11 = 0.1
@@ -51,9 +51,7 @@ function Get_classical_param()
 end
 
 function Get_initial_lattice(; frac=[0.4, 0.4, 0.1, 0.1], size_mat=25)
-
     ini_vec = sample([1, 2, 0, -1], Weights(frac), size_mat * size_mat)
-
     return reshape(ini_vec, size_mat, size_mat) #reshape by columns
 end
 
@@ -134,7 +132,7 @@ end
 
 function Run_CA_2_species(; time_sim, param, landscape, save, name_save, burning, N_snap)
 
-    d = Array{Float64}(undef, length(time_sim) + 1, 5) #Allocating
+    d = Array{Float64}(undef, time_sim + 1, 5) #Allocating
 
     rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
     rho_2 = length(findall((landscape .== 2))) / length(landscape) #fraction competitive
@@ -144,12 +142,12 @@ function Run_CA_2_species(; time_sim, param, landscape, save, name_save, burning
     d[1, :] = [1 rho_1 rho_2 rho_f rho_d] #the dataframe 
 
     n_save = 1
-    @inbounds for k = Base.OneTo(length(time_sim))
+    @inbounds for k in 1:time_sim
 
         rho_1, rho_2, rho_f, rho_d, landscape = Ca_2_species(landscape=landscape, param=param)
         @views d[k+1, :] = [k + 1 rho_1 rho_2 rho_f rho_d]
 
-        if save && k > burning && k % ((length(time_sim) - burning) / N_snap) == 0
+        if save && k > burning && k % ((time_sim - burning) / N_snap) == 0
             CSV.write(name_save * "_nsave_" * repr(n_save) * ".csv", Tables.table(landscape), writeheader=false)
             n_save += 1
 
@@ -208,6 +206,7 @@ function Spatial_grid(size_landscape)
 end
 
 
+
 "Function for faster computing of CA using Gillespie Tau leeping method"
 function Gillespie_tau_leeping(; landscape, param, time)
 
@@ -230,7 +229,7 @@ function Gillespie_tau_leeping(; landscape, param, time)
     tau_leap = param["tau_leap"]
 
 
-    rules_change = transpose([0 0 0 1 2 -1; 1 2 -1 0 0 0])
+    rules_change = transpose([0 0 1 2 -1 0; 1 2 0 0 0 -1])
 
     #Global densities
     rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
@@ -261,10 +260,10 @@ function Gillespie_tau_leeping(; landscape, param, time)
         Rate_landscape[:, :, 2] .= Rate_landscape[:, :, 2] .* (landscape .== 0)
 
         # calculate regeneration, degradation & mortality rate
-        Rate_landscape[:, :, 3] .= d .* (landscape .== 0)
-        Rate_landscape[:, :, 4] .= m .* (landscape .== 1)
-        Rate_landscape[:, :, 5] .= m .* (landscape .== 2)
-        Rate_landscape[:, :, 6] .= @.(r + f * neigh_1 / z) .* (landscape .== -1)
+        Rate_landscape[:, :, 3] .= m .* (landscape .== 1)
+        Rate_landscape[:, :, 4] .= m .* (landscape .== 2)
+        Rate_landscape[:, :, 5] .= @.(r + f * neigh_1 / z) .* (landscape .== -1)
+        Rate_landscape[:, :, 6] .= d .* (landscape .== 0)
 
         #calculate propensity
 
@@ -278,11 +277,9 @@ function Gillespie_tau_leeping(; landscape, param, time)
             if nb_events[event] != 0 && length(patches) > nb_events[event]
                 landscape[wsample(patches, Rate_landscape[patches, event], nb_events[event])] .= rules_change[event, 2]
             end
-
         end
 
 
-        Rate_landscape = zeros(nb_cell, nb_cell, 6)
 
         rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
         rho_2 = length(findall((landscape .== 2))) / length(landscape) #fraction competitive
@@ -291,6 +288,8 @@ function Gillespie_tau_leeping(; landscape, param, time)
 
 
         @views d2[t, :] = [t rho_1 rho_2 rho_f rho_d]
+        Rate_landscape = zeros(nb_cell, nb_cell, 6)
+
 
 
     end
@@ -300,6 +299,7 @@ function Gillespie_tau_leeping(; landscape, param, time)
 
 
 end
+
 
 
 function Plot_dynamics(d)
@@ -731,7 +731,7 @@ end
 
 function Run_CA_2_species2(; time_sim, param, landscape)
 
-    d = Array{Float64}(undef, length(time_sim) + 1, 5) #Allocating
+    d = Array{Float64}(undef, time_sim + 1, 5) #Allocating
 
     rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
     rho_2 = length(findall((landscape .== 2))) / length(landscape) #fraction competitive
@@ -740,7 +740,7 @@ function Run_CA_2_species2(; time_sim, param, landscape)
 
     d[1, :] = [1 rho_1 rho_2 rho_f rho_d] #the dataframe 
 
-    @inbounds for k = Base.OneTo(length(time_sim))
+    @inbounds for k in 1:time_sim
 
         rho_1, rho_2, rho_f, rho_d, landscape = Ca_2_species2(landscape=landscape, param=param)
         @views d[k+1, :] = [k + 1 rho_1 rho_2 rho_f rho_d]
@@ -752,12 +752,13 @@ function Run_CA_2_species2(; time_sim, param, landscape)
 end
 
 #two examples for influence of dispersal range
+param = Get_classical_param()
 param["alpha11"] = 0.3
 param["alpha12"] = 0.01
 param["alpha21"] = 0.2
 param["alpha22"] = 0.01
 param["cg"] = 0.01
-param["S"] = 0.2
+param["S"] = 0.7
 param["tau_leap"] = 0.1
 size_landscape = 100
 ini = Get_initial_lattice(size_mat=size_landscape)
@@ -765,25 +766,19 @@ max_time = 1000
 rep = 3
 
 #similar dispersal
-state, d = Run_CA_2_species(time_sim=range(1, max_time, step=1), param=copy(param), landscape=copy(ini),
+state, d = Run_CA_2_species(time_sim=max_time, param=copy(param), landscape=copy(ini),
     save=false, burning=10, name_save="", N_snap=0)
 Plot_landscape(state)
 savefig("../Figures/2_species/CA/Patagonian_type_same_disp.png")
 
 
 #different dispersal
-state, d = Run_CA_2_species2(time_sim=range(1, max_time, step=1), param=copy(param), landscape=copy(ini))
+state, d = Run_CA_2_species2(time_sim=max_time, param=copy(param), landscape=copy(ini))
 Plot_landscape(state)
 Plot_dynamics(d)
 savefig("../Figures/2_species/CA/Patagonian_type_different_disp.png")
 
 
 
-@time state, d = Gillespie_tau_leeping(landscape=copy(ini), param=copy(param), time=range(1, max_time, step=1))
-Plot_dynamics(d)
-
-S_seq = collect(range(0, stop=8, length=25))
-a_seq = collect(range(0.1, stop=1.5, length=25))
-param = Get_classical_param()
 
 #endregion
