@@ -1,8 +1,8 @@
 rm(list=ls())
 x <- c(
   "tidyverse", "ggpubr", "latex2exp", "deSolve", "reshape2",
-  "JuliaCall", "diffeqr", "simecol", "tseries", "phaseR",
-  "ggquiver", "scales", "boot", "spatialwarnings"
+  "JuliaCall", "diffeqr", "simecol", "tseries", "phaseR","GGally",
+  "ggquiver", "scales", "boot", "spatialwarnings","simecol","igraph"
 )
 lapply(x, require, character.only = TRUE)
 
@@ -14,9 +14,13 @@ the_theme <- theme_classic() + theme(
   strip.text.x = element_text(size = 8), axis.text = element_text(size = 11), axis.title = element_text(size = 13),
   legend.text = element_text(size = 10), text = element_text(family = "NewCenturySchoolbook")
 )
-color_rho = c("coexistence" = "#D8CC7B", "competitive" = "#ACD87B", "desert" = "#696969", "stress_tol" = "#7BD8D3")
 
+color_rho = c("coexistence" = "#D8CC7B", "competitive" = "#ACD87B", "desert" = "#696969", "stress_tol" = "#7BD8D3")
 color_Nsp=colorRampPalette(c("#077D10",as.character(color_rho[2]),as.character(color_rho[4]),"#2A39EF"))
+set.seed(123)
+Vec_densities_ass=runif(15)
+
+
 
 dir.create("../Table/N_species", showWarnings = F)
 dir.create("../Table/N_species/MF", showWarnings = F)
@@ -24,10 +28,8 @@ dir.create("../Figures/N_species", showWarnings = F)
 dir.create("../Figures/N_species/MF", showWarnings = F)
 
 
-
 # Species niche : area and range
-
-Get_species_niche=function(d,Nsp,traits){
+Get_species_niche = function(d,Nsp,traits){
   
   d_melt=melt(d,measure.vars = paste0("Sp_",1:Nsp))%>%
     mutate(., Trait=rep(traits,each=nrow(d)))
@@ -52,8 +54,7 @@ Get_species_niche=function(d,Nsp,traits){
 }
 
 # Number of abrupt shifts
-
-Get_number_shifts=function(d,tresh,traits){
+Get_number_shifts = function(d,tresh,traits){
   
   d_melt=melt(d,measure.vars = paste0("Sp_",1:Nsp))%>%
     mutate(., Trait=rep(traits,each=nrow(d)))
@@ -80,13 +81,8 @@ Get_number_shifts=function(d,tresh,traits){
   return(d_shift)
 }
 
-set.seed(123)
-Vec_densities_ass=runif(15)
-
-
 # Hysteresis per species
-
-Compute_hysteresis = function(d, Nsp = 15,tresh=0.01) {
+Compute_hysteresis = function(d, Nsp = 15,tresh=0.01){
   
   d_hysteresis = tibble()
   
@@ -125,6 +121,56 @@ Compute_hysteresis = function(d, Nsp = 15,tresh=0.01) {
   return(d_hysteresis)
 }
 
+# Plot landscape
+Plot_landscape = function(landscape,Nsp=15){
+  color_CA = color_Nsp(Nsp)
+  
+  ggplot(melt(landscape)) +
+    geom_tile(aes(x = Var1, y = Var2, fill = value)) +
+    theme_transparent() +
+    scale_fill_gradientn(colours = color_CA) +
+    theme(panel.border = element_blank()) +
+    theme(legend.position = "bottom") +
+    labs(fill = "")
+}
 
+# Create co-occurrence matrix from z-scores and plot the co-occurrence network
 
+Co_occurrence_matrix = function(df,traits){
+  color_CA = color_Nsp(length(traits))
+  color_edge=c("red","blue")
+    
+  d=df %>%
+    pivot_wider(names_from = c("Var1"), values_from = value)%>%
+    select(., -Var2)%>%
+    replace(is.na(.), 0) #Get adjacency matrix
+    
+  d=d[-1,-1] #Removing fertile patches
+  
+  d[d > -1.96 & d < 1.96]=0;d[d < -1.96]=-1;d[d > 1.96] = 1  
+  
+  #  colnames(d)=round(as.numeric(traits[as.numeric(gsub("Sp_",replacement = "",x=colnames(d)))]),4)
+  
+  #getting colors for igraph plot = 
+  inter=as.numeric(as.matrix(d))
+  inter=inter[inter!=0] 
+  inter[inter==1] = 2
+  inter[inter==-1] = 1
+  
+  #vertex colors
+  d_col=data.frame(Sp=1:length(traits),Traits=traits)
+  d_col=d_col[order(d_col$Traits),]
+  color_CA=color_CA[d_col$Sp]
+  
+  graph_d=graph_from_adjacency_matrix(as.matrix(d),weighted = T)
+  
+  V(graph_d)$color=color_CA
+  V(graph_d)$label=""
+  E(graph_d)$color=color_edge[inter]
+  E(graph_d)$arrow.size=0
+  E(graph_d)$width=2
+  
+  
+  return(graph_d)    
+}
 

@@ -235,6 +235,8 @@ for (com_compo in c("20.0","50.0","80.0")){
         mutate(., V20=recode_factor(V20,"1"="Low_intra","2"="Intra=inter"))
       colnames(d_Nsp)=c(paste0("Sp_",1:Nsp),"Fertile","Degraded","Stress","Rela_c","Scena","Nrep")  
       
+      d_Nsp[,1:Nsp][d_Nsp[,1:Nsp]<10^{-5}]=0
+      
       for (stress in unique(d_Nsp$Stress)){
         d_stress=filter(d_Nsp,Stress==stress)
         
@@ -244,9 +246,13 @@ for (com_compo in c("20.0","50.0","80.0")){
         })
         
         Mean_trait=sapply(1:nrow(d_stress),function(x){ 
-          return(sum(as.numeric(d_stress[x,1:15] * trait_sp ))/sum(as.numeric(d_stress[x,1:15]))) #mean trait of the community
+          if (round(sum(as.numeric(d_stress[x,1:15]),3))==0){
+            return(NA)
+            
+          }else { return(sum(as.numeric(d_stress[x,1:15] * trait_sp ))/sum(as.numeric(d_stress[x,1:15])))} #mean trait of the community
         })
         
+        #Sum of densities
         Global_vege=sapply(1:nrow(d_stress),function(x){ 
           return(sum(d_stress[x,1:15]))
         })
@@ -300,3 +306,110 @@ for (com_compo in c("20.0","50.0","80.0")){
   ggsave(paste0("../Figures/N_species/MF/ASS_&_CSI_frac_facilitator_",com_compo,"_colored_mean_trait.pdf"),p_tot,width = 8,height = 8)
   
 }
+
+# Step 1bis : Role of facilitation ----
+
+d_facil=read.table("../Table/N_species/MF/Role_facilitation/Role_facilitation_dynamics.csv",sep=",")
+trait=read.table("../Table/N_species/MF/Role_facilitation/Role_facilitation_traits.csv",sep=",")$V1
+colnames(d_facil)=c(paste0("Sp_",1:15),"Fertile","Degraded","Stress","Facilitation","ID_scena")
+
+p=ggplot(melt(d_facil,measure.vars = c(paste0("Sp_",1:15)))%>%
+           mutate(., Trait_sp=rep(trait,each=nrow(d_facil))))+
+  geom_line(aes(x=Stress,value,color=Trait_sp,group=variable))+
+  facet_wrap(.~Facilitation,scales = "free")+
+  the_theme+
+  labs(x="Stress (S)",y="Densities",color=TeX("$\\psi_i$"))+
+  scale_color_gradientn(colours = color_Nsp(15))
+ggsave("../Figures/N_species/MF/Role_facilitation.pdf",p,width = 12,height = 5)
+
+
+# Step 2 : Building co-occurrence networks ----
+## 1) Get association sign between species ----
+
+Nsp=15
+S_seq=c("0.0","0.25","0.5","0.75")
+
+d_score=d_score_noself=d_cor_trait=d_landscape=tibble()
+
+for (stress in S_seq){
+  
+  #Get final state
+  final_state=read.table(paste0("../Table/N_species/CA/Final_state_IBM_S_",stress,".csv"),sep=",")
+  d_landscape=rbind(d_landscape,melt(as.matrix(final_state))%>%add_column(Stress=as.numeric(stress)))
+  
+  #Get z_scores
+  Z_score_test=read.table(paste0("../Table/N_species/CA/Z_score_IBM_occurrence_S_",stress,".csv"),sep=",")
+  colnames(Z_score_test)=rownames(Z_score_test) = c("No vege",paste0("Sp_",1:15))
+  d_score=rbind(d_score,melt(as.matrix(Z_score_test))%>%add_column(Stress=as.numeric(stress)))
+
+  for (i in 1:nrow(Z_score_test)) Z_score_test[i,i]=0
+
+  d_score_noself=rbind(d_score_noself,melt(as.matrix(Z_score_test))%>%add_column(Stress=as.numeric(stress)))
+  
+  #Get the traits
+  trait_sp=read.table(paste0("../Table/N_species/CA/IBM_traits_sp_S_",stress,".csv"),sep=",")$V1
+
+  if (which(S_seq==stress)==1){l <-layout_nicely(Co_occurrence_matrix(df=melt(as.matrix(Z_score_test)),traits=trait_sp))} #we fix the layout
+  
+  pdf(paste0("../Figures/N_species/CA/Co_occurrences/Co_occurrence_network_",which(S_seq==stress),".pdf"),width = 10,height = 7)
+  plot(Co_occurrence_matrix(df=melt(as.matrix(Z_score_test)),traits=trait_sp),layout=l)
+  dev.off()
+  
+  
+  Z_score_vege=Z_score_test[-1,-1]
+  for (i in 1:(nrow(Z_score_vege)-1)){
+    for (j in (i+1):nrow(Z_score_vege)){
+      d_cor_trait=rbind(d_cor_trait,tibble(Z_score=Z_score_vege[][i,j],Trait_1=trait_sp[i],
+                                           Trait_2=trait_sp[j],Delta_trait=abs(trait_sp[j]-trait_sp[i]),
+                                           Stress=as.numeric(stress),Sp1=i,Sp2=j))
+    }
+  }
+}
+
+color_CA = color_Nsp(Nsp)
+d_landscape$value[d_landscape$value %in% c(0,-1)]=NA #puting NA for fertile patches so that they are colored in specific color
+d_landscape$value=unlist(sapply(1:nrow(d_landscape),function(x){
+  if (!is.na(d_landscape$value[x])){return(as.numeric(trait_sp[d_landscape$value[x]]))
+  } else {
+    return(NA)
+  }
+  
+}))
+
+p0=ggplot(d_landscape%>%mutate())+geom_tile(aes(x = Var1, y = Var2, fill = value)) +
+  theme_transparent() +
+  scale_fill_gradientn(colours = color_CA,na.value = "white") +
+  theme(panel.border = element_blank()) +
+  theme(legend.position = "bottom") +
+  labs(fill = TeX("$\\psi_i$"))+
+  facet_grid(.~Stress,labeller = label_both)
+ggsave("../Figures/N_species/CA/Landscape.pdf",p0,width = 10,height = 3)
+
+
+
+p1=ggplot(d_score)+geom_tile(aes(x=Var1,Var2,fill=value),color="gray30")+theme_classic()+
+  scale_fill_gradient2(low="red",mid="white",high="blue")+labs(fill="Z-score",x="",y="")+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  facet_grid(.~Stress,labeller = label_both)
+ggsave("../Figures/N_species/CA/Z_score_occurrence.pdf",p1,width = 10,height = 3)
+
+
+p2=ggplot(d_score_noself)+geom_tile(aes(x=Var1,Var2,fill=value),color="gray30")+theme_classic()+
+  scale_fill_gradient2(low="red",mid="white",high="blue")+labs(fill="Z-score",x="",y="")+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  facet_grid(.~Stress,labeller = label_both)
+ggsave("../Figures/N_species/CA/Z_score_occurrence_no_self_occurrence.pdf",p2,width = 10,height = 3)
+
+
+d_cor_trait$Association="Random"
+d_cor_trait$Association[which(d_cor_trait$Z_score < -1.96)]="Negative"
+d_cor_trait$Association[which(d_cor_trait$Z_score > 1.96)]="Positive"
+
+p=ggplot(d_cor_trait)+geom_point(aes(x=Delta_trait,y=Z_score,color=Association),shape=19,size=2,alpha=.4)+
+  theme_classic()+geom_hline(yintercept = c(-1.96,1.96),linetype=9)+
+  scale_color_manual(values=c("Random"="black","Positive"="blue","Negative"="red"))+
+  labs(x=TeX("$|\\psi_i - \\psi_j|$"),y="Z-score")+
+  facet_grid(.~Stress,labeller = label_both)
+ggsave("../Figures/N_species/CA/Correlation_Z_score_traits.pdf",p,width = 10,height = 3)
+
+

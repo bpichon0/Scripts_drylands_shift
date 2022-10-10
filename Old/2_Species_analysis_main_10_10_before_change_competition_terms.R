@@ -28,7 +28,81 @@ de = diffeq_setup()
 
 
 
-## 1) State diagram with competitive ability and stress for different type of competition ----
+## 1) No difference of competition, influence of tolerance ----
+
+
+param = c(r = 0.05, d = 0.1, f = 0.9, beta = 0.8, m = 0.1, e = 0.1, emax = 1.2, c = 0.3, S = 0)
+state = c(rho_1 = 0.4, rho_2 = 0.4, rho_d = 0.1, rho_0 = 0.1)
+tspan = c(0, 10000)
+t = seq(0, 10000, by = 1)
+julia_library("DifferentialEquations")
+julia_assign("state", state)
+julia_assign("p", param)
+julia_assign("tspan", tspan)
+
+MF_two_species_julia = julia_eval("
+function MF_two_species(du,u,p,t)
+  r,d,f,beta,m,e,emax,c,S=p
+  rho_1,rho_2,rho_d,rho_0=u
+
+  du[1] = rho_0 * ( beta * rho_1 *  (emax *( 1 -S*(1-e)) - c*(rho_2 + rho_1))) - rho_1 * m
+  du[2] = rho_0 * ( beta * rho_2 *  (emax *( 1 -S) - c*(rho_2 + rho_1))) - rho_2 * m
+  du[3] = d*rho_0 - rho_d*(r+f*(rho_1))
+  du[4] = -d*rho_0 + rho_d*(r+f*(rho_1))-rho_0 * ( beta * rho_1 *  (emax *( 1 -S*(1-e)) - c*(rho_2 + rho_1)))  -
+      rho_0 * ( beta * rho_2 *  (emax *( 1 -S) - c*(rho_2 + rho_1))) + rho_2 * m + rho_1 * m
+
+
+end")
+
+
+
+
+d2 = tibble()
+S_seq = seq(0, 1, length.out = 100)
+for (S in S_seq) {
+  for (e in c(.1, .4)) {
+    param[9] = S
+    param[6] = e
+    julia_assign("p", param)
+    prob = julia_eval("ODEProblem(MF_two_species, state, tspan, p)")
+    sol = de$solve(prob, de$Tsit5(), saveat = t)
+    d = as.data.frame(t(sapply(sol$u, identity)))
+    d2 = rbind(d2, d[nrow(d), ] %>% add_column(e = e, S = S))
+  }
+}
+colnames(d2) = c("rho_1", "rho_2", "rho_d", "rho_0", "e", "S")
+d2$rho_plus = d2$rho_1 + d2$rho_2
+
+p1 = ggplot(d2 %>% melt(., id.vars = c("S", "e"))) +
+  geom_point(aes(x = S, y = value, color = as.factor(variable), group = variable), size = 1) +
+  theme_classic() +
+  theme(legend.position = "bottom") +
+  labs(x = "Stress", y = "Density") +
+  scale_color_manual(
+    name = "", values = color_rho,
+    labels = c(TeX("$\\rho_1$"), TeX("$\\rho_2$"), TeX("$\\rho_d$"), TeX("$\\rho_0$"), TeX("$\\rho_+$"))
+  ) +
+  facet_wrap(. ~ e, labeller = label_both) +
+  theme(legend.text = element_text(size = 14))
+
+ggsave("../Figures/2_species/MF/Bifu_kefi_2_species_no_compet.pdf", p1, width = 7, height = 4)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## 2) State diagram with competitive ability and stress for different type of competition ----
 
 # We now try to replicate Danet figure with abiotic stress in x-axis and differential competitive ability in y-axis
 
@@ -39,92 +113,40 @@ de = diffeq_setup()
 # preparing the 3 types of simulations
 
 
+state =Get_MF_initial_state()
 tspan = c(0, 4000)
 t = seq(0, 4000, by = 1)
 julia_library("DifferentialEquations")
+julia_assign("state", state)
 julia_assign("tspan", tspan)
 
-#First we need to get the values of stress were competitive species is wiped out the system without stress-tolerant one.
-#This will help to measure the niche expansion of species.
 
-# 1) Competitive species alone
+for_sim = tibble(
+  scena = c("inter=0", "low_inter", "inter=intra", "intra=0"),
+  cinter2 = c(0, .05, .1, .15),
+  cintra = c(.25, .2, .1, 0)
+)[-1,]
 
-state =c(0,.8,.1,.1)
-julia_assign("state", state)
 
-param=Get_MF_parameters()    
-d2 = tibble()
-S_seq = seq(0, 1, length.out = 100)
-
-for (S in S_seq) {
+for (i in 1:nrow(for_sim)) {
   
-  param["S"] = S
-  julia_assign("p", param)
+  param = c(
+    r = 0.05, d = 0.1, f = 0.9, beta = 0.8, m = 0.1, e = .1, emax = 1.2, cintra = for_sim$cintra[i],
+    cinter1 = for_sim$cinter2[i], cinter2 = for_sim$cinter2[i], S = 0
+  )
   
-  prob = julia_eval("ODEProblem(MF_two_species, state, tspan, p)")
-  sol = de$solve(prob, de$Tsit5(), saveat = t)
-  d = as.data.frame(t(sapply(sol$u, identity)))
-  colnames(d) = c("rho_1", "rho_2", "rho_d", "rho_0")
+  # d2=read.table(paste0("../Table/2_species/2_species_",for_sim$scena[i],".csv"),sep=";")
   
-  d2 = rbind(d2, d[nrow(d), ] %>% add_column(S = S))
-}
-d2[d2 < 10^-3] = 0
-colnames(d2) = c("rho_1", "rho_2", "rho_d", "rho_0", "S")
-
-S_critic2=d2$S[min(which(d2$rho_2==0))]
   
-
-# 2) Stress-tolerant species alone
-
-state =c(0.8,0,.1,.1)
-julia_assign("state", state)
-
-param=Get_MF_parameters()    
-d2 = tibble()
-S_seq = seq(0, 1, length.out = 100)
-
-for (S in S_seq) {
-  
-  param["S"] = S
-  julia_assign("p", param)
-  
-  prob = julia_eval("ODEProblem(MF_two_species, state, tspan, p)")
-  sol = de$solve(prob, de$Tsit5(), saveat = t)
-  d = as.data.frame(t(sapply(sol$u, identity)))
-  colnames(d) = c("rho_1", "rho_2", "rho_d", "rho_0")
-  
-  d2 = rbind(d2, d[nrow(d), ] %>% add_column(S = S))
-}
-d2[d2 < 10^-3] = 0
-colnames(d2) = c("rho_1", "rho_2", "rho_d", "rho_0", "S")
-
-S_critic1=d2$S[min(which(d2$rho_1==0))]
-
-
-
-
-# 3) Simulation with stress-tolerant one
-state =Get_MF_initial_state()
-julia_assign("state", state)
-
-for (scena in c( "main")){
-  
-
-  param=Get_MF_parameters()    
-  # d2=read.table(paste0("../Table/2_species/2_species_",scena,".csv"),sep=";")
   d2 = tibble()
   S_seq = seq(0, 1, length.out = 100)
-  c_seq = seq(0,.5, length.out = 100)
-  
-  if (scena=="main"){
-    param["cintra"] =  max(c_seq)
-    
-  }
+  c_seq = seq(param["cinter1"], 4 * param["cinter1"], length.out = 100)
   for (S in S_seq) {
-    for (comp in c_seq) {
+    
+    for (c1 in c_seq) {
       
       param["S"] = S
-      param["alpha_0"] = comp
+      param["cinter1"] = c1
       julia_assign("p", param)
       
       prob = julia_eval("ODEProblem(MF_two_species, state, tspan, p)")
@@ -132,22 +154,22 @@ for (scena in c( "main")){
       d = as.data.frame(t(sapply(sol$u, identity)))
       colnames(d) = c("rho_1", "rho_2", "rho_d", "rho_0")
       
-      d2 = rbind(d2, d[nrow(d), ] %>% add_column(S = S, alpha_0 = comp))
+      d2 = rbind(d2, d[nrow(d), ] %>% add_column(S = S, cinter1 = c1))
     }
   }
   d2[d2 < 10^-3] = 0
-  colnames(d2) = c("rho_1", "rho_2", "rho_d", "rho_0", "S", "alpha_0")
+  colnames(d2) = c("rho_1", "rho_2", "rho_d", "rho_0", "S", "cinter1")
   d2$rho_plus = d2$rho_1 + d2$rho_2
   
   
-  Post_processing_MF(d2, scena, C_seq = c_seq,S_critic1=S_critic1,S_critic2=S_critic2)
+  Post_processing_MF(d2, for_sim$scena[i], C_seq = c_seq)
 }
 
 
 
 
 
-## 2) Hysteresis size as a function of competition coefficient ----
+## 3) Hysteresis size as a function of competition coefficient ----
 
 
 Run_dynamics_hysteresis(plot = T, N_seq_c = 3, N_seq_S = 300)
@@ -195,7 +217,66 @@ ggsave("../Figures/2_species/MF/Evolution_hysteresis_competition.pdf", p_tot, wi
 
 
 
-## 3) Net effects between species ----
+## 4) Interplay between facilitation & competition  ----
+
+# interplay between facilitation and competition on the coexistence and type of transition
+# For that, we use 3 values of stress for which we do heat maps of the density of species.
+
+state = c(rho_1 = 0.4, rho_2 = 0.4, rho_d = 0.1, rho_0 = 0.1)
+tspan = c(0, 5000)
+t = seq(0, 5000, by = 1)
+julia_library("DifferentialEquations")
+julia_assign("state", state)
+julia_assign("p", param)
+julia_assign("tspan", tspan)
+
+param = c(r = 0.05, d = 0.1, f = 0.9, beta = 0.8, m = 0.1, e = .1, emax = 1.2, cintra = .1, cinter1 = .1, cinter2 = .1, S = 0)
+
+c_seq = seq(param["cinter1"], 4 * param["cinter1"], length.out = 30)
+f_seq = seq(0, 1.5, length.out = 30)
+S_seq = c(0, .25, .5, .75)
+d2 = tibble()
+
+for (S in S_seq) {
+  for (f in f_seq) {
+    for (c1 in c_seq) {
+      param[3] = f
+      param[9] = c1
+      param[11] = S
+      julia_assign("p", param)
+      prob = julia_eval("ODEProblem(MF_two_species, state, tspan, p)")
+      sol = de$solve(prob, de$Tsit5(), saveat = t)
+      d = as.data.frame(t(sapply(sol$u, identity)))
+      colnames(d) = c("rho_1", "rho_2", "rho_d", "rho_0")
+      d2 = rbind(d2, d[nrow(d), ] %>% add_column(facil = f, cinter1 = c1, S = S))
+    }
+  }
+}
+d2[d2 < 10^-3] = 0
+d2$rho_plus = d2$rho_1 + d2$rho_2
+
+
+density_col = colorRampPalette(c("red", "white", "blue"))
+
+p = ggplot(d2) +
+  geom_tile(aes(x = facil, y = cinter1 / param["cinter2"], fill = rho_plus)) +
+  theme_classic() +
+  labs(x = "Facilitation strength (f)", y = "Relative competition strength", fill = TeX("$\\rho_{+}$")) +
+  scale_fill_gradientn(colours = density_col(100)) +
+  facet_wrap(. ~ S)
+
+ggsave("../Figures/2_species/MF/Interplay_facilitation_competition.pdf", width = 7, height = 6)
+
+
+
+
+
+
+
+
+
+
+## 5) Net effects between species ----
 
 # we want to calculate the net effect between both species. We evaluate that by increasing slightly the recruitment rate of 1 at eq
 
@@ -207,117 +288,195 @@ julia_assign("state", state)
 julia_assign("tspan", tspan)
 
 
-
-length_seq = 300;epsilon=10^(-5)
+length_seq = 500;epsilon=10^(-5)
 S_seq = seq(0, 1, length.out = length_seq)
 
-for (func_MF in c("normal","SGH")[1]){
-
-  d2 = d3 = tibble()
-  param=Get_MF_parameters()  
-  param=c(param[1:3],"beta1"=.8,"beta2"=.8,param[5:9])
-  
-  c_seq = seq(0, .25, length.out = length_seq)  #we constrain the competition coefficient explored to allow species to coexist.
-  param["cintra"]=.5
-  
-  C_for_analyse = c_seq[c(1,round((3/4)*length(c_seq)),length(c_seq))]
-  
-  for (comp in C_for_analyse) {
-    for (S in S_seq) {
-      for (sp in 1:2) { #for both species
-        
-        param["S"] = S
-        param["alpha_0"] = comp # update parameters
-        julia_assign("p", param)
-        
-        
-        # first without press perturbation
-        
-        
-        if (func_MF=="normal"){
-          prob = julia_eval("ODEProblem(MF_two_species_press, state, tspan, p)")
-        } else {
-          prob = julia_eval("ODEProblem(MF_two_species_SGH_press, state, tspan, p)")
+for (func_MF in c("normal","SGH")){
+  for (scena in c("low_inter")){
+    
+    d2 = d3 = tibble()
+    
+    if (scena == "low_inter"){
+      param = c(
+        r = 0.05, d = 0.1, f = 0.9, beta1 = 0.8, beta2 = .8, m = 0.1, e = .1, emax = 1.2, cintra = .2,
+        cinter1 = .05, cinter2 = .05, S = 0
+      )
+    } else {
+      param = c(
+        r = 0.05, d = 0.1, f = 0.9, beta1 = 0.8, beta2 = .8, m = 0.1, e = .1, emax = 1.2, cintra = .1,
+        cinter1 = .1, cinter2 = .1, S = 0
+      )
+    }
+    
+    c_seq = seq(param["cinter1"], 5 * param["cinter1"], length.out = length_seq)
+    C_for_analyse = c_seq[c(1,round((3/4)*length(c_seq)),length(c_seq))]
+    
+    for (c1 in C_for_analyse) {
+      for (S in S_seq) {
+        for (sp in 1:2) { #for both species
+          
+          param["S"] = S
+          param["cinter1"] = c1 # update parameters
+          
+          # first without press
+          
+          julia_assign("p", param)
+          if (func_MF=="normal"){
+            prob = julia_eval("ODEProblem(MF_two_species_press, state, tspan, p)")
+          } else {
+            prob = julia_eval("ODEProblem(MF_two_species_SGH_press, state, tspan, p)")
+          }
+          sol = de$solve(prob, de$Tsit5(), saveat = t)
+          d = as.data.frame(t(sapply(sol$u, identity)))
+          mean_densities=as_tibble(t(get_mean_densities(d)))[,c(1,2)[-sp]]
+          colnames(mean_densities)="Densities"
+          d2 = rbind(d2, mean_densities %>% add_column(S = S, cinter1 = c1, Type = "control",Species=c(1,2)[sp])) 
+          d3 = rbind(d3, as_tibble(d[nrow(d),]) %>% add_column(S = S, cinter1 = c1))
+          
+          # with press
+          
+          param[paste0("beta",sp)] = param[paste0("beta",sp)] + epsilon # press
+          julia_assign("p", param)
+          if (func_MF=="SGH"){
+            prob = julia_eval("ODEProblem(MF_two_species_press, state, tspan, p)")
+          } else {
+            prob = julia_eval("ODEProblem(MF_two_species_SGH_press, state, tspan, p)")
+          }
+          sol = de$solve(prob, de$Tsit5(), saveat = t)
+          d = as.data.frame(t(sapply(sol$u, identity)))
+          mean_densities=as_tibble(t(get_mean_densities(d)))[,c(1,2)[-sp]]
+          colnames(mean_densities)="Densities"
+          d2 = rbind(d2, mean_densities %>% add_column(S = S, cinter1 = c1, Type = "press",Species=c(1,2)[sp]))
+          
+          param[paste0("beta",sp)] = .8
         }
-        sol = de$solve(prob, de$Tsit5(), saveat = t)
-        d = as.data.frame(t(sapply(sol$u, identity)))
-        mean_densities=as_tibble(t(get_mean_densities(d)))[,c(1,2)[-sp]]
-        colnames(mean_densities)="Densities"
-        d2 = rbind(d2, mean_densities %>% add_column(S = S, alpha_0 = comp, Type = "control",Species=c(1,2)[sp])) 
-        d3 = rbind(d3, as_tibble(d[nrow(d),]) %>% add_column(S = S, alpha_0 = comp))
-        
-        
-        
-        # with press perturbation on growth rate
-        
-        param[paste0("beta",sp)] = param[paste0("beta",sp)] + epsilon # press
-        julia_assign("p", param)
-        
-        
-        if (func_MF=="normal"){
-          prob = julia_eval("ODEProblem(MF_two_species_press, state, tspan, p)")
-        } else {
-          prob = julia_eval("ODEProblem(MF_two_species_SGH_press, state, tspan, p)")
-        }
-        
-        
-        sol = de$solve(prob, de$Tsit5(), saveat = t)
-        d = as.data.frame(t(sapply(sol$u, identity)))
-        mean_densities=as_tibble(t(get_mean_densities(d)))[,c(1,2)[-sp]]
-        colnames(mean_densities)="Densities"
-        d2 = rbind(d2, mean_densities %>% add_column(S = S, alpha_0 = comp, Type = "press",Species=c(1,2)[sp]))
-        
-        param[paste0("beta",sp)] = .8
       }
     }
-  }
-  
-  d2[d2 < epsilon] = 0
-  colnames(d2) = c("eq", "S", "alpha_0", "Type","Species")
-  
-  
-  net_effect =sapply(1:length(seq(1, nrow(d2) , by = 2)),function(x){
-    i=seq(1, nrow(d2) , by = 2)[x]
-    return((d2$eq[i+1] - d2$eq[i]) / epsilon)
-  })
-  
-  d_net=d2%>%
-    filter(., Type=="control")%>%
-    select(.,-Type)
-  d_net$value=net_effect
-  
-  #for latex format in facet
-  appender <- function(string) {
-    TeX(paste("$\\alpha_0 = $", string))  
-  }
-  
-  p=ggplot(d_net %>%
-             mutate(., alpha_0=as.factor(round(alpha_0,2)))) +
-    geom_line(aes(x = S, y = value, color = as.factor(Species)),lwd=1,alpha=.5) +
-    the_theme+scale_color_manual(values=c("blue","green"),labels=c("1"= "Stess_tol","2"="Competitive"))+
-    geom_hline(yintercept = 0,linetype=9)+
-    facet_wrap(.~alpha_0)+
-    labs(x="Stress (S)",alpha=TeX('$\\alpha_0$'),color="Species",y=TeX(r'(Net effect \ \ $\frac{\partial \rho_{\psi_i}}{\partial b_j}$)'))+
-    theme(panel.grid = element_blank())+ theme(strip.text.x = element_blank(),strip.background = element_blank())
-  
-  
-  
-  colnames(d3)=c("rho_1","rho_2","rho_d","rho_0","S","alpha_0")
-  
-  p2=ggplot(d3%>%select(., -rho_d,-rho_0)%>%
-              melt(., id.vars=c("S","alpha_0"))%>%
-              mutate(., alpha_0=as.factor(round(alpha_0,2))))+
     
-    geom_line(aes(x=S,y=value,color=as.factor(variable),alpha=alpha_0),lwd=1,alpha=.5)+
-    the_theme+scale_color_manual(values=c("blue","green"),labels=c("rho_1"= "Stess_tol","rho_2"="Competitive"))+
-    facet_wrap(.~alpha_0,labeller = as_labeller(appender, default = label_parsed))+
-    labs(x="Stress (S)",alpha=TeX('$\\alpha_0$'),color="Species",y="Densities")
+    d2[d2 < epsilon] = 0
+    colnames(d2) = c("eq", "S", "cinter1", "Type","Species")
+    
+    
+    net_effect =sapply(1:length(seq(1, nrow(d2) , by = 2)),function(x){
+      i=seq(1, nrow(d2) , by = 2)[x]
+      return((d2$eq[i+1] - d2$eq[i]) / epsilon)
+    })
+    
+    d_net=d2%>%
+      filter(., Type=="control")%>%
+      select(.,-Type)
+    d_net$value=net_effect
+    
+    #for latex format in facet
+    appender <- function(string) {
+      TeX(paste("$\\frac{c_{0,1}}{c_{1,0}} = $", string))  
+    }
+    
+    p=ggplot(d_net %>%
+               mutate(., cinter1=as.factor(round(cinter1/param["cinter2"],2)))) +
+      geom_line(aes(x = S, y = value, color = as.factor(Species)),lwd=1,alpha=.5) +
+      the_theme+scale_color_manual(values=c("blue","green"),labels=c("1"= "Stess_tol","2"="Competitive"))+
+      geom_hline(yintercept = 0,linetype=9)+
+      facet_wrap(.~cinter1)+
+      labs(x="Stress (S)",alpha=TeX('$c_{2,1} / c_{1,2}$'),color="Species",y=TeX(r'(Net effect \ \ $\frac{\partial \rho_{\psi_i}}{\partial b_j}$)'))+
+      theme(panel.grid = element_blank())+ theme(strip.text.x = element_blank(),strip.background = element_blank())
+    
+    
+    
+    colnames(d3)=c("rho_1","rho_2","rho_d","rho_0","S","cinter1")
+    
+    p2=ggplot(d3%>%select(., -rho_d,-rho_0)%>%
+                melt(., id.vars=c("S","cinter1"))%>%
+                mutate(., cinter1=as.factor(round(cinter1/param["cinter2"],2))))+
+      
+      geom_line(aes(x=S,y=value,color=as.factor(variable),alpha=cinter1),lwd=1,alpha=.5)+
+      the_theme+scale_color_manual(values=c("blue","green"),labels=c("rho_1"= "Stess_tol","rho_2"="Competitive"))+
+      facet_wrap(.~cinter1,labeller = as_labeller(appender, default = label_parsed))+
+      labs(x="Stress (S)",alpha=TeX('$c_{2,1}/c_{1,2}$'),color="Species",y="Densities")
+    
+    
+    p_tot=ggarrange(p2,p,common.legend = T,legend = "bottom",nrow=2,align = "v")
+    ggsave(paste0("../Figures/2_species/MF/Net_effects_",scena,"_",func_MF,".pdf"),p_tot,width = 8,height = 5)
+  }
+}
+
+
+## 6) Comparing recruitment rate along stress S ----
+
+
+
+state =Get_MF_initial_state()
+tspan = c(0, 10000)
+t = seq(0, 10000, by = 1)
+julia_library("DifferentialEquations")
+julia_assign("state", state)
+julia_assign("tspan", tspan)
+
+
+for_sim = tibble(
+  scena = c("low_inter", "inter=intra", "intra=0"),
+  cinter2 = c(.05, .1, .15),
+  cintra = c(.2, .1, 0)
+)
+
+d2 = tibble()
+
+for (i in 1:nrow(for_sim)) {
+  
+  param = c(
+    r = 0.05, d = 0.1, f = 0.9, beta = 0.8, m = 0.1, e = .1, emax = 1.2, cintra = for_sim$cintra[i],
+    cinter1 = for_sim$cinter2[i], cinter2 = for_sim$cinter2[i], S = 0
+  )
   
   
-  p_tot=ggarrange(p2,p,common.legend = T,legend = "bottom",nrow=2,align = "v")
-  ggsave(paste0("../Figures/2_species/MF/Net_effects_","main","_",func_MF,".pdf"),p_tot,width = 8,height = 5)
+  S_seq = seq(0, 1, length.out = 100)
+  c_seq = seq(param["cinter1"], 4 * param["cinter1"], length.out = 3)
+  for (S in S_seq) {
+    
+    for (c1 in c_seq) {
+      
+      param["S"] = S
+      param["cinter1"] = c1
+      julia_assign("p", param)
+      
+      prob = julia_eval("ODEProblem(MF_two_species, state, tspan, p)")
+      sol = de$solve(prob, de$Tsit5(), saveat = t)
+      d = as.data.frame(t(sapply(sol$u, identity)))
+      colnames(d) = c("rho_1", "rho_2", "rho_d", "rho_0")
+      recruit_rate=Get_recruitment_rates(d[nrow(d), ],param)
+      d2 = rbind(d2, as_tibble(t(recruit_rate)) %>% add_column(Scenario=for_sim$scena[i],S = S, cinter1 = round(c1/param["cinter2"],4),rho_1=d[nrow(d), 1],rho_2=d[nrow(d), 2]))
+    }
+  }
+  d2[d2 < 10^-3] = 0
+  colnames(d2) = c("r1","r2","Scenario", "S", "cinter1","rho_1","rho_2")
   
 }
+
+p=ggplot(d2 %>% 
+           melt(.,measure.vars=c("rho_1","rho_2","r1","r2"))%>%
+           mutate(type_data=sapply(1:nrow(.),function(x){
+             if (.$variable[x] %in% c("rho_1","rho_2")){
+               return("Density")
+             } else {
+               return("Recruitment_rate")
+             }
+           }))%>%
+           mutate(species=sapply(1:nrow(.),function(x){
+             if (.$variable[x] %in% c("rho_1","r1")){
+               return("Stress_tol")
+             } else {
+               return("Competitive")
+             }
+           }))%>%
+           
+           mutate(.,variable=recode_factor(variable,"rho_1"="stress_tol","rho_2"="competitive")))+
+  geom_line(aes(x=S,y=value,color=variable),lwd=1)+labs(x="Stress (S)",y="Density/Growth rate",color="")+
+  the_theme+  theme(legend.text = element_text(size=12))+
+  facet_grid(Scenario~cinter1)+
+  scale_color_manual(values=c(color_rho[c(2,4)],"r1"="#EA7474",'r2'="#8E63AB"))
+
+ggsave("../Figures/2_species/MF/Relative_recruitment_rate.pdf",p,width = 7,height = 5)
+#at eq drho/dt = 0 ...
 
 
 # Step 2) Pair approximation (PA) ----
@@ -330,139 +489,164 @@ de = diffeq_setup()
 ## 1) Exploration along competitive ability ----
 
 
-# As we can get oscillations, function to get the mean densities
+
+
+# As I get oscillations, function to get the mean densities
+param=Get_PA_parameters()
+state=Get_PA_initial_state()
 
 tspan = c(0, 6000)
 t = seq(0, 6000, by = 1)
 julia_library("DifferentialEquations")
+julia_assign("state", state)
+julia_assign("p", param)
 julia_assign("tspan", tspan)
 
 
-for (scena in c("global_comp","local_comp")){
-  
-  
-  
-  #setting intraspecific competition to .5 (maximal competition strength explored)
-  param=Get_PA_parameters(type_comp = gsub("_comp","",scena))
-  param["cintra"]=.5
-  param["r"]=.05
-  param["d"]=.1
-  
-  N_rep = 100
-  S_seq = seq(0, 1, length.out = N_rep)
-  alpha_seq = seq(0, .5, length.out = N_rep)
 
+param["alpha11"]=param["alpha22"]=.2
+param["alpha21"]=param["alpha12"]=.05
+
+
+
+
+N_rep = 50
+d2 = tibble()
+S_seq = seq(0, 1, length.out = N_rep)
+alpha_seq = seq(param["alpha12"], 4 * param["alpha12"], length.out = N_rep)
+for (S in S_seq) {
   
-  
-  
-  #first species alone for the fundamental niche of species 
-  # 1) Competitive species alone
-  
-  state=Get_PA_initial_state(c(0,.8,.1))
-  julia_assign("state", state)
-  d2 = tibble()
-  
-  for (S in S_seq) {
+  for (alpha21 in alpha_seq) {
     
     param["S"] = S
-
-    if (scena=="global_comp"){
-      julia_assign("p", param)
-      prob = julia_eval("ODEProblem(PA_two_species_global_comp, state, tspan, p)")
-    }else{
-      param["cg"]=0
-      julia_assign("p", param)
-      prob = julia_eval("ODEProblem(PA_two_species_local_comp, state, tspan, p)")
-      
-    }
-    sol = de$solve(prob, de$Tsit5(), saveat = t)
-    d = as.data.frame(t(sapply(sol$u, identity)))
-    colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
-    
-    d2 = rbind(d2, d[nrow(d), ] %>% add_column(S = S))
-  }
-  d2[d2 < 10^-3] = 0
-
-  S_critic2=d2$S[min(which(d2$rho_2==0))]
-  
-  
-  # 2) Stress-tolerant species alone
-  
-  state=Get_PA_initial_state(c(0.8,0,.1))
-  julia_assign("state", state)
-  
-  d2 = tibble()
-  S_seq = seq(0, 1, length.out = 100)
-  
-  for (S in S_seq) {
-    
-    param["S"] = S
+    param["alpha21"] = alpha21
     julia_assign("p", param)
     
-    if (scena=="global_comp"){
-      julia_assign("p", param)
-      prob = julia_eval("ODEProblem(PA_two_species_global_comp, state, tspan, p)")
-    }else{
-      param["cg"]=0
-      julia_assign("p", param)
-      prob = julia_eval("ODEProblem(PA_two_species_local_comp, state, tspan, p)")
-      
-    }
+    prob = julia_eval("ODEProblem(PA_two_species, state, tspan, p)")
     sol = de$solve(prob, de$Tsit5(), saveat = t)
     d = as.data.frame(t(sapply(sol$u, identity)))
+    
     colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
     
-    d2 = rbind(d2, d[nrow(d), ] %>% add_column(S = S))
+    d2 = rbind(d2, as_tibble(t(get_mean_densities(d))) %>% add_column(S = S, alpha21 = alpha21))
   }
-  d2[d2 < 10^-3] = 0
+}
+d2[d2 < 10^-4] = 0
+colnames(d2) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm", "S", "alpha21")
+d2$rho_plus = d2$rho_1 + d2$rho_2
 
-  S_critic1=d2$S[min(which(d2$rho_1==0))]
+# postprocessing
+post_processing_2species_PA(d2, alpha_seq, S_seq)
+
+
+
+
+
+## 2) Testing the influence of global and local competition ----
+
+param=Get_PA_parameters()
+state=Get_PA_initial_state()
+tspan = c(0, 6000)
+t = seq(0, 6000, by = 1)
+julia_library("DifferentialEquations")
+julia_assign("state", state)
+julia_assign("tspan", tspan)
+
+scenarios_sim=tibble(name=c("high_global","only_local","local=global"),
+                     cglobal=c(.2,0,.1),
+                     alpha_intra=c(0.01,0.1,.05),
+                     alpha_inter=c(0.01,.1,.05))
+
+N_rep=50
+S_seq=seq(0,1,length.out=N_rep)
+
+for (nsim in 1:nrow(scenarios_sim)){
   
-  
-  #main loop with coexisting species
   d2 = tibble()
-  
-  state=Get_PA_initial_state()
-  julia_assign("state", state)
+  param["cg"]=scenarios_sim$cglobal[nsim]
+  param["alpha11"]=param["alpha22"]=scenarios_sim$alpha_intra[nsim]
+  param["alpha21"]=param["alpha12"]=scenarios_sim$alpha_inter[nsim]
+  alpha_seq = seq(param["alpha12"], 4 * param["alpha12"], length.out = N_rep)
   
   for (S in S_seq) {
     
-    for (alpha0 in alpha_seq) {
+    for (alpha21 in alpha_seq) {
       
       param["S"] = S
-      param["alpha_0"] = alpha0
+      param["alpha21"] = alpha21
+      
       julia_assign("p", param)
-      
-      if (scena=="global_comp"){
-        julia_assign("p", param)
-        prob = julia_eval("ODEProblem(PA_two_species_global_comp, state, tspan, p)")
-      }else{
-        param["cg"]=0
-        julia_assign("p", param)
-        prob = julia_eval("ODEProblem(PA_two_species_local_comp, state, tspan, p)")
-        
-      }
-      
+      prob = julia_eval("ODEProblem(PA_two_species, state, tspan, p)")
       sol = de$solve(prob, de$Tsit5(), saveat = t)
       d = as.data.frame(t(sapply(sol$u, identity)))
-      
       colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
       
-      d2 = rbind(d2, as_tibble(t(get_mean_densities(d))) %>% add_column(S = S, alpha_0 = alpha0))
+      d2 = rbind(d2, as_tibble(t(get_mean_densities(d))) %>% add_column(S = S, alpha21 = alpha21,scenario=scenarios_sim$name[nsim]))
     }
   }
   d2[d2 < 10^-4] = 0
-  colnames(d2) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm", "S", "alpha_0")
-  d2$rho_plus = d2$rho_1 + d2$rho_2
+  colnames(d2) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm", "S", "alpha21","scenario")
   
-  # postprocessing
-  post_processing_2species_PA(d2, alpha_seq, S_seq,file_name = scena,S_critic1,S_critic2)
+  assign(paste0("p_tot_",nsim),post_processing_2species_PA(d2, alpha_seq, S_seq)+ggtitle(scenarios_sim$name[nsim]))
 }
 
 
+p_final=ggarrange(p_tot_1,p_tot_2,p_tot_3,nrow=3,common.legend = T,legend = "bottom")
+ggsave("../Figures/2_species/PA/PA_scenarios_global_local.pdf",p_final,width = 14,height = 18)
+
+## 3) Influence of the strength of competition (local + global) ----
 
 
-## 2) Net effects of species ----
+param=Get_PA_parameters()
+state=Get_PA_initial_state()
+tspan = c(0, 4000)
+t = seq(0, 4000, by = 1)
+julia_library("DifferentialEquations")
+julia_assign("state", state)
+julia_assign("tspan", tspan)
+
+scenarios_sim=tibble(name=c("high","medium","normal"),
+                     cglobal=c(.3,0.2,.1),
+                     alpha_intra=c(0.3,0.2,.1),
+                     alpha_inter=c(0.3,.2,.1))
+
+N_rep=50
+S_seq=seq(0,1,length.out=N_rep)
+
+for (nsim in 1:nrow(scenarios_sim)){
+  d2 = tibble()
+  param["cg"]=scenarios_sim$cglobal[nsim]
+  param["alpha11"]=param["alpha22"]=scenarios_sim$alpha_intra[nsim]
+  param["alpha21"]=param["alpha12"]=scenarios_sim$alpha_inter[nsim]
+  alpha_seq = seq(param["alpha12"], 4 * param["alpha12"], length.out = N_rep)
+  
+  for (S in S_seq) {
+    
+    for (alpha21 in alpha_seq) {
+      
+      param["S"] = S
+      param["alpha21"] = alpha21
+      
+      julia_assign("p", param)
+      prob = julia_eval("ODEProblem(PA_two_species, state, tspan, p)")
+      sol = de$solve(prob, de$Tsit5(), saveat = t)
+      d = as.data.frame(t(sapply(sol$u, identity)))
+      colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
+      
+      d2 = rbind(d2, as_tibble(t(get_mean_densities(d))) %>% add_column(S = S, alpha21 = alpha21,scenario=scenarios_sim$name[nsim]))
+    }
+  }
+  d2[d2 < 10^-6] = 0
+  colnames(d2) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm", "S", "alpha21","scenario")
+  
+  assign(paste0("p_tot_",nsim),post_processing_2species_PA(d2, alpha_seq, S_seq)+ggtitle(scenarios_sim$name[nsim]))
+}
+
+p_final=ggarrange(p_tot_1,p_tot_2,p_tot_3,nrow=3,common.legend = T,legend = "bottom")
+ggsave("../Figures/2_species/PA/PA_strength_competition.pdf",p_final,width = 14,height = 18)
+
+
+## 4) Net effects of species ----
 
 param=Get_PA_parameters()
 state=Get_PA_initial_state()

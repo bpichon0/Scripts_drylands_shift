@@ -21,14 +21,12 @@ function Get_classical_param()
     e = 0.1
     emax = 1.2
     cg = 0.1
-    alpha11 = 0.1
-    alpha12 = 0.1
-    alpha21 = 0.1
-    alpha22 = 0.1
+    alpha_0 = 0.1
+    cintra = 0.1
     S = 0
     delta = 0.1
     z = 4
-    tau_leap = 0.05
+    tau_leap = 1
 
     return Dict{String,Any}(
         "r" => r,
@@ -37,12 +35,9 @@ function Get_classical_param()
         "beta" => beta,
         "m" => m,
         "e" => e,
-        "emax" => emax,
         "cg" => cg,
-        "alpha11" => alpha11,
-        "alpha12" => alpha12,
-        "alpha21" => alpha21,
-        "alpha22" => alpha22,
+        "alpha_0" => alpha_0,
+        "cintra" => cintra,
         "S" => S,
         "delta" => delta,
         "z" => z,
@@ -55,109 +50,6 @@ function Get_initial_lattice(; frac=[0.4, 0.4, 0.1, 0.1], size_mat=25)
     return reshape(ini_vec, size_mat, size_mat) #reshape by columns
 end
 
-
-function Ca_2_species(; landscape, param)
-
-
-    rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
-    rho_2 = length(findall((landscape .== 2))) / length(landscape) #fraction competitive
-    rho_f = length(findall((landscape .== 0))) / length(landscape) #fraction fertile
-    rho_d = 1 - rho_1 - rho_2 - rho_f # fraction degraded
-
-
-    # Neighbors :
-
-    #using simcol package from R 
-    @rput landscape
-    R"neigh_1= simecol::neighbors(x =landscape,state = 1, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
-    R"neigh_2= simecol::neighbors(x =landscape,state = 2, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
-    R"neigh_f= simecol::neighbors(x =landscape,state = 0, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
-    R"neigh_d= simecol::neighbors(x =landscape,state = -1, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
-
-    @rget neigh_1
-    @rget neigh_2
-    @rget neigh_f
-    @rget neigh_d
-
-    r = param["r"]
-    d = param["d"]
-    f = param["f"]
-    beta = param["beta"]
-    m = param["m"]
-    e = param["e"]
-    emax = param["emax"]
-    cg = param["cg"]
-    alpha11 = param["alpha11"]
-    alpha12 = param["alpha12"]
-    alpha21 = param["alpha21"]
-    alpha22 = param["alpha22"]
-    S = param["S"]
-    delta = param["delta"]
-    z = param["z"]
-
-
-    colonization1 = @. beta * (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(emax * (1 - S * (1 - e)) - (cg * (rho_1 + rho_2) + (alpha11 * (neigh_1 / z) + alpha21 * (neigh_2 / z))))
-    colonization2 = @. beta * (delta * rho_2 + (1 - delta) * neigh_2 / z) * @.(emax * (1 - S) - (cg * (rho_1 + rho_2) + (alpha22 * (neigh_2 / z) + alpha12 * (neigh_1 / z))))
-
-    # calculate regeneration, degradation & mortality rate
-    death = m
-    regeneration = @.(r + f * neigh_1 / z)
-    degradation = d
-
-    # Apply rules
-    rnum = reshape(rand(length(landscape)), Int64(sqrt(length(landscape))), Int64(sqrt(length(landscape))))# one random number between 0 and 1 for each cell
-    landscape_update = copy(landscape)
-
-    ## New vegetation
-    landscape_update[findall((landscape .== 0) .& (rnum .<= colonization1))] .= 1
-    landscape_update[findall((landscape .== 0) .& (rnum .> colonization1) .& (rnum .<= colonization1 .+ colonization2))] .= 2
-
-    ## New fertile
-    landscape_update[findall((landscape .== 1) .& (rnum .<= death))] .= 0
-    landscape_update[findall((landscape .== 2) .& (rnum .<= death))] .= 0
-    landscape_update[findall((landscape .== -1) .& (rnum .<= regeneration))] .= 0
-
-    ## New degraded 
-    landscape_update[findall((landscape .== 0) .& (rnum .> colonization1 .+ colonization2) .& (rnum .<= (colonization1 .+ colonization2 .+ degradation)))] .= -1
-
-    rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
-    rho_2 = length(findall((landscape .== 2))) / length(landscape) #fraction competitive
-    rho_f = length(findall((landscape .== 0))) / length(landscape) #fraction fertile
-    rho_d = 1 - rho_1 - rho_2 - rho_f # fraction degraded
-
-    return rho_1, rho_2, rho_f, rho_d, landscape_update
-
-end
-
-
-function Run_CA_2_species(; time_sim, param, landscape, save, name_save, burning, N_snap)
-
-    d = Array{Float64}(undef, time_sim + 1, 5) #Allocating
-
-    rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
-    rho_2 = length(findall((landscape .== 2))) / length(landscape) #fraction competitive
-    rho_f = length(findall((landscape .== 0))) / length(landscape) #fraction fertile
-    rho_d = 1 - rho_1 - rho_2 - rho_f # fraction degraded
-
-    d[1, :] = [1 rho_1 rho_2 rho_f rho_d] #the dataframe 
-
-    n_save = 1
-    @inbounds for k in 1:time_sim
-
-        rho_1, rho_2, rho_f, rho_d, landscape = Ca_2_species(landscape=landscape, param=param)
-        @views d[k+1, :] = [k + 1 rho_1 rho_2 rho_f rho_d]
-
-        if save && k > burning && k % ((time_sim - burning) / N_snap) == 0
-            CSV.write(name_save * "_nsave_" * repr(n_save) * ".csv", Tables.table(landscape), writeheader=false)
-            n_save += 1
-
-        end
-    end
-
-
-    return landscape, d
-
-end
 
 
 
@@ -208,7 +100,7 @@ end
 
 
 "Function for faster computing of CA using Gillespie Tau leeping method"
-function Gillespie_tau_leeping(; landscape, param, time)
+function Gillespie_tau_leeping(; landscape, param, time, type_competition, save=false, burning=1500, N_snap=25)
 
     d2 = zeros(time, 5) #Allocating
     r = param["r"]
@@ -217,12 +109,9 @@ function Gillespie_tau_leeping(; landscape, param, time)
     beta = param["beta"]
     m = param["m"]
     e = param["e"]
-    emax = param["emax"]
     cg = param["cg"]
-    alpha11 = param["alpha11"]
-    alpha12 = param["alpha12"]
-    alpha21 = param["alpha21"]
-    alpha22 = param["alpha22"]
+    cintra = param["cintra"]
+    alpha_0 = param["alpha_0"]
     S = param["S"]
     delta = param["delta"]
     z = param["z"]
@@ -243,65 +132,222 @@ function Gillespie_tau_leeping(; landscape, param, time)
     Rate_landscape = zeros(nb_cell, nb_cell, 6)
 
 
-    for t in 1:time
+    if type_competition == "global" #competition occurs globally
+
+        for t in 1:time
 
 
-        @rput landscape
-        R"neigh_1= simecol::neighbors(x =landscape,state = 1, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
-        R"neigh_2= simecol::neighbors(x =landscape,state = 2, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
+            @rput landscape
+            R"neigh_1= simecol::neighbors(x =landscape,state = 1, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
+            R"neigh_2= simecol::neighbors(x =landscape,state = 2, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
 
-        @rget neigh_1
-        @rget neigh_2
+            @rget neigh_1
+            @rget neigh_2
 
-        Rate_landscape[:, :, 1] .= @. beta * (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(emax * (1 - S * (1 - e)) - (cg * (rho_1 + rho_2) + (alpha11 * (neigh_1 / z) + alpha21 * (neigh_2 / z))))
-        Rate_landscape[:, :, 1] .= Rate_landscape[:, :, 1] .* (landscape .== 0)
+            Rate_landscape[:, :, 1] .= @. (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(beta * (1 - S * (1 - e)) - ((cintra * (neigh_1 / z) + alpha_0 * (1 + exp(-1)) * (neigh_2 / z))))
+            Rate_landscape[:, :, 1] .= Rate_landscape[:, :, 1] .* (landscape .== 0)
 
-        Rate_landscape[:, :, 2] .= @. beta * (delta * rho_2 + (1 - delta) * neigh_2 / z) * @.(emax * (1 - S) - (cg * (rho_1 + rho_2) + (alpha22 * (neigh_2 / z) + alpha12 * (neigh_1 / z))))
-        Rate_landscape[:, :, 2] .= Rate_landscape[:, :, 2] .* (landscape .== 0)
+            Rate_landscape[:, :, 2] .= @. (delta * rho_2 + (1 - delta) * neigh_2 / z) * @.(beta * (1 - S) - ((cintra * (neigh_2 / z) + alpha_0 * (neigh_1 / z))))
+            Rate_landscape[:, :, 2] .= Rate_landscape[:, :, 2] .* (landscape .== 0)
 
-        # calculate regeneration, degradation & mortality rate
-        Rate_landscape[:, :, 3] .= m .* (landscape .== 1)
-        Rate_landscape[:, :, 4] .= m .* (landscape .== 2)
-        Rate_landscape[:, :, 5] .= @.(r + f * neigh_1 / z) .* (landscape .== -1)
-        Rate_landscape[:, :, 6] .= d .* (landscape .== 0)
+            # calculate regeneration, degradation & mortality rate
+            Rate_landscape[:, :, 3] .= m .* (landscape .== 1)
+            Rate_landscape[:, :, 4] .= m .* (landscape .== 2)
+            Rate_landscape[:, :, 5] .= @.(r + f * neigh_1 / z) .* (landscape .== -1)
+            Rate_landscape[:, :, 6] .= d .* (landscape .== 0)
 
-        #calculate propensity
+            #calculate propensity
 
-        propensity = [sum(Rate_landscape[:, :, k]) for k in 1:size(Rate_landscape)[3]]
+            propensity = [sum(Rate_landscape[:, :, k]) for k in 1:size(Rate_landscape)[3]]
 
-        nb_events = map(x -> rand(Poisson(x)), propensity * tau_leap)
+            nb_events = map(x -> rand(Poisson(x)), propensity * tau_leap)
 
-        for event in 1:length(nb_events) #for each type of events
-            patches = findall(landscape .== rules_change[event, 1])
+            for event in 1:length(nb_events) #for each type of events
+                patches = findall(landscape .== rules_change[event, 1])
 
-            if nb_events[event] != 0 && length(patches) > nb_events[event]
-                landscape[wsample(patches, Rate_landscape[patches, event], nb_events[event])] .= rules_change[event, 2]
+                if nb_events[event] != 0 && length(patches) > nb_events[event]
+                    landscape[wsample(patches, Rate_landscape[patches, event], nb_events[event])] .= rules_change[event, 2]
+                end
             end
+
+            rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
+            rho_2 = length(findall((landscape .== 2))) / length(landscape) #fraction competitive
+            rho_f = length(findall((landscape .== 0))) / length(landscape) #fraction fertile
+            rho_d = 1 - rho_1 - rho_2 - rho_f # fraction degraded
+
+            @views d2[t, :] = [t rho_1 rho_2 rho_f rho_d]
+            Rate_landscape = zeros(nb_cell, nb_cell, 6)
+
+            if save && t > burning && t % ((time - burning) / N_snap) == 0
+                CSV.write(name_save * "_nsave_" * repr(n_save) * ".csv", Tables.table(landscape), writeheader=false)
+                n_save += 1
+            end
+
+
         end
 
 
-
-        rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
-        rho_2 = length(findall((landscape .== 2))) / length(landscape) #fraction competitive
-        rho_f = length(findall((landscape .== 0))) / length(landscape) #fraction fertile
-        rho_d = 1 - rho_1 - rho_2 - rho_f # fraction degraded
+    else #competition occurs locally
 
 
-        @views d2[t, :] = [t rho_1 rho_2 rho_f rho_d]
-        Rate_landscape = zeros(nb_cell, nb_cell, 6)
+        for t in 1:time
+
+            @rput landscape
+            R"neigh_1= simecol::neighbors(x =landscape,state = 1, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
+            R"neigh_2= simecol::neighbors(x =landscape,state = 2, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
+
+            @rget neigh_1
+            @rget neigh_2
+
+            Rate_landscape[:, :, 1] .= @. (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(beta * (1 - S * (1 - e)) - (cg * (rho_1 + rho_2) + (cintra * (neigh_1 / z) + alpha_0 * (1 + exp(-1)) * (neigh_2 / z))))
+            Rate_landscape[:, :, 1] .= Rate_landscape[:, :, 1] .* (landscape .== 0)
+
+            Rate_landscape[:, :, 2] .= @. (delta * rho_2 + (1 - delta) * neigh_2 / z) * @.(beta * (1 - S) - (cg * (rho_1 + rho_2) + (cintra * (neigh_2 / z) + alpha_0 * (neigh_1 / z))))
+            Rate_landscape[:, :, 2] .= Rate_landscape[:, :, 2] .* (landscape .== 0)
+
+            # calculate regeneration, degradation & mortality rate
+            Rate_landscape[:, :, 3] .= m .* (landscape .== 1)
+            Rate_landscape[:, :, 4] .= m .* (landscape .== 2)
+            Rate_landscape[:, :, 5] .= @.(r + f * neigh_1 / z) .* (landscape .== -1)
+            Rate_landscape[:, :, 6] .= d .* (landscape .== 0)
+
+            #calculate propensity
+
+            propensity = [sum(Rate_landscape[:, :, k]) for k in 1:size(Rate_landscape)[3]]
+
+            nb_events = map(x -> rand(Poisson(x)), propensity * tau_leap)
+
+            for event in 1:length(nb_events) #for each type of events
+                patches = findall(landscape .== rules_change[event, 1])
+
+                if nb_events[event] != 0 && length(patches) > nb_events[event]
+                    landscape[wsample(patches, Rate_landscape[patches, event], nb_events[event])] .= rules_change[event, 2]
+                end
+            end
+
+            rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
+            rho_2 = length(findall((landscape .== 2))) / length(landscape) #fraction competitive
+            rho_f = length(findall((landscape .== 0))) / length(landscape) #fraction fertile
+            rho_d = 1 - rho_1 - rho_2 - rho_f # fraction degraded
+
+            @views d2[t, :] = [t rho_1 rho_2 rho_f rho_d]
+            Rate_landscape = zeros(nb_cell, nb_cell, 6)
+
+            if save && t > burning && t % ((time - burning) / N_snap) == 0
+                CSV.write(name_save * "_nsave_" * repr(n_save) * ".csv", Tables.table(landscape), writeheader=false)
+                n_save += 1
+            end
 
 
 
+        end
     end
-
-
     return d2, landscape
+end
 
+
+function Ca_2_species(; landscape, param, type_competition)
+
+
+    rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
+    rho_2 = length(findall((landscape .== 2))) / length(landscape) #fraction competitive
+    rho_f = length(findall((landscape .== 0))) / length(landscape) #fraction fertile
+    rho_d = 1 - rho_1 - rho_2 - rho_f # fraction degraded
+
+
+    # Neighbors :
+
+    #using simcol package from R 
+    @rput landscape
+    R"neigh_1= simecol::neighbors(x =landscape,state = 1, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
+    R"neigh_2= simecol::neighbors(x =landscape,state = 2, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
+    R"neigh_f= simecol::neighbors(x =landscape,state = 0, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
+    R"neigh_d= simecol::neighbors(x =landscape,state = -1, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
+
+    @rget neigh_1
+    @rget neigh_2
+    @rget neigh_f
+    @rget neigh_d
+
+    r = param["r"]
+    d = param["d"]
+    f = param["f"]
+    beta = param["beta"]
+    m = param["m"]
+    e = param["e"]
+    cg = param["cg"]
+    cintra = param["cintra"]
+    alpha_0 = param["alpha_0"]
+    S = param["S"]
+    delta = param["delta"]
+    z = param["z"]
+
+    if type_competition == "global"
+        colonization1 = @. (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(beta * (1 - S * (1 - e)) - (cintra * rho_1 + rho_2 * alpha_0 * (1 + exp(-1))))
+        colonization2 = @. (delta * rho_2 + (1 - delta) * neigh_2 / z) * @.(beta * (1 - S) - (cintra * rho_2 + rho_1 * alpha_0))
+    else
+        colonization1 = @. (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(beta * (1 - S * (1 - e)) - (cg * (rho_1 + rho_2) + (cintra * (neigh_1 / z) + alpha_0 * (1 + exp(-1)) * (neigh_2 / z))))
+        colonization2 = @. (delta * rho_2 + (1 - delta) * neigh_2 / z) * @.(beta * (1 - S) - (cg * (rho_1 + rho_2) + (cintra * (neigh_2 / z) + alpha_0 * (neigh_1 / z))))
+    end
+    # calculate regeneration, degradation & mortality rate
+    death = m
+    regeneration = @.(r + f * neigh_1 / z)
+    degradation = d
+
+    # Apply rules
+    rnum = reshape(rand(length(landscape)), Int64(sqrt(length(landscape))), Int64(sqrt(length(landscape))))# one random number between 0 and 1 for each cell
+    landscape_update = copy(landscape)
+
+    ## New vegetation
+    landscape_update[findall((landscape .== 0) .& (rnum .<= colonization1))] .= 1
+    landscape_update[findall((landscape .== 0) .& (rnum .> colonization1) .& (rnum .<= colonization1 .+ colonization2))] .= 2
+
+    ## New fertile
+    landscape_update[findall((landscape .== 1) .& (rnum .<= death))] .= 0
+    landscape_update[findall((landscape .== 2) .& (rnum .<= death))] .= 0
+    landscape_update[findall((landscape .== -1) .& (rnum .<= regeneration))] .= 0
+
+    ## New degraded 
+    landscape_update[findall((landscape .== 0) .& (rnum .> colonization1 .+ colonization2) .& (rnum .<= (colonization1 .+ colonization2 .+ degradation)))] .= -1
+
+    rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
+    rho_2 = length(findall((landscape .== 2))) / length(landscape) #fraction competitive
+    rho_f = length(findall((landscape .== 0))) / length(landscape) #fraction fertile
+    rho_d = 1 - rho_1 - rho_2 - rho_f # fraction degraded
+
+    return rho_1, rho_2, rho_f, rho_d, landscape_update
 
 end
 
 
+function Run_CA_2_species(; time, param, landscape, save, name_save="", burning=1500, N_snap=25, type_competition)
 
+    d = Array{Float64}(undef, time + 1, 5) #Allocating
+
+    rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
+    rho_2 = length(findall((landscape .== 2))) / length(landscape) #fraction competitive
+    rho_f = length(findall((landscape .== 0))) / length(landscape) #fraction fertile
+    rho_d = 1 - rho_1 - rho_2 - rho_f # fraction degraded
+
+    d[1, :] = [1 rho_1 rho_2 rho_f rho_d] #the dataframe 
+
+    n_save = 1
+    @inbounds for k in 1:time
+
+        rho_1, rho_2, rho_f, rho_d, landscape = Ca_2_species(landscape=copy(landscape), param=param, type_competition=type_competition)
+        @views d[k+1, :] = [k + 1 rho_1 rho_2 rho_f rho_d]
+
+        if save && k > burning && k % ((time - burning) / N_snap) == 0
+            CSV.write(name_save * "_nsave_" * repr(n_save) * ".csv", Tables.table(landscape), writeheader=false)
+            n_save += 1
+
+        end
+    end
+
+
+    return d, landscape
+
+end
 function Plot_dynamics(d)
 
     plot(d[:, 1], d[:, 2], seriescolor=:lightgreen, label="stress_tol")
@@ -320,225 +366,34 @@ end
 
 #endregion
 
-#
-#region : Step 1-- Clustering along competitive gradient
-
-
 
 param = Get_classical_param();
-push!(param, 0.05); #tau leap
-size_landscape = 25
+size_landscape = 100
 landscape = Get_initial_lattice(size_mat=size_landscape)
-time = range(1, 1000, step=1)
+time_sim = 2000
 
-d, state = Run_CA_2_species(time_sim=range(1, 5000, step=1), param=copy(param), landscape=copy(landscape))
+d, state = Run_CA_2_species(time=time_sim, param=copy(param), landscape=copy(landscape), type_competition="global", save=false)
 plot(d[:, 1], d[:, 2], seriescolor=:lightgreen, label="stress_tol")
 plot!(d[:, 1], d[:, 3], seriescolor=:blue, label="competitive")
 plot!(d[:, 1], d[:, 4], seriescolor=:orange, label="fertile")
 plot!(d[:, 1], d[:, 5], seriescolor=:grey, label="degraded")
 
 
-
-
-#Making the loop along interspecific competition gradient
-c_seq = collect(range(0.1, stop=0.5, length=50))
-S_seq = [0, 0.25, 0.5]
-param = Get_classical_param()
-size_landscape = 25
-ini = Get_initial_lattice(size_mat=size_landscape)
-replicate = 1
-
-d2 = zeros(length(S_seq) * length(c_seq) * replicate, 6) #Allocating
-count = 1
-
-for stress in S_seq
-    param[11] = stress
-    for c1 in c_seq
-        for rep in 1:replicate
-            param[9] = c1
-            d, state = Run_CA_2_species(time_sim=range(1, 10000, step=1), param=copy(param), landscape=copy(ini))
-
-            #compute neighbors 
-            @rput state
-            R"neigh_1= simecol::neighbors(x =state,state = 1, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
-            R"neigh_2= simecol::neighbors(x =state,state = 2, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
-
-            @rget neigh_1
-            @rget neigh_2
-
-            # clustering the the two species
-            rho_1 = length(findall((state .== 1))) / length(state)
-
-            if rho_1 > 0
-                q12 = mean(neigh_2[findall((state .== 1))] / 4) #average number of species 2 around species 1 
-            else
-                q12 = 0
-            end
-            c12 = q12 / rho_1
-
-            # clustering total vegetation
-            rho_p = (length(findall((state .== 2))) + length(findall((state .== 1)))) / length(state)
-
-
-            if length(findall((state .== 2))) > 0 & length(findall((state .== 1))) > 0
-                qpp = mean(neigh_2[findall((state .== 1))] + neigh_1[findall((state .== 1))] + neigh_2[findall((state .== 2))]) / 4 #vegetation value
-            else
-                qpp = 0
-            end
-            cpp = qpp / rho_p
-
-            @views d2[count, :] = [rep q12 c12 cpp c1 stress]
-
-            count += 1
-        end
-    end
-end
-
-
-CSV.write("../Table/2_species/Clustering_species_interspe_compet_gradient.csv", Tables.table(d2), writeheader=false)
+d2, state = Gillespie_tau_leeping(time=time_sim, param=copy(param), landscape=copy(landscape), type_competition="global")
+plot(d2[:, 1], d2[:, 2], seriescolor=:lightgreen, label="stress_tol")
+plot!(d2[:, 1], d2[:, 3], seriescolor=:blue, label="competitive")
+plot!(d2[:, 1], d2[:, 4], seriescolor=:orange, label="fertile")
+plot!(d2[:, 1], d2[:, 5], seriescolor=:grey, label="degraded")
 
 
 
-
-#endregion
-
-#
-#region : Step 2-- Clustering along stress gradient 
-
-# My intuition is that interspecific clusters of species is observed when (i) stress_tol -> competitive is low but competitive -> stress_tol high
-# Facilitation must be high, stress_tol intraspecific competition is high so that we insure that only competitive can recruit near adult facilitators
-# Low intraspecific competition between species with exploitative strategies
-
-
-#Making the loop along stress gradient
-S_seq = collect(range(0, stop=1, length=20))
-param = Get_classical_param()
-param["alpha11"] = 0.2
-param["alpha12"] = 0.01
-param["alpha21"] = 0.2
-param["alpha22"] = 0.01
-size_landscape = 25
-ini = Get_initial_lattice(size_mat=size_landscape)
-replicate = 1
-max_time = 5000
-
-d2 = zeros(length(S_seq) * replicate, 12) #Allocating
-count = 1
-
-for stress in S_seq
-    param["S"] = stress
-    for rep in 1:replicate
-        state, d = Run_CA_2_species(time_sim=range(1, max_time, step=1), param=copy(param), landscape=copy(ini))
-
-        #compute neighbors 
-        @rput state
-        R"neigh_1= simecol::neighbors(x =state,state = 1, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
-        R"neigh_2= simecol::neighbors(x =state,state = 2, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
-
-        @rget neigh_1
-        @rget neigh_2
-
-        # clustering of the two species : q12, q21
-        rho_1 = length(findall((state .== 1))) / length(state)
-
-        if rho_1 > 0
-            q12 = mean(neigh_2[findall((state .== 1))] / 4) #average number of species 2 around species 1 
-            c12 = q12 / rho_1
-
-            q11 = mean(neigh_1[findall((state .== 1))] / 4)
-            c11 = q11 / rho_1
-        else
-            q12 = 0
-            c12 = 0
-            q11 = 0
-            c11 = 0
-        end
-
-        rho_2 = length(findall((state .== 2))) / length(state)
-
-        if rho_2 > 0
-            q21 = mean(neigh_1[findall((state .== 2))] / 4) #average number of species 1 around species 2 
-            c21 = q21 / rho_2
-
-            q22 = mean(neigh_2[findall((state .== 2))] / 4)
-            c22 = q22 / rho_2
-        else
-            q21 = 0
-            c21 = 0
-            q22 = 0
-            c22 = 0
-        end
-
-
-        # clustering total vegetation
-        rho_p = (length(findall((state .== 2))) + length(findall((state .== 1)))) / length(state)
-
-
-        if length(findall((state .== 2))) > 0 & length(findall((state .== 1))) > 0 #we can compute q++
-            qpp = mean(neigh_2[findall((state .== 1))] + neigh_1[findall((state .== 1))] + neigh_2[findall((state .== 2))]) / 4 #vegetation value
-            cpp = qpp / rho_p
-        else
-            qpp = 0
-            cpp = 0
-        end
-
-
-        @views d2[count, :] = [rep q12 q21 q11 q22 c12 c21 c11 c22 qpp cpp stress]
-
-        count += 1
-    end
-end
-
-
-CSV.write("../Table/2_species/Clustering_species_stress_gradient.csv", Tables.table(d2), writeheader=false)
-
-#endregion
-
-#
-#region : Step 3-- Gillespie vs normal
-
-p = Get_classical_param();
-size_landscape = 25
-init = Get_initial_lattice(size_mat=size_landscape)
-time = range(1, 5000, step=1)
-
-
-@time for k in 1:10
-    Gillespie_tau_leeping(; landscape=init, param=p, time)
-end
-
-@time land, dynamics = Gillespie_tau_leeping(; landscape=init, param=p, time)
-plot(dynamics[:, 1], dynamics[:, 2], seriescolor=:lightgreen, label="stress_tol")
-plot!(dynamics[:, 1], dynamics[:, 3], seriescolor=:blue, label="competitive")
-plot!(dynamics[:, 1], dynamics[:, 4], seriescolor=:orange, label="fertile")
-plot!(dynamics[:, 1], dynamics[:, 5], seriescolor=:grey, label="degraded")
-
-
-
-@time for k in 1:10
-    Run_CA_2_species(time_sim=time, param=p, landscape=init)
-end
-
-@time d, state = Run_CA_2_species(time_sim=time, param=p, landscape=init)
-plot(d[:, 1], d[:, 2], seriescolor=:lightgreen, label="stress_tol")
-plot!(d[:, 1], d[:, 3], seriescolor=:blue, label="competitive")
-plot!(d[:, 1], d[:, 4], seriescolor=:orange, label="fertile")
-plot!(d[:, 1], d[:, 5], seriescolor=:grey, label="degraded")
-
-
-#endregion
-
-#
-#region : Step 4-- Patch size distribution : different competition scenario  
+#region : Step 1-- Patch size distribution : different competition scenario  
 
 S_seq = collect(range(0, stop=1, length=6))
 param = Get_classical_param()
-param["alpha11"] = 0.3
-param["alpha12"] = 0.01
-param["alpha21"] = 0.2
-param["alpha22"] = 0.01
+param["alpha_0"] = 0.3
+param["cintra"] = 0.01
 param["S"] = 0.6
-param["tau_leap"] = 0.1
 size_landscape = 100
 ini = Get_initial_lattice(size_mat=size_landscape)
 max_time = 2000
@@ -547,8 +402,7 @@ rep = 3
 for stress in S_seq
     for nrep in 1:3
         param["S"] = stress
-        #state, d = Gillespie_tau_leeping(time=range(1, max_time, step=1), param=copy(param), landscape=copy(ini))
-        state, d = Run_CA_2_species(time_sim=range(1, max_time, step=1), param=copy(param), landscape=copy(ini))
+        state, d = Gillespie_tau_leeping(time=2000, param=copy(param), landscape=copy(ini), type_competition="global")
         CSV.write("../Table/2_species/Patch_size/Example_sim/Landscape_size_100_stress_" * repr(stress) * "_" * repr(nrep) * ".csv", Tables.table(state), writeheader=false)
     end
 end
@@ -596,7 +450,7 @@ end
 #endregion
 
 #
-#region : Step 5-- Fitting power laws for patch size distribution 
+#region : Step 2-- Fitting power laws for patch size distribution 
 # S varies for 3-4 competition strength
 
 max_time = 10000
@@ -653,7 +507,7 @@ end
 #endregion
 
 #
-#region : Step 6-- Patagonian steppe structure
+#region : Step 3-- Patagonian steppe structure
 
 
 function Ca_2_species2(; landscape, param)
