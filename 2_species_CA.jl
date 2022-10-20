@@ -2,14 +2,6 @@ using StatsBase, RCall, Plots, Random, Agents, DifferentialEquations, BenchmarkT
 
 #region : Step 0-- Functions, CA, Gillespie
 
-# function Get_params(; r, d, f, beta, m, e, emax, cg, alpha11, alpha12, alpha21, alpha22, S, delta, z)
-#     return vec(Float64[r d f beta m e emax cg alpha11 alpha12 alpha21 alpha22 S delta z])
-# end
-
-# function Get_classical_param()
-#     return Get_params(r=0.05, d=0.1, f=0.9, beta=0.8, m=0.1, e=0, emax=1.2,
-#         cg=0.1, alpha11=0.1, alpha12=0.1, alpha21=0.1, alpha22=0.1, S=0, delta=0.1, z=4)
-# end
 
 function Get_classical_param()
 
@@ -19,14 +11,14 @@ function Get_classical_param()
     beta = 0.8
     m = 0.1
     e = 0.1
-    emax = 1.2
     cg = 0.1
     alpha_0 = 0.1
-    cintra = 0.1
+    cintra = 0.2
     S = 0
     delta = 0.1
     z = 4
-    tau_leap = 1
+    tau_leap = 0.5
+    h=1
 
     return Dict{String,Any}(
         "r" => r,
@@ -41,7 +33,8 @@ function Get_classical_param()
         "S" => S,
         "delta" => delta,
         "z" => z,
-        "tau_leap" => tau_leap
+        "tau_leap" => tau_leap,
+        "h" => h
     )
 end
 
@@ -100,7 +93,8 @@ end
 
 
 "Function for faster computing of CA using Gillespie Tau leeping method"
-function Gillespie_tau_leeping(; landscape, param, time, type_competition, save=false, burning=1500, N_snap=25)
+function Gillespie_tau_leeping(; landscape, param, time, type_competition, save=false, burning=1500, N_snap=25, name_save="")
+    n_save = 1
 
     d2 = zeros(time, 5) #Allocating
     r = param["r"]
@@ -116,6 +110,7 @@ function Gillespie_tau_leeping(; landscape, param, time, type_competition, save=
     delta = param["delta"]
     z = param["z"]
     tau_leap = param["tau_leap"]
+    h = param["h"]
 
 
     rules_change = transpose([0 0 1 2 -1 0; 1 2 0 0 0 -1])
@@ -144,10 +139,10 @@ function Gillespie_tau_leeping(; landscape, param, time, type_competition, save=
             @rget neigh_1
             @rget neigh_2
 
-            Rate_landscape[:, :, 1] .= @. (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(beta * (1 - S * (1 - e)) - ((cintra * (neigh_1 / z) + alpha_0 * (1 + exp(-1)) * (neigh_2 / z))))
+            Rate_landscape[:, :, 1] .= @. (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(beta * (1 - S * (1 - e)) - ((cintra * rho_1 + alpha_0 * h * (1 + exp(-1)) * rho_2)))
             Rate_landscape[:, :, 1] .= Rate_landscape[:, :, 1] .* (landscape .== 0)
 
-            Rate_landscape[:, :, 2] .= @. (delta * rho_2 + (1 - delta) * neigh_2 / z) * @.(beta * (1 - S) - ((cintra * (neigh_2 / z) + alpha_0 * (neigh_1 / z))))
+            Rate_landscape[:, :, 2] .= @. (delta * rho_2 + (1 - delta) * neigh_2 / z) * @.(beta * (1 - S) - ((cintra * rho_2 + alpha_0 * rho_1)))
             Rate_landscape[:, :, 2] .= Rate_landscape[:, :, 2] .* (landscape .== 0)
 
             # calculate regeneration, degradation & mortality rate
@@ -155,6 +150,8 @@ function Gillespie_tau_leeping(; landscape, param, time, type_competition, save=
             Rate_landscape[:, :, 4] .= m .* (landscape .== 2)
             Rate_landscape[:, :, 5] .= @.(r + f * neigh_1 / z) .* (landscape .== -1)
             Rate_landscape[:, :, 6] .= d .* (landscape .== 0)
+
+            Rate_landscape[findall(Rate_landscape .< 0)] .= 0 #to avoid problems with propensity
 
             #calculate propensity
 
@@ -199,7 +196,7 @@ function Gillespie_tau_leeping(; landscape, param, time, type_competition, save=
             @rget neigh_1
             @rget neigh_2
 
-            Rate_landscape[:, :, 1] .= @. (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(beta * (1 - S * (1 - e)) - (cg * (rho_1 + rho_2) + (cintra * (neigh_1 / z) + alpha_0 * (1 + exp(-1)) * (neigh_2 / z))))
+            Rate_landscape[:, :, 1] .= @. (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(beta * (1 - S * (1 - e)) - (cg * (rho_1 + rho_2) + (cintra * (neigh_1 / z) + alpha_0 * (1 + h* exp(-1)) * (neigh_2 / z))))
             Rate_landscape[:, :, 1] .= Rate_landscape[:, :, 1] .* (landscape .== 0)
 
             Rate_landscape[:, :, 2] .= @. (delta * rho_2 + (1 - delta) * neigh_2 / z) * @.(beta * (1 - S) - (cg * (rho_1 + rho_2) + (cintra * (neigh_2 / z) + alpha_0 * (neigh_1 / z))))
@@ -210,6 +207,8 @@ function Gillespie_tau_leeping(; landscape, param, time, type_competition, save=
             Rate_landscape[:, :, 4] .= m .* (landscape .== 2)
             Rate_landscape[:, :, 5] .= @.(r + f * neigh_1 / z) .* (landscape .== -1)
             Rate_landscape[:, :, 6] .= d .* (landscape .== 0)
+
+            Rate_landscape[findall(Rate_landscape .< 0)] .= 0 #to avoid problems with propensity
 
             #calculate propensity
 
@@ -246,7 +245,75 @@ function Gillespie_tau_leeping(; landscape, param, time, type_competition, save=
 end
 
 
-function Ca_2_species(; landscape, param, type_competition)
+function Ca_2_species_global(; landscape, param)
+
+
+    rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
+    rho_2 = length(findall((landscape .== 2))) / length(landscape) #fraction competitive
+    rho_f = length(findall((landscape .== 0))) / length(landscape) #fraction fertile
+    rho_d = 1 - rho_1 - rho_2 - rho_f # fraction degraded
+
+
+    # Neighbors :
+
+    #using simcol package from R 
+    @rput landscape
+    R"neigh_1= simecol::neighbors(x =landscape,state = 1, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
+    R"neigh_2= simecol::neighbors(x =landscape,state = 2, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
+    R"neigh_f= simecol::neighbors(x =landscape,state = 0, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
+    R"neigh_d= simecol::neighbors(x =landscape,state = -1, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
+
+    @rget neigh_1
+    @rget neigh_2
+    @rget neigh_f
+    @rget neigh_d
+
+    r = param["r"]
+    d = param["d"]
+    f = param["f"]
+    beta = param["beta"]
+    m = param["m"]
+    e = param["e"]
+    cintra = param["cintra"]
+    alpha_0 = param["alpha_0"]
+    S = param["S"]
+    delta = param["delta"]
+    z = param["z"]
+
+    colonization1 = @. (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(beta * (1 - S * (1 - e)) - (cintra * rho_1 + alpha_0 * (1 + exp(-1)) * rho_2))
+    colonization2 = @. (delta * rho_2 + (1 - delta) * neigh_2 / z) * @.(beta * (1 - S) - (cintra * rho_2 + alpha_0 * rho_1))
+    # calculate regeneration, degradation & mortality rate
+    death = m
+    regeneration = (@.(r + f * neigh_1 / z)) .* (landscape .== -1)
+    degradation = d
+
+    # Apply rules
+    rnum = reshape(rand(length(landscape)), Int64(sqrt(length(landscape))), Int64(sqrt(length(landscape))))# one random number between 0 and 1 for each cell
+    landscape_update = copy(landscape)
+
+    ## New vegetation
+    landscape_update[findall((landscape .== 0) .& (rnum .<= colonization1))] .= 1
+    landscape_update[findall((landscape .== 0) .& (rnum .> colonization1) .& (rnum .<= colonization1 .+ colonization2))] .= 2
+
+    ## New fertile
+    landscape_update[findall((landscape .== 1) .& (rnum .<= death))] .= 0
+    landscape_update[findall((landscape .== 2) .& (rnum .<= death))] .= 0
+    landscape_update[findall((landscape .== -1) .& (rnum .<= regeneration))] .= 0
+
+    ## New degraded 
+    landscape_update[findall((landscape .== 0) .& (rnum .> colonization1 .+ colonization2) .& (rnum .<= (colonization1 .+ colonization2 .+ degradation)))] .= -1
+
+    rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
+    rho_2 = length(findall((landscape .== 2))) / length(landscape) #fraction competitive
+    rho_f = length(findall((landscape .== 0))) / length(landscape) #fraction fertile
+    rho_d = 1 - rho_1 - rho_2 - rho_f # fraction degraded
+
+    return rho_1, rho_2, rho_f, rho_d, landscape_update
+
+end
+
+
+function Ca_2_species_local(; landscape, param)
 
 
     rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
@@ -282,13 +349,8 @@ function Ca_2_species(; landscape, param, type_competition)
     delta = param["delta"]
     z = param["z"]
 
-    if type_competition == "global"
-        colonization1 = @. (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(beta * (1 - S * (1 - e)) - (cintra * rho_1 + rho_2 * alpha_0 * (1 + exp(-1))))
-        colonization2 = @. (delta * rho_2 + (1 - delta) * neigh_2 / z) * @.(beta * (1 - S) - (cintra * rho_2 + rho_1 * alpha_0))
-    else
-        colonization1 = @. (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(beta * (1 - S * (1 - e)) - (cg * (rho_1 + rho_2) + (cintra * (neigh_1 / z) + alpha_0 * (1 + exp(-1)) * (neigh_2 / z))))
-        colonization2 = @. (delta * rho_2 + (1 - delta) * neigh_2 / z) * @.(beta * (1 - S) - (cg * (rho_1 + rho_2) + (cintra * (neigh_2 / z) + alpha_0 * (neigh_1 / z))))
-    end
+    colonization1 = @. (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(beta * (1 - S * (1 - e)) - (cg * (rho_1 + rho_2) + (cintra * (neigh_1 / z) + alpha_0 * (1 + exp(-1)) * (neigh_2 / z))))
+    colonization2 = @. (delta * rho_2 + (1 - delta) * neigh_2 / z) * @.(beta * (1 - S) - (cg * (rho_1 + rho_2) + (cintra * (neigh_2 / z) + alpha_0 * (neigh_1 / z))))
     # calculate regeneration, degradation & mortality rate
     death = m
     regeneration = @.(r + f * neigh_1 / z)
@@ -320,6 +382,10 @@ function Ca_2_species(; landscape, param, type_competition)
 end
 
 
+
+
+
+
 function Run_CA_2_species(; time, param, landscape, save, name_save="", burning=1500, N_snap=25, type_competition)
 
     d = Array{Float64}(undef, time + 1, 5) #Allocating
@@ -332,16 +398,32 @@ function Run_CA_2_species(; time, param, landscape, save, name_save="", burning=
     d[1, :] = [1 rho_1 rho_2 rho_f rho_d] #the dataframe 
 
     n_save = 1
-    @inbounds for k in 1:time
+    if type_competition == "global" #global competition
+        @inbounds for k in 1:time
 
-        rho_1, rho_2, rho_f, rho_d, landscape = Ca_2_species(landscape=copy(landscape), param=param, type_competition=type_competition)
-        @views d[k+1, :] = [k + 1 rho_1 rho_2 rho_f rho_d]
+            rho_1, rho_2, rho_f, rho_d, landscape = Ca_2_species_global(landscape=copy(landscape), param=param)
+            @views d[k+1, :] = [k + 1 rho_1 rho_2 rho_f rho_d]
 
-        if save && k > burning && k % ((time - burning) / N_snap) == 0
-            CSV.write(name_save * "_nsave_" * repr(n_save) * ".csv", Tables.table(landscape), writeheader=false)
-            n_save += 1
+            if save && k > burning && k % ((time - burning) / N_snap) == 0
+                CSV.write(name_save * "_nsave_" * repr(n_save) * ".csv", Tables.table(landscape), writeheader=false)
+                n_save += 1
 
+            end
         end
+    else #local competition
+
+        @inbounds for k in 1:time
+
+            rho_1, rho_2, rho_f, rho_d, landscape = Ca_2_species_local(landscape=copy(landscape), param=param)
+            @views d[k+1, :] = [k + 1 rho_1 rho_2 rho_f rho_d]
+
+            if save && k > burning && k % ((time - burning) / N_snap) == 0
+                CSV.write(name_save * "_nsave_" * repr(n_save) * ".csv", Tables.table(landscape), writeheader=false)
+                n_save += 1
+
+            end
+        end
+
     end
 
 
@@ -367,81 +449,52 @@ end
 #endregion
 
 
-param = Get_classical_param();
-size_landscape = 100
-landscape = Get_initial_lattice(size_mat=size_landscape)
-time_sim = 2000
-
-d, state = Run_CA_2_species(time=time_sim, param=copy(param), landscape=copy(landscape), type_competition="global", save=false)
-plot(d[:, 1], d[:, 2], seriescolor=:lightgreen, label="stress_tol")
-plot!(d[:, 1], d[:, 3], seriescolor=:blue, label="competitive")
-plot!(d[:, 1], d[:, 4], seriescolor=:orange, label="fertile")
-plot!(d[:, 1], d[:, 5], seriescolor=:grey, label="degraded")
-
-
-d2, state = Gillespie_tau_leeping(time=time_sim, param=copy(param), landscape=copy(landscape), type_competition="global")
-plot(d2[:, 1], d2[:, 2], seriescolor=:lightgreen, label="stress_tol")
-plot!(d2[:, 1], d2[:, 3], seriescolor=:blue, label="competitive")
-plot!(d2[:, 1], d2[:, 4], seriescolor=:orange, label="fertile")
-plot!(d2[:, 1], d2[:, 5], seriescolor=:grey, label="degraded")
-
-
-
 #region : Step 1-- Patch size distribution : different competition scenario  
 
-S_seq = collect(range(0, stop=1, length=6))
+S_seq = collect(range(0, stop=0.6, length=4))
 param = Get_classical_param()
 param["alpha_0"] = 0.3
-param["cintra"] = 0.01
-param["S"] = 0.6
+param["cintra"] = 0.5
 size_landscape = 100
 ini = Get_initial_lattice(size_mat=size_landscape)
-max_time = 2000
+max_time = 3000
 rep = 3
 
 for stress in S_seq
     for nrep in 1:3
         param["S"] = stress
-        state, d = Gillespie_tau_leeping(time=2000, param=copy(param), landscape=copy(ini), type_competition="global")
+        d, state = Gillespie_tau_leeping(time=max_time, param=copy(param), landscape=copy(ini), type_competition="global")
         CSV.write("../Table/2_species/Patch_size/Example_sim/Landscape_size_100_stress_" * repr(stress) * "_" * repr(nrep) * ".csv", Tables.table(state), writeheader=false)
     end
 end
 
 
 
-S_seq = collect(range(0, stop=1, length=6))
+S_seq = collect(range(0, stop=0.6, length=4))
 param = Get_classical_param()
-param["S"] = 0.6
-param["tau_leap"] = 0.1
+
 size_landscape = 100
 ini = Get_initial_lattice(size_mat=size_landscape)
-max_time = 2000
+max_time = 4000
 rep = 3
-for rela_c in [1, 2.5, 4]
-    for scena in (1:2)
+for alpha0 in [0, 0.25, 0.5]
+    param["alpha_0"] = alpha0
+    for scena in (2)
 
-        if scena == 1 #low inter
-            name_scena = "low_inter"
-            param["cg"] = 0.01
-            param["alpha12"] = 0.05
-            param["alpha21"] = param["alpha12"] * rela_c
-            param["alpha11"] = 0.2
-            param["alpha22"] = 0.2
-        else #inter=intra
-            name_scena = "intra=inter"
-            param["cg"] = 0.01
-            param["alpha12"] = 0.1
-            param["alpha21"] = param["alpha12"] * rela_c
-            param["alpha11"] = 0.1
-            param["alpha22"] = 0.1
+        if scena == 1
+            name_scena = "global"
+            type_comp = "global"
+        else
+            name_scena = "local"
+            type_comp = "local"
         end
 
         for stress in S_seq
             for nrep in 1:3
                 param["S"] = stress
                 #state, d = Gillespie_tau_leeping(time=range(1, max_time, step=1), param=copy(param), landscape=copy(ini))
-                state, d = Run_CA_2_species(time_sim=range(1, max_time, step=1), param=copy(param), landscape=copy(ini))
-                CSV.write("../Table/2_species/Patch_size/Competition_regime/Landscape_size_100_stress_" * repr(stress) * "_" * name_scena * "_" * repr(nrep) * "_relat_compet_" * repr(rela_c) * ".csv", Tables.table(state), writeheader=false)
+                d, state = Gillespie_tau_leeping(time=max_time, param=copy(param), landscape=copy(ini), type_competition=type_comp)
+                CSV.write("../Table/2_species/Patch_size/Competition_regime/Landscape_size_100_stress_" * repr(stress) * "_" * name_scena * "_" * repr(nrep) * "_relat_compet_" * repr(alpha0) * ".csv", Tables.table(state), writeheader=false)
             end
         end
     end
@@ -457,51 +510,37 @@ max_time = 10000
 n_snapshot = 25
 burning_phase = 3000
 S_seq = collect(range(0, stop=0.8, length=30))
+S_seq_prime = collect(range(0.8, stop=0.9, length=4))
+popfirst!(S_seq_prime);
 param = Get_classical_param()
-
+param["cintra"] = 0.3
 size_landscape = 100
+Random.seed!(123)
 ini = Get_initial_lattice(size_mat=size_landscape)
 
-name_scena = ["low_inter", "inter=intra"]
 
 for scena in (1)
-    for stress in S_seq
+    for stress in S_seq_prime
         param["S"] = stress
-        for rela_c in [1, 2.5, 4]
+        for alpha0 in [0, 0.15, 0.3]
+            param["alpha_0"] = alpha0
 
-            if scena == 1 #low inter
-                name_scena = "low_inter"
-                param["cg"] = 0.01
-                param["alpha12"] = 0.05
-                param["alpha21"] = param["alpha12"] * rela_c
-                param["alpha11"] = 0.2
-                param["alpha22"] = 0.2
-            else #inter=intra
-                name_scena = "intra=inter"
-                param["cg"] = 0.01
-                param["alpha12"] = 0.1
-                param["alpha21"] = param["alpha12"] * rela_c
-                param["alpha11"] = 0.1
-                param["alpha22"] = 0.1
+            if scena == 1 #global competition
+                name_scena = "global"
+                type_comp = "global"
+
+            else
+                name_scena = "local"
+                type_comp = "local"
             end
 
 
-            param["alpha21"] = param["alpha12"] * rela_c
-            name_landscape = "../Table/2_species/Patch_size/Big_sim/Landscape_" * name_scena[scena] * "_S_" * repr(round(stress, digits=2)) * "_a21_" * repr(rela_c)
-            state, d = Run_CA_2_species(time_sim=range(1, max_time, step=1), param=copy(param),
-                landscape=copy(ini), save=true, name_save=name_landscape, burning=burning_phase, N_snap=n_snapshot)
+            name_landscape = "../Table/2_species/Patch_size/Big_sim/Landscape_" * name_scena * "_S_" * repr(round(stress, digits=2)) * "_alpha0_" * repr(alpha0)
+            d, state = Gillespie_tau_leeping(time=max_time, param=copy(param), landscape=copy(ini), type_competition=type_comp, save=true, burning=burning_phase, N_snap=n_snapshot, name_save=name_landscape)
 
         end
     end
 end
-
-
-
-
-
-
-
-
 
 
 #endregion
@@ -636,3 +675,19 @@ savefig("../Figures/2_species/CA/Patagonian_type_different_disp.png")
 
 
 #endregion
+
+
+
+param["S"] = 0.2
+param["alpha_0"] = 0.25
+param["tau_leap"] = 0.25
+
+
+max_time = 8000
+d, state = Gillespie_tau_leeping(time=max_time, param=copy(param), landscape=copy(ini), type_competition="global", save=false)
+
+max_time = 8000
+d2, state2 = Run_CA_2_species(time=max_time, param=copy(param), landscape=copy(ini), save=false, type_competition="global")
+
+Plot_dynamics(d)
+Plot_dynamics(d2)

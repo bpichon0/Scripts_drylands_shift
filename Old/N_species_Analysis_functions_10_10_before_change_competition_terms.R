@@ -1,7 +1,8 @@
+rm(list=ls())
 x <- c(
   "tidyverse", "ggpubr", "latex2exp", "deSolve", "reshape2",
   "JuliaCall", "diffeqr", "simecol", "tseries", "phaseR","GGally",
-  "ggquiver", "scales", "boot", "spatialwarnings","simecol","igraph","hillR"
+  "ggquiver", "scales", "boot", "spatialwarnings","simecol","igraph"
 )
 lapply(x, require, character.only = TRUE)
 
@@ -171,36 +172,5 @@ Co_occurrence_matrix = function(df,traits){
   
   
   return(graph_d)    
-}
-
-
-Get_diversity_community=function(trait,densities){
-  
-  densities=as.numeric(densities) #to avoid errors
-  trait=as.numeric(trait)
-  
-  
-  trait=matrix(trait,length(trait),1)
-  colnames(trait)="trait1";rownames(trait)=paste0("Sp",1:length(trait))
-  
-  densities = matrix(densities,1,length(densities))
-  colnames(densities)=paste0("Sp",1:length(trait));rownames(densities)="comm1"
-  
-  
-  diversity=d_name=c()
-  for (type in c("FD","D")){ #we do that for functional diversity and species diversity
-    for (q in 0:2){
-      if (type=="D"){ div = hill_taxa(densities,q=q)}
-      if (type=="FD"){ div = hill_func(densities,trait,q=q)["FD_q",1]}
-      diversity=c(diversity,div)
-      d_name= c(d_name,paste0(type,"_",q))
-
-    }
-  }
-  
-  #adding community-weighted mean of traits
-  d_diversity=as_tibble(matrix(diversity,1,6))
-  colnames(d_diversity)=d_name
-  return(d_diversity)
 }
 

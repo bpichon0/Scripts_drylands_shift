@@ -4,7 +4,7 @@ using StatsBase, RCall, Plots, StatsPlots, Random, DifferentialEquations, LaTeXS
 
 #Parameters functions 
 
-function Get_classical_param(; N_species=4, type_interaction="classic", alpha_0=0.1, cintra=0.2, scenario_trait="spaced", h=1)
+function Get_classical_param(; N_species=4, type_interaction="nested", relative_competition=4, scenario_trait="random")
 
     r = 0.05
     d = 0.1
@@ -12,15 +12,15 @@ function Get_classical_param(; N_species=4, type_interaction="classic", alpha_0=
     beta = 0.8
     m = 0.1
     e = 0.1
+    emax = 1.2
     cg = 0.1
     S = 0
     delta = 0.1
     z = 4
     tau_leap = 0.05
     trait = Get_species_traits(Nsp=N_species, scena=scenario_trait)
-    h = h
 
-    Interaction_mat = Get_interaction_matrix(Nsp=N_species, type=type_interaction, alpha_0=alpha_0, cintra=cintra, trait_sp=trait, h=h)
+    Interaction_mat = Get_interaction_matrix(Nsp=N_species, type=type_interaction, rela_comp=relative_competition, trait_sp=trait)
 
     return Dict{String,Any}(
         "Nsp" => N_species,
@@ -30,35 +30,45 @@ function Get_classical_param(; N_species=4, type_interaction="classic", alpha_0=
         "beta" => beta,
         "m" => m,
         "e" => e,
+        "emax" => emax,
         "cg" => cg,
         "S" => S,
         "delta" => delta,
         "z" => z,
         "tau_leap" => tau_leap,
         "trait" => trait,
-        "alpha" => Interaction_mat,
-        "h" => h
+        "alpha" => Interaction_mat
     )
 end
 
-function Get_interaction_matrix(; Nsp, type, trait_sp, cintra=0.5, alpha_0, h=1)
+function Get_interaction_matrix(; Nsp, type, trait_sp, rela_comp) #A discuter comment définir les interactions
 
     if (type == "random")
         Interaction_mat = rand(Nsp * Nsp) / (Nsp + 3)
         Interaction_mat = reshape(Interaction_mat, Nsp, Nsp)
     elseif (type == "equal")
-        Interaction_mat = zeros(Nsp, Nsp) .+ 0.2 / (Nsp)
+        Interaction_mat = zeros(Nsp, Nsp) .+ 0.1
 
-    elseif type == "classic"
-        Interaction_mat = zeros(Nsp, Nsp)
+    elseif (type == "nested")
+        Interaction_mat = zeros(Nsp, Nsp) .+ 0.1 #for intraspecific competition
         for i in 1:Nsp
-            Interaction_mat[i, i] = cintra
+            for j in 1:Nsp
+                if (trait_sp[i] > trait_sp[j]) #i.e., less stress tolerant plant
+                    Interaction_mat[j, i] += Interaction_mat[j, i] * abs(trait_sp[i] - trait_sp[j]) * rela_comp
+                    #Interaction_mat[j, i] += Interaction_mat[j, i] * exp(-abs(trait_sp[i] - trait_sp[j])) * rela_comp
+                end
+            end
         end
-        for i in 1:(Nsp-1)
-            for j in (i+1):Nsp
-                if i != j
-                    Interaction_mat[i, j] = alpha_0 * (1 + h * exp(-abs(trait_sp[i] - trait_sp[j])) * trait_sp[i]) #j on i
-                    Interaction_mat[j, i] = alpha_0 * (1 + h * exp(-abs(trait_sp[i] - trait_sp[j])) * trait_sp[j]) #i on j
+
+    elseif type == "low_inter"
+        Interaction_mat = zeros(Nsp, Nsp) .+ 0.05 #for interspecific competition
+        for i in 1:size(Interaction_mat)[1]
+            Interaction_mat[i, i] = 0.2
+        end
+        for i in 1:Nsp
+            for j in 1:Nsp
+                if (trait_sp[i] > trait_sp[j]) # i is more stress tolerant but less competitive than j
+                    Interaction_mat[j, i] += Interaction_mat[j, i] * abs(trait_sp[i] - trait_sp[j]) * rela_comp
                 end
             end
         end
@@ -125,24 +135,23 @@ function Get_initial_state(; param, type, branch)
     return frac
 end
 
-# MF functions 
+# MF & PA functions 
 function MF_N_species(du, u, p, t)
     rho_0 = u[p["Nsp"]+1]
     rho_d = u[p["Nsp"]+2]
 
     for k in 1:p["Nsp"]
-        du[k] = rho_0 * (u[k] * (p["beta"] * (1 - p["S"] * (1 - p["trait"][k] * p["e"])) - (sum([p["alpha"][k, i] * u[i] for i in 1:p["Nsp"]])))) - u[k] * p["m"]
+        du[k] = rho_0 * (p["beta"] * u[k] * (p["emax"] * (1 - p["S"] * (1 - p["trait"][k] * p["e"])) - (p["cg"] * sum(u[1:p["Nsp"]]) + sum([p["alpha"][i, k] * u[i] for i in 1:p["Nsp"]])))) - u[k] * p["m"]
     end
     du[p["Nsp"]+1] = -p["d"] * rho_0 + rho_d * (p["r"] + p["f"] * (sum([p["trait"][i] * u[i] for i in 1:p["Nsp"]])))
 
     for k in 1:p["Nsp"]
-        du[p["Nsp"]+1] = du[p["Nsp"]+1] - rho_0 * (u[k] * (p["beta"] * (1 - p["S"] * (1 - p["trait"][k] * p["e"])) - (sum([p["alpha"][k, i] * u[i] for i in 1:p["Nsp"]])))) + u[k] * p["m"]
+        du[p["Nsp"]+1] = du[p["Nsp"]+1] - rho_0 * (p["beta"] * u[k] * (p["emax"] * (1 - p["S"] * (1 - p["trait"][k] * p["e"])) - (p["cg"] * sum(u[1:p["Nsp"]]) + sum([p["alpha"][i, k] * u[i] for i in 1:p["Nsp"]])))) + u[k] * p["m"]
     end
 
     du[p["Nsp"]+2] = p["d"] * rho_0 - rho_d * (p["r"] + p["f"] * (sum([p["trait"][i] * u[i] for i in 1:p["Nsp"]])))
 
 end
-
 
 function Reorder_dynamics(sol)
     sol_dyn = reduce(hcat, sol.u)'     #transforming solutions in clean matrix
@@ -151,7 +160,59 @@ function Reorder_dynamics(sol)
 end
 
 function PA_N_species(du, u, p, t)
-    return ()
+
+    f = p["f"]
+    e = p["e"]
+    tau_leap = p["tau_leap"]
+    Nsp = p["Nsp"]
+    emax = p["emax"]
+    cg = p["cg"]
+    alpha = p["alpha"]
+    r = p["r"]
+    delta = p["delta"]
+    beta = p["beta"]
+    S = p["S"]
+    m = p["m"]
+    trait_sp = p["trait"]
+    z = p["z"]
+    d = p["d"]
+
+    # u : 
+
+    #rho_1
+    du[1] = (1 - rho_1 - rho_2 - rho_m) * beta * (delta * rho_1 + (1 - delta) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1 - rho_1 - rho_2 - rho_m))) * (emax * (1 - S * e) - (cg * (rho_1 + rho_2) + (alpha11 * ((rho_1 - rho_11 - rho_12 - rho_1m) / (1 - rho_1 - rho_2 - rho_m)) + alpha21 * ((rho_2 - rho_22 - rho_12 - rho_2m) / (1 - rho_1 - rho_2 - rho_m))))) - rho_1 * m
+
+    #rho_2
+    du[2] = (1 - rho_1 - rho_2 - rho_m) * beta * (delta * rho_2 + (1 - delta) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1 - rho_1 - rho_2 - rho_m))) * (emax * (1 - S) - (cg * (rho_1 + rho_2) + (alpha22 * ((rho_2 - rho_22 - rho_12 - rho_2m) / (1 - rho_1 - rho_2 - rho_m)) + alpha12 * ((rho_1 - rho_11 - rho_12 - rho_1m) / (1 - rho_1 - rho_2 - rho_m))))) - rho_2 * m
+
+    #rho_m
+    du[3] = (1 - rho_1 - rho_2 - rho_m) * d - rho_m * (r + f * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1 - rho_1 - rho_2 - rho_m)))
+
+    #rho_12
+    du[4] = ((rho_1 - rho_11 - rho_12 - rho_1m)) * beta * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1 - rho_1 - rho_2 - rho_m))) * (emax * (1 - S) - (cg * (rho_1 + rho_2) + (alpha22 * ((z - 1) / z) * ((rho_2 - rho_22 - rho_12 - rho_2m) / (1 - rho_1 - rho_2 - rho_m)) + (alpha12 / z) + alpha12 * ((z - 1) / z) * ((rho_1 - rho_11 - rho_12 - rho_1m) / (1 - rho_1 - rho_2 - rho_m))))) +
+            ((rho_2 - rho_22 - rho_12 - rho_2m)) * beta * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1 - rho_1 - rho_2 - rho_m))) * (emax * (1 - S * e) - (cg * (rho_1 + rho_2) + (alpha11 * ((z - 1) / z) * ((rho_1 - rho_11 - rho_12 - rho_1m) / (1 - rho_1 - rho_2 - rho_m)) + (alpha21 / z) + alpha21 * ((z - 1) / z) * ((rho_2 - rho_22 - rho_12 - rho_2m) / (1 - rho_1 - rho_2 - rho_m))))) -
+            2 * rho_12 * m
+
+    #rho_1m
+    du[5] = ((rho_1 - rho_11 - rho_12 - rho_1m)) * d + (rho_m - rho_mm - rho_1m - rho_2m) * beta * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1 - rho_1 - rho_2 - rho_m))) * (emax * (1 - S * e) - (cg * (rho_1 + rho_2) + (alpha11 * ((rho_1 - rho_11 - rho_12 - rho_1m) / (1 - rho_1 - rho_2 - rho_m)) + alpha21 * ((rho_2 - rho_22 - rho_12 - rho_2m) / (1 - rho_1 - rho_2 - rho_m))))) -
+            rho_1m * m - rho_1m * (r + f * ((1 / z) + ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1 - rho_1 - rho_2 - rho_m))))
+
+    #rho_2m
+    du[6] = ((rho_2 - rho_22 - rho_12 - rho_2m)) * d + (rho_m - rho_mm - rho_1m - rho_2m) * beta * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1 - rho_1 - rho_2 - rho_m)) * (emax * (1 - S) - (cg * (rho_1 + rho_2) + (alpha22 * ((rho_2 - rho_22 - rho_12 - rho_2m) / (1 - rho_1 - rho_2 - rho_m)) + alpha12 * ((rho_1 - rho_11 - rho_12 - rho_1m) / (1 - rho_1 - rho_2 - rho_m)))))) -
+            rho_2m * m - rho_2m * (r + f * (((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1 - rho_1 - rho_2 - rho_m))))
+
+    #rho_11
+    du[7] = 2 * ((rho_1 - rho_11 - rho_12 - rho_1m)) * beta * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1 - rho_1 - rho_2 - rho_m))) * (emax * (1 - S * e) - (cg * (rho_1 + rho_2) + (alpha11 * ((rho_1 - rho_11 - rho_12 - rho_1m) / (1 - rho_1 - rho_2 - rho_m)) * ((z - 1) / z) + (alpha11 / z) + alpha21 * ((z - 1) / z) * ((rho_2 - rho_22 - rho_12 - rho_2m) / (1 - rho_1 - rho_2 - rho_m))))) -
+            2 * rho_11 * m
+
+    #rho_22
+    du[8] = 2 * ((rho_2 - rho_22 - rho_12 - rho_2m)) * beta * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1 - rho_1 - rho_2 - rho_m))) * (emax * (1 - S) - (cg * (rho_1 + rho_2) + (alpha22 * ((rho_2 - rho_22 - rho_12 - rho_2m) / (1 - rho_1 - rho_2 - rho_m)) * ((z - 1) / z) + (alpha22 / z) + alpha12 * ((z - 1) / z) * ((rho_1 - rho_11 - rho_12 - rho_1m) / (1 - rho_1 - rho_2 - rho_m))))) -
+            2 * rho_22 * m
+
+    #rho_mm
+    du[9] = 2 * (rho_m - rho_mm - rho_1m - rho_2m) * d - 2 * rho_mm * (r + f * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1 - rho_1 - rho_2 - rho_m)))
+
+
 end
 
 
@@ -163,7 +224,7 @@ function Get_neighbors_matrix(; landscape, sp)
     @rget neighbors_mat
 end
 
-function Gillespie_CA_N_species(; param, landscape, tmax, type_competition)
+function Gillespie_CA_N_species(; param, landscape, tmax)
 
 
     r = param["r"]
@@ -174,6 +235,7 @@ function Gillespie_CA_N_species(; param, landscape, tmax, type_competition)
     m = param["m"]
     e = param["e"]
     emax = param["emax"]
+    cg = param["cg"]
     Nsp = param["Nsp"]
     delta = param["delta"]
     S = param["S"]
@@ -192,120 +254,61 @@ function Gillespie_CA_N_species(; param, landscape, tmax, type_competition)
     #Allocating
     Rate_landscape = zeros(nb_cell, nb_cell, 2 * Nsp + 2) #death and recruitment rates, degradation + restoration
 
-    if type_competition == "global"
 
-        for dt in 1:tmax
+    for dt in 1:tmax
 
-            neigh_matrix = zeros(nb_cell, nb_cell, Nsp)
-            for k in 1:Nsp
-                neigh_matrix[:, :, k] = Get_neighbors_matrix(landscape=copy(landscape), sp=copy(k))
+        neigh_matrix = zeros(nb_cell, nb_cell, Nsp)
+        for k in 1:Nsp
+            neigh_matrix[:, :, k] = Get_neighbors_matrix(landscape=copy(landscape), sp=copy(k))
+        end
+
+        for sp in 1:Nsp
+            Rate_landscape[:, :, sp] .= beta .* (delta * rho[sp] .+ (1 - delta) * neigh_matrix[:, :, sp] / z) .* #dispersal
+                                        (emax * (1 - S * (1 - trait_sp[sp] * e)) .- #recruitment
+                                         (cg * sum(rho[1:Nsp]) .+ (sum([interaction_mat[k, sp] * #global competition
+                                                                        neigh_matrix[:, :, k] for k in 1:Nsp]) / z))) .* (landscape .== 0) #local competition
+
+            Rate_landscape[:, :, Nsp+sp] .= m .* (landscape .== sp) #to have mortality only in species cells
+
+        end
+        # calculate regeneration, degradation & mortality rate
+        Rate_landscape[:, :, 2*Nsp+1] .= (r .+ f .* sum([trait_sp[k] .* neigh_matrix[:, :, k] for k in 1:Nsp]) ./ z) .* (landscape .== -1)
+        Rate_landscape[:, :, 2*Nsp+2] .= d .* (landscape .== 0)
+
+
+
+
+        propensity = [sum(Rate_landscape[:, :, k]) for k in 1:size(Rate_landscape)[3]]
+
+        nb_events = map(x -> rand(Poisson(x)), propensity * tau_leap)
+
+        for event in 1:length(nb_events) #for each type of events : colonization, death etc...
+            patches = findall(landscape .== rules_change[event, 1])
+
+            if nb_events[event] != 0 && length(patches) > nb_events[event]
+                landscape[wsample(patches, Rate_landscape[patches, event], nb_events[event])] .= rules_change[event, 2]
             end
 
-            for sp in 1:Nsp
-                Rate_landscape[:, :, sp] .= beta .* (delta * rho[sp] .+ (1 - delta) * neigh_matrix[:, :, sp] / z) .* #dispersal
-                                            (emax * (1 - S * (1 - trait_sp[sp] * e)) .- #recruitment
-                                             ((sum([interaction_mat[sp, k] * #global competition
-                                                    rho[k] for k in 1:Nsp]) / z))) .* (landscape .== 0) #local competition
+        end #end event loop
 
-                Rate_landscape[:, :, Nsp+sp] .= m .* (landscape .== sp) #to have mortality only in species cells
+        rho = [length(findall((landscape .== k))) / length(landscape) for k in 1:Nsp] #vegetation
+        push!(rho, length(findall((landscape .== 0))) / length(landscape)) #empty sites
+        push!(rho, length(findall((landscape .== -1))) / length(landscape)) #degraded sites
+        push!(rho, dt)
 
-            end
-            # calculate regeneration, degradation & mortality rate
-            Rate_landscape[:, :, 2*Nsp+1] .= (r .+ f .* sum([trait_sp[k] .* neigh_matrix[:, :, k] for k in 1:Nsp]) ./ z) .* (landscape .== -1)
-            Rate_landscape[:, :, 2*Nsp+2] .= d .* (landscape .== 0)
+        @views d2[dt, :] = rho
 
+        Rate_landscape = zeros(nb_cell, nb_cell, 2 * Nsp + 2) #death and recruitment rates, degradation + restoration
 
+    end #end time loop
 
 
-            propensity = [sum(Rate_landscape[:, :, k]) for k in 1:size(Rate_landscape)[3]]
-
-            nb_events = map(x -> rand(Poisson(x)), propensity * tau_leap)
-
-            for event in 1:length(nb_events) #for each type of events : colonization, death etc...
-                patches = findall(landscape .== rules_change[event, 1])
-
-                if nb_events[event] != 0 && length(patches) > nb_events[event]
-                    landscape[wsample(patches, Rate_landscape[patches, event], nb_events[event])] .= rules_change[event, 2]
-                end
-
-            end #end event loop
-
-            rho = [length(findall((landscape .== k))) / length(landscape) for k in 1:Nsp] #vegetation
-            push!(rho, length(findall((landscape .== 0))) / length(landscape)) #empty sites
-            push!(rho, length(findall((landscape .== -1))) / length(landscape)) #degraded sites
-            push!(rho, dt)
-
-            @views d2[dt, :] = rho
-
-            Rate_landscape = zeros(nb_cell, nb_cell, 2 * Nsp + 2) #death and recruitment rates, degradation + restoration
-
-        end #end time loop
-
-    else
-
-        for dt in 1:tmax
-
-            neigh_matrix = zeros(nb_cell, nb_cell, Nsp)
-            for k in 1:Nsp
-                neigh_matrix[:, :, k] = Get_neighbors_matrix(landscape=copy(landscape), sp=copy(k))
-            end
-
-            for sp in 1:Nsp
-                Rate_landscape[:, :, sp] .= beta .* (delta * rho[sp] .+ (1 - delta) * neigh_matrix[:, :, sp] / z) .* #dispersal
-                                            (emax * (1 - S * (1 - trait_sp[sp] * e)) .- #recruitment
-                                             ((sum([interaction_mat[sp, k] *
-                                                    neigh_matrix[:, :, k] for k in 1:Nsp]) / z))) .* (landscape .== 0)
-
-                Rate_landscape[:, :, Nsp+sp] .= m .* (landscape .== sp) #to have mortality only in species cells
-
-            end
-            # calculate regeneration, degradation & mortality rate
-            Rate_landscape[:, :, 2*Nsp+1] .= (r .+ f .* sum([trait_sp[k] .* neigh_matrix[:, :, k] for k in 1:Nsp]) ./ z) .* (landscape .== -1)
-            Rate_landscape[:, :, 2*Nsp+2] .= d .* (landscape .== 0)
-
-
-
-
-            propensity = [sum(Rate_landscape[:, :, k]) for k in 1:size(Rate_landscape)[3]]
-
-            nb_events = map(x -> rand(Poisson(x)), propensity * tau_leap)
-
-            for event in 1:length(nb_events) #for each type of events : colonization, death etc...
-                patches = findall(landscape .== rules_change[event, 1])
-
-                if nb_events[event] != 0 && length(patches) > nb_events[event]
-                    landscape[wsample(patches, Rate_landscape[patches, event], nb_events[event])] .= rules_change[event, 2]
-                end
-
-            end #end event loop
-
-            rho = [length(findall((landscape .== k))) / length(landscape) for k in 1:Nsp] #vegetation
-            push!(rho, length(findall((landscape .== 0))) / length(landscape)) #empty sites
-            push!(rho, length(findall((landscape .== -1))) / length(landscape)) #degraded sites
-            push!(rho, dt)
-
-            @views d2[dt, :] = rho
-
-            Rate_landscape = zeros(nb_cell, nb_cell, 2 * Nsp + 2) #death and recruitment rates, degradation + restoration
-
-        end #end time loop
-
-
-
-
-
-
-
-
-
-
-    end
 
     return d2, landscape
 
 end
 
-function Plot_dynamics(; d, Nsp, name_x_axis="time")
+function Plot_dynamics(; d, Nsp, name_x_axis)
     plot(xlabel=name_x_axis, ylabel="Densities", legend=false)
 
     names = ["Sp" * repr(x) for x in 1:Nsp]
@@ -380,9 +383,6 @@ function Spatial_grid(size_landscape)
 end
 
 
-
-
-#For co-occurrence analysis
 function Randomization_landscape(; landscape, niter=10000)
 
     for i in 1:niter

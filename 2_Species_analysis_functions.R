@@ -1,6 +1,6 @@
 x = c("tidyverse", "ggpubr", "latex2exp", "deSolve", "reshape2", 
       "JuliaCall", "diffeqr", "simecol", "tseries","phaseR",
-      "ggquiver", "scales","boot","spatialwarnings")
+      "ggquiver", "scales","boot","spatialwarnings","hillR","RColorBrewer")
 lapply(x, require, character.only = TRUE)
 
 
@@ -34,15 +34,27 @@ dir.create("../Figures/2_species/MF",showWarnings = F)
 
 Get_MF_parameters = function() {
     return(c(
-        r = 0.05, d = 0.1, f = 0.9, beta = .8, m = 0.1, e = .1,  cintra = .1,
-        alpha_0 = .1, S = 0
+        r = 0.01, d = .025, f = 0.9, beta = 1, m = 0.15, e = .1,  cintra = .3,
+        alpha_0 = .3, S = 0,h=1
     ))
 }
 
-Get_MF_initial_state = function() {
-    state = c(rho_1 = 0.4, rho_2 = 0.4, rho_m = 0.1, rho_0 = .1)
-    names(state) = c("rho_1", "rho_2","rho_m","rho_0")
-    return(state)
+
+Get_MF_initial_state = function(type="equal") {
+  
+  if (is.character(type)){
+    if (type=="equal"){
+      state = c(rho_1 = 0.4, rho_2 = 0.4, rho_m = 0.1, rho_0 = .1)
+      names(state) = c("rho_1", "rho_2","rho_m","rho_0")
+    } else{
+      state1=runif(1)*.8
+      state=c(state1,.8-state1,.1,.1)
+    }
+  }else{
+    state=c(rho_1 = type[1], rho_2 = type[2], rho_m = type[3], rho_0 = 1-sum(type))
+    
+  }
+  return(state)
 }
 
 
@@ -52,13 +64,13 @@ MF_two_species_julia = julia_eval("
 
 function MF_two_species(du,u,p,t)
 
-  r,d,f,beta,m,e,cintra,alpha_0,S=p
+  r,d,f,beta,m,e,cintra,alpha_0,S,h=p
   rho_1,rho_2,rho_d,rho_0=u
   
-  du[1] = rho_0 * ( rho_1 *  (beta * ( 1 - S * (1 - e)) - (cintra*rho_1 + alpha_0 * (1+exp(-1)) * rho_2))) - rho_1 * m
+  du[1] = rho_0 * ( rho_1 *  (beta * ( 1 - S * (1 - e)) - (cintra*rho_1 + alpha_0 * (1+h*exp(-1)) * rho_2))) - rho_1 * m
   du[2] = rho_0 * ( rho_2 *  (beta *( 1 - S) - (cintra*rho_2 + alpha_0*rho_1 ))) - rho_2 * m
   du[3] = d*rho_0 - rho_d*(r+f*(rho_1))
-  du[4] = -d*rho_0 + rho_d*(r+f*(rho_1)) - rho_0 * ( rho_1 *  (beta * ( 1 - S * (1 - e)) - (cintra*rho_1 + alpha_0 * (1+exp(-1)) * rho_2 ))) -
+  du[4] = -d*rho_0 + rho_d*(r+f*(rho_1)) - rho_0 * ( rho_1 *  (beta * ( 1 - S * (1 - e)) - (cintra*rho_1 + alpha_0 * (1+h*exp(-1)) * rho_2 ))) -
       rho_0 * ( rho_2 *  (beta *( 1 - S) - (cintra*rho_2 + alpha_0*rho_1 ))) + rho_2 * m + rho_1 * m
 
 end")
@@ -69,136 +81,17 @@ MF_two_species_julia_press = julia_eval("
 
 function MF_two_species_press(du,u,p,t)
 
-  r,d,f,beta1,beta2,m,e,cintra,alpha_0,S=p
+  r,d,f,beta1,beta2,m,e,cintra,alpha_0,S,h=p
   rho_1,rho_2,rho_d,rho_0=u
   
-  du[1] = rho_0 * ( rho_1 *  (beta1 * ( 1 - S * (1 - e)) - (cintra*rho_1 + alpha_0 * (1+exp(-1)) * rho_2))) - rho_1 * m
+  du[1] = rho_0 * ( rho_1 *  (beta1 * ( 1 - S * (1 - e)) - (cintra*rho_1 + alpha_0 * (1+h*exp(-1)) * rho_2))) - rho_1 * m
   du[2] = rho_0 * ( rho_2 *  (beta2 *( 1 - S) - (cintra*rho_2 + alpha_0*rho_1 ))) - rho_2 * m
   du[3] = d*rho_0 - rho_d*(r+f*(rho_1))
-  du[4] = -d*rho_0 + rho_d*(r+f*(rho_1)) - rho_0 * ( rho_1 *  (beta1 * ( 1 - S * (1 - e)) - (cintra*rho_1 + alpha_0 * (1+exp(-1)) * rho_2 ))) -
+  du[4] = -d*rho_0 + rho_d*(r+f*(rho_1)) - rho_0 * ( rho_1 *  (beta1 * ( 1 - S * (1 - e)) - (cintra*rho_1 + alpha_0 * (1+h*exp(-1)) * rho_2 ))) -
       rho_0 * ( rho_2 *  (beta2 *( 1 - S) - (cintra*rho_2 + alpha_0*rho_1 ))) + rho_2 * m + rho_1 * m
 
 end")
 
-
-
-# OLD : 10/10, explicit increases of facilitation with stress : don't change. We model it implicitly now  
-# MF_two_species_julia_SGH = julia_eval("
-# 
-# function MF_two_species_SGH(du,u,p,t)
-# 
-#   r,d,f,beta1,beta2,m,e,emax,cintra,cinter1,cinter2,S=p
-#   rho_1,rho_2,rho_d,rho_0=u
-# 
-#   du[1] = rho_0 * ( beta * rho_1 *  (emax *( 1 -S*(1-e)) - (cintra*rho_1 + cinter1*rho_2))) - rho_1 * m
-#   du[2] = rho_0 * ( beta * rho_2 *  (emax *( 1 -S) - (cintra*rho_2 + cinter2*rho_1))) - rho_2 * m
-#   du[3] = d*rho_0 - rho_d*(r+S*f*(rho_1))
-#   du[4] = -d*rho_0 + rho_d*(r+S*f*(rho_1))-rho_0 * ( beta * rho_1 *  (emax *( 1 -S*(1-e)) - (cintra*rho_1 + cinter1*rho_2)))  -
-#       rho_0 * ( beta * rho_2 *  (emax *( 1 -S) - (cintra*rho_2 + cinter2*rho_1))) + rho_2 * m + rho_1 * m
-# 
-# end")
-# 
-# 
-# MF_two_species_julia_SGH_press = julia_eval("
-# 
-# function MF_two_species_SGH_press(du,u,p,t)
-# 
-#   r,d,f,beta1,beta2,m,e,emax,cintra,cinter1,cinter2,S=p
-#   rho_1,rho_2,rho_d,rho_0=u
-# 
-#   du[1] = rho_0 * ( beta1 * rho_1 *  (emax *( 1 -S*(1-e)) - (cintra*rho_1 + cinter1*rho_2))) - rho_1 * m
-#   du[2] = rho_0 * ( beta2 * rho_2 *  (emax *( 1 -S) - (cintra*rho_2 + cinter2*rho_1))) - rho_2 * m
-#   du[3] = d*rho_0 - rho_d*(r+S*f*(rho_1))
-#   du[4] = -d*rho_0 + rho_d*(r+S*f*(rho_1))-rho_0 * ( beta1 * rho_1 *  (emax *( 1 -S*(1-e)) - (cintra*rho_1 + cinter1*rho_2)))  -
-#       rho_0 * ( beta2 * rho_2 *  (emax *( 1 -S) - (cintra*rho_2 + cinter2*rho_1))) + rho_2 * m + rho_1 * m
-# 
-# end")
-
-
-# Analysis and ploting figs
-
-Post_processing_MF = function(d2, name, C_seq = c_seq,S_critic1,S_critic2) {
-
-    write.table(d2,paste0("../Table/2_species/2_species_",name,".csv"),sep=";")
-
-
-    d2$state = sapply(1:nrow(d2), function(x) {
-        if (d2[x, 1] > 0 & d2[x, 2] > 0) {
-            return("coexistence")
-        }
-        if (d2[x, 1] > 0 & d2[x, 2] == 0) {
-            return("stress_tol")
-        }
-        if (d2[x, 1] == 0 & d2[x, 2] > 0) {
-            return("competitive")
-        }
-        if (d2[x, 1] == 0 & d2[x, 2] == 0) {
-            return("desert")
-        }
-    })
-
-    c_values_bifu = C_seq[c(1, round(length(C_seq) / 2), length(C_seq))]
-
-
-    color_rho = c("coexistence" = "#D8CC7B", "competitive" = "#ACD87B", "desert" = "#696969", "stress_tol" = "#7BD8D3")
-
-    # state at equilibrium
-    p1 = ggplot(d2) +
-        geom_tile(aes(x = S, y = alpha_0, fill = state)) +
-        theme_classic() +
-        scale_fill_manual(values = color_rho) +
-        annotate("text", x = rep(1.05, 3), y = c_values_bifu+max(c_values_bifu)/20 , label = c("C", "B", "A"), color = "black") +
-        theme(legend.position = "bottom") +
-        labs(x = "Stress (S)", y = TeX(r'(Strength of competition \ $\alpha_0)'), fill = "") +
-        geom_hline(yintercept = c_values_bifu , lwd = .1, color = "gray40") +
-        theme(legend.text = element_text(size = 11))
-
-
-    # density of global vegetation
-    density_col = colorRampPalette(c("red", "white", "blue"))
-    p2 = ggplot(d2) +
-        geom_tile(aes(x = S, y = alpha_0 , fill = rho_plus)) +
-        theme_classic() +
-        scale_fill_gradientn(colours = density_col(100)) +
-        theme(legend.position = "bottom") +
-        labs(
-            x = "Stress (S)", y = TeX(r'(Strength of competition \ $\alpha_0)'),
-            fill = TeX(r'(Global vegetation \ $\rho_1 + \rho_2$)')
-        )
-
-
-    # some bifurcation diagrams
-
-    c_values_bifu = c_seq[c(1, round(length(c_seq) / 2), length(c_seq))]
-    d_bifu = filter(d2, round(alpha_0, 4) %in% round(c_values_bifu, 4))
-    for (c_bifu in 1:3) {
-        assign(
-            paste0("p3_", c_bifu),
-            ggplot(d_bifu %>% filter(., round(alpha_0, 4) == round(c_values_bifu[c_bifu], 4)) %>% melt(., measure.vars = c("rho_1", "rho_2")) %>%
-                mutate(., variable = recode_factor(variable, "rho_1" = "stress_tol", "rho_2" = "competitive"))) +
-                geom_point(aes(x = S, y = value, color = variable), size = .5) +
-                geom_segment(
-                  x = S_critic2, y = .075,xend = S_critic2, yend = 0,
-                  lineend = "round",linejoin = "round", size = .3, 
-                  arrow = arrow(length = unit(0.1, "inches")),
-                  colour = color_rho[2]) + 
-              geom_segment(
-                x = S_critic1, y = .075,xend = S_critic1, yend = 0,
-                lineend = "round",linejoin = "round", size = .3, 
-                arrow = arrow(length = unit(0.1, "inches")),
-                colour = color_rho[4]) + 
-                labs(x = "Stress (S)", y = "Density", color = "") +
-                the_theme +
-                scale_color_manual(values = color_rho[c(2, 4)]) +
-                theme(legend.text = element_text(size = 12))
-        )
-    }
-    p3 = ggarrange(p3_3, p3_2, p3_1, nrow = 3, common.legend = T, legend = "bottom", labels = LETTERS[1:3])
-
-    p_tile = ggarrange(p1, p2, ncol = 2)
-    p_tot = ggarrange(p_tile, p3, ncol = 2, widths = c(3, 1))
-    ggsave(paste0("../Figures/2_species/MF/2_species_", name, ".pdf"), width = 14, height = 6)
-}
 
 
 
@@ -217,8 +110,8 @@ Run_dynamics_hysteresis = function(plot = F, N_seq_c = 100, N_seq_S = 100, write
     param=Get_MF_parameters()    
     N_seq_s = N_seq_S
     d2 = tibble()
-    c_seq = seq(0,0.5, length.out = N_seq_c)
-    param["c_intra"]=.5
+    c_seq = seq(0,0.3, length.out = N_seq_c)
+    param["cintra"]=.3
 
 
     for (comp in c_seq) { # for each competition coefficient
@@ -270,7 +163,7 @@ Run_dynamics_hysteresis = function(plot = F, N_seq_c = 100, N_seq_S = 100, write
             facet_wrap(. ~ alpha_0, labeller = label_both) +
             scale_linetype_manual(values = c(1, 2)) +
             scale_color_manual(values = color_rho[c(2, 4)]) +
-            labs(x = "Stress (S)", y = TeX("$\\rho_{1}, \\rho_{2}$"), color = "",linetype="")
+            labs(x = "Stress (S)", y = TeX("$\\rho_{+_1}, \\rho_{+_2}$"), color = "",linetype="")
 
         p_tot = ggarrange(p, p2, nrow = 2)
         ggsave("../Figures/2_species/MF/Example_hysteresis.pdf", width = 7, height = 6)
@@ -324,7 +217,7 @@ Compute_hysteresis = function(d, n_species = 2) {
 
 plot_dynamics = function(d) {
     color_rho2 = c("fertile" = "#D8CC7B", "competitive" = "#ACD87B", "desert" = "#696969", "stress_tol" = "#7BD8D3")
-    colnames(d) = c("rho_1", "rho_2", "rho_0", "rho_d","time")
+    colnames(d) = c("rho_1", "rho_2", "rho_0", "rho_d")
     if ("time" %in% colnames(d) | "Time" %in% colnames(d)) {
         return(ggplot(d %>% melt(., id.vars = colnames(d)[ncol(d)]) %>%
             mutate(., variable = recode_factor(variable, "rho_1" = "stress_tol", "rho_2" = "competitive", "rho_0" = "fertile", "rho_d" = "desert"))) +
@@ -350,8 +243,8 @@ plot_dynamics = function(d) {
 
 Get_recruitment_rates = function(eq, param) {
     recruit_rate = c(
-        r1 =  (1 - eq$rho_1 - eq$rho_2 - eq$rho_d) * param["beta"] * eq$rho_1 * (param["emax"] * (1 - param["S"] * (1 - param["e"])) - (param["cintra"] * eq$rho_1 + param["cinter1"] * eq$rho_2)) - eq$rho_1 * param["m"],
-        r2 =  (1 - eq$rho_1 - eq$rho_2 - eq$rho_d) * param["beta"] * eq$rho_2 * (param["emax"] * (1 - param["S"]) - (param["cintra"] * eq$rho_2 + param["cinter2"] * eq$rho_1)) - eq$rho_2 * param["m"]
+        r1 =  (1 - eq$rho_1 - eq$rho_2 - eq$rho_d) * param["beta"] * eq$rho_1 * ( (1 - param["S"] * (1 - param["e"])) - (param["cintra"] * eq$rho_1 + param["cinter1"] * eq$rho_2)) - eq$rho_1 * param["m"],
+        r2 =  (1 - eq$rho_1 - eq$rho_2 - eq$rho_d) * param["beta"] * eq$rho_2 * ( (1 - param["S"]) - (param["cintra"] * eq$rho_2 + param["cinter2"] * eq$rho_1)) - eq$rho_2 * param["m"]
     )
 
     names(recruit_rate) = c("r1", "r2")
@@ -361,29 +254,25 @@ Get_recruitment_rates = function(eq, param) {
 
 # B) Pair approximation analysis ----
 
-Get_PA_parameters = function(type_comp="global") {
-  if (type_comp=="global"){
-    param=c(
-      r = 0.05, d = 0.1, f = .9, beta = 0.8, m = 0.1, e = .1, cintra=.5,alpha_0=0, S = 0, delta = .1, z = 4
-    )
-  } else {
-    param=c(
-      r = 0.05, d = 0.1, f = .9, beta = 0.8, m = 0.1, e = .1,cg = .1,  cintra=.5,alpha_0=0, S = 0, delta = .1, z = 4
-    )
-  }
+Get_PA_parameters = function() {
+  param=c(
+    r = 0.01, d = 0.025, f = .9, beta = 1, m = 0.15, e = .1, cintra=.3,alpha_0=.3, S = 0, delta = .1, z = 4,h=1
+  )       
   
   return(param)
 }
 
 Get_PA_initial_state = function(ini=c(.4,.4,.1)) {
-    state = ini
+  
+    if (length(ini==4)){ini=ini[-4]}
+  
     state_pair = c(
-        rho_12 = state[1] * state[2], rho_1m = state[1] * state[3], rho_2m = state[2] * state[3],
-        rho_11 = state[1] * state[1], rho_22 = state[2] * state[2], rho_mm = state[3] * state[3]
+        rho_12 = ini[1] * ini[2], rho_1m = ini[1] * ini[3], rho_2m = ini[2] * ini[3],
+        rho_11 = ini[1] * ini[1], rho_22 = ini[2] * ini[2], rho_mm = ini[3] * ini[3]
     )
-    state = c(state, state_pair)
-    names(state) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
-    return(state)
+    ini = c(ini, state_pair)
+    names(ini) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
+    return(ini)
 }
 
 get_mean_densities = function(d) {
@@ -393,12 +282,14 @@ get_mean_densities = function(d) {
 }
 
 
-PA_two_species_julia = julia_eval("
+# a) local facilitation ----
 
-function PA_two_species_local_comp(du,u,p,t)
+PA_two_species_local_C_local_F = julia_eval("
+
+function PA_two_species_local_C_local_F(du,u,p,t)
 
 
-r,d,f,beta,m,e,cg,cintra,alpha_0,S,delta,z=p
+r,d,f,beta,m,e,cintra,alpha_0,S,delta,z,h=p
 rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
 
 rho_0=(1- rho_1-rho_2-rho_m)
@@ -410,41 +301,41 @@ rho_0m = rho_m - rho_mm - rho_1m - rho_2m
 
 #rho_1
 du[1] =  rho_0 *  (delta * rho_1 + (1 - delta) * (((rho_10)) / rho_0)) * (beta * (1 - S * (1-e )) - 
-(cg *(rho_1 + rho_2) + (cintra * ((rho_10)/rho_0) + alpha_0 * (1+exp(-1)) *((rho_20)/rho_0)) ) ) - rho_1 * m
+( (cintra * ((rho_10)/rho_0) + alpha_0 * (1+h*exp(-1)) *((rho_20)/rho_0)) ) ) - rho_1 * m
 
 #rho_2
 du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (((rho_20)) / rho_0)) * (beta * (1 - S)  - 
-(cg *(rho_1 + rho_2) + (cintra * ((rho_20)/rho_0) + alpha_0 *((rho_10)/rho_0))  )  ) - rho_2 * m
+( (cintra * ((rho_20)/rho_0) + alpha_0 * ((rho_10)/rho_0))  )  ) - rho_2 * m
 
 #rho_m
 du[3] =  rho_0 * d - rho_m * (r + f * (((rho_10)) / rho_0))
 
 #rho_12
 du[4] = ((rho_10)) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_20)) / rho_0)) * 
-        (beta * (1 - S ) - (cg *(rho_1 + rho_2) + (cintra * ((z - 1) / z)*((rho_20)/rho_0) + (alpha_0/z) + alpha_0 *((z - 1) / z)*((rho_10)/rho_0)) )   )  +
+        (beta * (1 - S ) - ( (cintra * ((z - 1) / z)*((rho_20)/rho_0) + (alpha_0/z) + alpha_0 *((z - 1) / z)*((rho_10)/rho_0)) )   )  +
         ((rho_20)) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * 
         (((rho_10)) / rho_0)) * (beta * (1 - S * (1-e )) - 
-        (cg *(rho_1 + rho_2) + (cintra * ((z - 1) / z) * ((rho_10)/rho_0) + ((alpha_0 * (1+exp(-1)))/z) + alpha_0 * (1+exp(-1)) * ((z - 1) / z) *((rho_20)/rho_0)) )  ) -
+        ( (cintra * ((z - 1) / z) * ((rho_10)/rho_0) + ((alpha_0 * (1+h*exp(-1)))/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *((rho_20)/rho_0)) )  ) -
         2 * rho_12 * m
 
 #rho_1m
 du[5] = ((rho_10)) * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (((rho_10)) / rho_0)) * (beta * (1 - S * (1-e )) - 
-        (cintra * ((z - 1) / z) * ((rho_10)/rho_0) + alpha_0 * (1+exp(-1)) * ((z - 1) / z) *((rho_20)/rho_0))     ) -
+        (cintra * ((z - 1) / z) * ((rho_10)/rho_0) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *((rho_20)/rho_0))     ) -
         rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (((rho_10)) / rho_0) ))
 
 #rho_2m
 du[6] = ((rho_20)) * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_20)) / rho_0) * (beta * (1 - S  ) - 
-        (cg *(rho_1 + rho_2) + (cintra * ((z - 1) / z) * ((rho_20)/rho_0) + alpha_0 *  ((z - 1) / z) *((rho_10)/rho_0)) ))) -
+        ( (cintra * ((z - 1) / z) * ((rho_20)/rho_0) + alpha_0 *  ((z - 1) / z) *((rho_10)/rho_0)) ))) -
         rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (((rho_10)) / rho_0 )))
 
 #rho_11
 du[7] = 2* ((rho_10)) *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_10)) / rho_0 )) * 
-        (beta *  (1 - S * (1-e )) - (cintra * ((z - 1) / z) * ((rho_10)/rho_0) + (cintra/z) + alpha_0 * (1+exp(-1)) * ((z - 1) / z) *((rho_20)/rho_0))  ) -
+        (beta *  (1 - S * (1-e )) - (cintra * ((z - 1) / z) * ((rho_10)/rho_0) + (cintra/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *((rho_20)/rho_0))  ) -
         2 * rho_11 * m
 
 #rho_22
 du[8] = 2* ((rho_20)) * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_20)) / rho_0 )) * (beta *  
-        (1 - S ) - (cg *(rho_1 + rho_2) + (cintra * ((z - 1) / z)*((rho_20)/rho_0) + (cintra/z) + alpha_0 *((z - 1) / z)*((rho_10)/rho_0)) )    ) -
+        (1 - S ) - ( (cintra * ((z - 1) / z)*((rho_20)/rho_0) + (cintra/z) + alpha_0 *((z - 1) / z)*((rho_10)/rho_0)) )    ) -
         2 * rho_22 * m
 
 #rho_mm
@@ -456,11 +347,11 @@ end
 
 ")
 
-PA_two_species_julia = julia_eval("
+PA_two_species_global_C_local_F = julia_eval("
 
-function PA_two_species_global_comp(du,u,p,t)
+function PA_two_species_global_C_local_F(du,u,p,t)
 
-r,d,f,beta,m,e,cintra,alpha_0,S,delta,z=p
+r,d,f,beta,m,e,cintra,alpha_0,S,delta,z,h=p
 rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
 
 rho_0=(1- rho_1-rho_2-rho_m)
@@ -471,7 +362,7 @@ rho_0m = rho_m - rho_mm - rho_1m - rho_2m
 
 #rho_1
 du[1] =  rho_0 *  (delta * rho_1 + (1 - delta) * (((rho_10)) / rho_0)) * (beta * (1 - S * (1-e )) - 
-(cintra *rho_1 + alpha_0 * (1+exp(-1))*rho_2) ) - rho_1 * m
+(cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) ) - rho_1 * m
 
 #rho_2
 du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (((rho_20)) / rho_0)) * (beta * (1 - S)  - 
@@ -485,12 +376,12 @@ du[4] = ((rho_10)) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_20)) 
         (beta * (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1))  +
         ((rho_20)) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * 
         (((rho_10)) / rho_0)) * (beta * (1 - S * (1-e )) - 
-        (cintra *rho_1 + alpha_0 * (1+exp(-1))*rho_2) )-
+        (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) )-
         2 * rho_12 * m
 
 #rho_1m
 du[5] = ((rho_10)) * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (((rho_10)) / rho_0)) * (beta * (1 - S * (1-e )) - 
-        (cintra *rho_1 + alpha_0 * (1+exp(-1))*rho_2)) -
+        (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
         rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (((rho_10)) / rho_0) ))
 
 #rho_2m
@@ -500,7 +391,7 @@ du[6] = ((rho_20)) * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z)
 
 #rho_11
 du[7] = 2* ((rho_10)) *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_10)) / rho_0 )) * 
-        (beta *  (1 - S * (1-e )) - (cintra *rho_1 + alpha_0 * (1+exp(-1))*rho_2)) -
+        (beta *  (1 - S * (1-e )) - (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
         2 * rho_11 * m
 
 #rho_22
@@ -519,41 +410,41 @@ end
 
 
 
-PA_two_species_julia_press = julia_eval("
+PA_two_species_local_C_local_F_press = julia_eval("
 
-function PA_two_species_press_local_comp(du,u,p,t)
+function PA_two_species_local_C_local_F_press(du,u,p,t)
 
-r,d,f,beta1,beta2,m,e,cg,cintra,alpha12,alpha21,alpha22,S,delta,z=p
+r,d,f,beta1,beta2,m,e,cintra,alpha_0,S,delta,z,h=p
 rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
 
 #rho_1
-du[1] =  (1- rho_1-rho_2-rho_m) * beta1 * (delta * rho_1 + (1 - delta) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S * e ) - (cg *(rho_1 + rho_2) + (alpha11 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) + alpha21 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) )) - rho_1 * m
+du[1] =  (1- rho_1-rho_2-rho_m) * beta1 * (delta * rho_1 + (1 - delta) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m))) * ((1 - S * e ) - ( (alpha_0 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) + alpha_0 * (1+h*exp(-1)) *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) )) - rho_1 * m
 
 #rho_2
-du[2] =  (1- rho_1-rho_2-rho_m) * beta2 * (delta * rho_2 + (1 - delta) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S)  - (cg *(rho_1 + rho_2) + (alpha22 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) + alpha_0 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) )) - rho_2 * m
+du[2] =  (1- rho_1-rho_2-rho_m) * beta2 * (delta * rho_2 + (1 - delta) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m))) * ((1 - S)  - ( (alpha22 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) + alpha_0 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) )) - rho_2 * m
 
 #rho_m
 du[3] =  (1- rho_1-rho_2-rho_m) * d - rho_m * (r + f * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m)))
 
 #rho_12
-du[4] = ((rho_1 - rho_11 - rho_12 - rho_1m)) * beta2 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S ) - (cg *(rho_1 + rho_2) + (alpha22 *((z - 1) / z)*((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) + (alpha_0/z) + alpha_0 *((z - 1) / z)*((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) ))  +
-        ((rho_2 - rho_22 - rho_12 - rho_2m)) * beta1 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S * e ) - (cg *(rho_1 + rho_2) + (alpha11 * ((z - 1) / z) * ((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) + (alpha21/z) + alpha21 * ((z - 1) / z) *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) ))-
+du[4] = ((rho_1 - rho_11 - rho_12 - rho_1m)) * beta2 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m))) * ((1 - S ) - ( (alpha22 *((z - 1) / z)*((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) + (alpha_0/z) + alpha_0 *((z - 1) / z)*((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) ))  +
+        ((rho_2 - rho_22 - rho_12 - rho_2m)) * beta1 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m))) * ((1 - S * e ) - ( (alpha_0 * ((z - 1) / z) * ((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) + (alpha_0 * (1+h*exp(-1))/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) ))-
         2 * rho_12 * m
 
 #rho_1m
-du[5] = ((rho_1 - rho_11 - rho_12 - rho_1m)) * d + (rho_m - rho_mm - rho_1m - rho_2m) * beta1 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m))) * (emax * (1 - S * e ) - (cg *(rho_1 + rho_2) + (alpha11 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) + alpha21 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) )) -
+du[5] = ((rho_1 - rho_11 - rho_12 - rho_1m)) * d + (rho_m - rho_mm - rho_1m - rho_2m) * beta1 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m))) * ((1 - S * e ) - ( (alpha_0 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) + alpha_0 * (1+h*exp(-1)) *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) )) -
         rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m)) ))
 
 #rho_2m
-du[6] = ((rho_2 - rho_22 - rho_12 - rho_2m)) * d + (rho_m - rho_mm - rho_1m - rho_2m) * beta2 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m)) * (emax * (1 - S  ) - (cg *(rho_1 + rho_2) + (alpha22 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) + alpha_0 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) ))) -
+du[6] = ((rho_2 - rho_22 - rho_12 - rho_2m)) * d + (rho_m - rho_mm - rho_1m - rho_2m) * beta2 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m)) * ((1 - S  ) - ( (alpha22 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) + alpha_0 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) ))) -
         rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m) )))
 
 #rho_11
-du[7] = 2* ((rho_1 - rho_11 - rho_12 - rho_1m)) *  beta1 * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m) )) * (emax * (1 - S * e ) - (cg *(rho_1 + rho_2) + (alpha11 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) * ((z - 1) / z) + (alpha11/z) + alpha21 * ((z - 1) / z) * ((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) )) -
+du[7] = 2* ((rho_1 - rho_11 - rho_12 - rho_1m)) *  beta1 * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m) )) * ((1 - S * e ) - ( (alpha_0 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) * ((z - 1) / z) + (alpha_0/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) * ((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) )) -
         2 * rho_11 * m
 
 #rho_22
-du[8] = 2* ((rho_2 - rho_22 - rho_12 - rho_2m)) * beta2 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m) )) * (emax * (1 - S ) - (cg *(rho_1 + rho_2) + (alpha22 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) * ((z - 1) / z) + (alpha22/z) + alpha_0 * ((z - 1) / z) * ((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) )) -
+du[8] = 2* ((rho_2 - rho_22 - rho_12 - rho_2m)) * beta2 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m) )) * ((1 - S ) - ( (alpha22 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) * ((z - 1) / z) + (alpha22/z) + alpha_0 * ((z - 1) / z) * ((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) )) -
         2 * rho_22 * m
 
 #rho_mm
@@ -565,96 +456,311 @@ end
 ")
 
 
-post_processing_2species_PA = function(d2, Alpha_seq = alpha_seq, S_seq,file_name = "",S_critic1,S_critic2) {
-    d2$state = sapply(1:nrow(d2), function(x) {
-      if (is.na(d2$rho_1[x]) & is.na(d2$rho_2[x])) {
-        return("NA")
-      }else{
-        
-        
-        if (d2$rho_1[x] > 0 & d2$rho_2[x] > 0) {
-              return("coexistence")
-          }
-          if (d2$rho_1[x] > 0 & d2$rho_2[x] == 0) {
-              return("stress_tol")
-          }
-          if (d2$rho_1[x] == 0 & d2$rho_2[x] > 0) {
-              return("competitive")
-          }
-          if (d2$rho_1[x] == 0 & d2$rho_2[x] == 0) {
-              return("desert")
-          }
-      }
-      
-    })
-
-    c_values_bifu = Alpha_seq[c(1, round(length(Alpha_seq) / 2), length(Alpha_seq))]
 
 
-    color_rho = c("coexistence" = "#D8CC7B", "competitive" = "#ACD87B", "desert" = "#696969", "stress_tol" = "#7BD8D3")
+PA_two_species_global_C_local_F_press = julia_eval("
 
-    # state at equilibrium
-    p1 = ggplot(d2) +
-        geom_tile(aes(x = S, y = alpha_0 , fill = state)) +
-        theme_classic() +
-        scale_fill_manual(values = color_rho) +
-        theme(legend.position = "bottom") +
-        labs(x = "Stress (S)", y = TeX(r'(Competition strength \ $\alpha_0)'), fill = "") +
-        geom_hline(yintercept = c_values_bifu , lwd = .1, color = "gray40") +
-        theme(legend.text = element_text(size = 11))
+function PA_two_species_global_C_local_F_press(du,u,p,t)
+
+r,d,f,beta1,beta2,m,e,cintra,alpha_0,S,delta,z,h=p
+rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
+
+rho_0=(1- rho_1-rho_2-rho_m)
+rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
+rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
+rho_0m = rho_m - rho_mm - rho_1m - rho_2m 
 
 
-    
-    # pair 12
-    density_pair = colorRampPalette(c("yellow", "#CE7604"))
-    d2$rho_12[which(d2$rho_1 == 0 | d2$rho_2 == 0)] = NA
-    p4 = ggplot(d2) +
-        geom_tile(aes(x = S, y = alpha_0, fill = rho_12)) +
-        theme_classic() +
-        scale_fill_gradientn(colours = density_pair(100), na.value = "grey") +
-        theme(legend.position = "bottom") +
-        labs(x = "Stress (S)", y = TeX(r'(Competition strength \ $\alpha_0)'), fill = "Pair sp1 & sp2")
+#rho_1
+du[1] =  rho_0 *  (delta * rho_1 + (1 - delta) * (((rho_10)) / rho_0)) * (beta1 * (1 - S * (1-e )) - 
+(cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) ) - rho_1 * m
 
-    # some bifurcation diagrams
+#rho_2
+du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (((rho_20)) / rho_0)) * (beta2 * (1 - S)  - 
+(cintra *rho_2 + alpha_0 * rho_1)) - rho_2 * m
 
-    a_values_bifu = Alpha_seq[c(1, round(length(Alpha_seq) / 2), length(Alpha_seq))]
-    d_bifu = filter(d2, round(alpha_0, 4) %in% round(a_values_bifu, 4))
-    for (a_bifu in 1:3) {
-        assign(
-            paste0("p3_", a_bifu),
-            ggplot(d_bifu %>% filter(., round(alpha_0, 4) == round(a_values_bifu[a_bifu], 4)) %>% melt(., measure.vars = c("rho_1", "rho_2")) %>%
-                mutate(., variable = recode_factor(variable, "rho_1" = "stress_tol", "rho_2" = "competitive"))) +
-                geom_point(aes(x = S, y = value, color = variable), size = .75) +
-                geom_segment(
-                  x = S_critic2, y = .075,xend = S_critic2, yend = 0,
-                  lineend = "round",linejoin = "round", size = .3, 
-                  arrow = arrow(length = unit(0.1, "inches")),
-                  colour = color_rho[2]) + 
-                geom_segment(
-                  x = S_critic1, y = .075,xend = S_critic1, yend = 0,
-                  lineend = "round",linejoin = "round", size = .3, 
-                  arrow = arrow(length = unit(0.1, "inches")),
-                  colour = color_rho[4])+
-                labs(x = "Stress (S)", y = "Density", color = "") +
-                the_theme +
-                scale_color_manual(values = color_rho[c(2, 4)]) +
-                theme(legend.text = element_text(size = 11))
-        )
-    }
-    p3 = ggarrange(p3_3, p3_2, p3_1, nrow = 3, common.legend = T, legend = "bottom")
+#rho_m
+du[3] =  rho_0 * d - rho_m * (r + f * (((rho_10)) / rho_0))
 
-    p_tile = ggarrange(p1, p4, ncol = 2)
-    p_tot = ggarrange(p_tile, p3, ncol = 2, widths = c(3, 1))
-    ggsave(paste0("../Figures/2_species/PA/PA_",file_name,".pdf"), width = 14, height = 6)
-    return(p_tot)
-}
+#rho_12
+du[4] = ((rho_10)) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_20)) / rho_0)) * 
+        (beta2 * (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1))  +
+        ((rho_20)) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * 
+        (((rho_10)) / rho_0)) * (beta1 * (1 - S * (1-e )) - 
+        (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) )-
+        2 * rho_12 * m
+
+#rho_1m
+du[5] = ((rho_10)) * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (((rho_10)) / rho_0)) * (beta1 * (1 - S * (1-e )) - 
+        (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
+        rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (((rho_10)) / rho_0) ))
+
+#rho_2m
+du[6] = ((rho_20)) * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_20)) / rho_0) * (beta2 * (1 - S  ) - 
+        ((cintra *rho_2 + alpha_0 *rho_1) ))) -
+        rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (((rho_10)) / rho_0 )))
+
+#rho_11
+du[7] = 2* ((rho_10)) *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_10)) / rho_0 )) * 
+        (beta1 *  (1 - S * (1-e )) - (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
+        2 * rho_11 * m
+
+#rho_22
+du[8] = 2* ((rho_20)) * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_20)) / rho_0 )) * (beta2 *  
+        (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1)) -
+        2 * rho_22 * m
+
+#rho_mm
+du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * ((z - 1) / z) * (((rho_10)) / rho_0))
+
+end
+
+
+")
+
+
+# b) global facilitation ----
+
+PA_two_species_local_C_global_F = julia_eval("
+
+function PA_two_species_local_C_global_F(du,u,p,t)
+
+
+r,d,f,beta,m,e,cintra,alpha_0,S,delta,z,h=p
+rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
+
+rho_0=(1- rho_1-rho_2-rho_m)
+rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
+rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
+rho_0m = rho_m - rho_mm - rho_1m - rho_2m 
+
+
+
+#rho_1
+du[1] =  rho_0 *  (delta * rho_1 + (1 - delta) * (((rho_10)) / rho_0)) * (beta * (1 - S * (1-e )) - 
+( (cintra * ((rho_10)/rho_0) + alpha_0 * (1+h*exp(-1)) *((rho_20)/rho_0)) ) ) - rho_1 * m
+
+#rho_2
+du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (((rho_20)) / rho_0)) * (beta * (1 - S)  - 
+( (cintra * ((rho_20)/rho_0) + alpha_0 *((rho_10)/rho_0))  )  ) - rho_2 * m
+
+#rho_m
+du[3] =  rho_0 * d - rho_m * (r + f * rho_1)
+
+#rho_12
+du[4] = ((rho_10)) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_20)) / rho_0)) * 
+        (beta * (1 - S ) - ( (cintra * ((z - 1) / z)*((rho_20)/rho_0) + (alpha_0/z) + alpha_0 *((z - 1) / z)*((rho_10)/rho_0)) )   )  +
+        ((rho_20)) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * 
+        (((rho_10)) / rho_0)) * (beta * (1 - S * (1-e )) - 
+        ( (cintra * ((z - 1) / z) * ((rho_10)/rho_0) + ((alpha_0 * (1+h*exp(-1)))/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *((rho_20)/rho_0)) )  ) -
+        2 * rho_12 * m
+
+#rho_1m
+du[5] = ((rho_10)) * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (((rho_10)) / rho_0)) * (beta * (1 - S * (1-e )) - 
+        (cintra * ((z - 1) / z) * ((rho_10)/rho_0) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *((rho_20)/rho_0))     ) -
+        rho_1m * m - rho_1m * (r + f*rho_1)
+
+#rho_2m
+du[6] = ((rho_20)) * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_20)) / rho_0) * (beta * (1 - S  ) - 
+        ( (cintra * ((z - 1) / z) * ((rho_20)/rho_0) + alpha_0 *  ((z - 1) / z) *((rho_10)/rho_0)) ))) -
+        rho_2m * m - rho_2m * (r + f*rho_1)
+
+#rho_11
+du[7] = 2* ((rho_10)) *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_10)) / rho_0 )) * 
+        (beta *  (1 - S * (1-e )) - (cintra * ((z - 1) / z) * ((rho_10)/rho_0) + (cintra/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *((rho_20)/rho_0))  ) -
+        2 * rho_11 * m
+
+#rho_22
+du[8] = 2* ((rho_20)) * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_20)) / rho_0 )) * (beta *  
+        (1 - S ) - ( (cintra * ((z - 1) / z)*((rho_20)/rho_0) + (cintra/z) + alpha_0 *((z - 1) / z)*((rho_10)/rho_0)) )    ) -
+        2 * rho_22 * m
+
+#rho_mm
+du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * rho_1)
+
+
+end
+
+
+")
+
+PA_two_species_global_C_global_F = julia_eval("
+
+function PA_two_species_global_C_global_F(du,u,p,t)
+
+r,d,f,beta,m,e,cintra,alpha_0,S,delta,z,h=p
+rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
+
+rho_0=(1- rho_1-rho_2-rho_m)
+rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
+rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
+rho_0m = rho_m - rho_mm - rho_1m - rho_2m 
+
+
+#rho_1
+du[1] =  rho_0 *  (delta * rho_1 + (1 - delta) * (((rho_10)) / rho_0)) * (beta * (1 - S * (1-e )) - (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) ) - rho_1 * m
+
+#rho_2
+du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (((rho_20)) / rho_0)) * (beta * (1 - S)  - 
+(cintra *rho_2 + alpha_0 * rho_1)) - rho_2 * m
+
+#rho_m
+du[3] =  rho_0 * d - rho_m * (r + f * rho_1)
+
+#rho_12
+du[4] = ((rho_10)) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_20)) / rho_0)) * 
+        (beta * (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1))  +
+        ((rho_20)) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * 
+        (((rho_10)) / rho_0)) * (beta * (1 - S * (1-e )) - 
+        (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) )-
+        2 * rho_12 * m
+
+#rho_1m
+du[5] = ((rho_10)) * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (((rho_10)) / rho_0)) * (beta * (1 - S * (1-e )) - 
+        (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
+        rho_1m * m - rho_1m * (r + f*rho_1)
+
+#rho_2m
+du[6] = ((rho_20)) * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_20)) / rho_0) * (beta * (1 - S  ) - 
+        ((cintra *rho_2 + alpha_0 *rho_1) ))) -
+        rho_2m * m - rho_2m * (r + f*rho_1)
+
+#rho_11
+du[7] = 2* ((rho_10)) *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_10)) / rho_0 )) * 
+        (beta *  (1 - S * (1-e )) - (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
+        2 * rho_11 * m
+
+#rho_22
+du[8] = 2* ((rho_20)) * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_20)) / rho_0 )) * (beta *  
+        (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1)) -
+        2 * rho_22 * m
+
+#rho_mm
+du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * rho_1)
+
+end
+
+
+")
+
+
+
+
+PA_two_species_local_C_global_F_press = julia_eval("
+
+function PA_two_species_local_C_global_F_press(du,u,p,t)
+
+r,d,f,beta1,beta2,m,e,cintra,alpha_0,S,delta,z,h=p
+rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
+
+#rho_1
+du[1] =  (1- rho_1-rho_2-rho_m) * beta1 * (delta * rho_1 + (1 - delta) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m))) * ((1 - S * e ) - ( (alpha_0 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) + alpha_0 * (1+h*exp(-1)) *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) )) - rho_1 * m
+
+#rho_2
+du[2] =  (1- rho_1-rho_2-rho_m) * beta2 * (delta * rho_2 + (1 - delta) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m))) * ((1 - S)  - ( (alpha22 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) + alpha_0 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) )) - rho_2 * m
+
+#rho_m
+du[3] =  (1- rho_1-rho_2-rho_m) * d - rho_m * (r + f * rho_1)
+
+#rho_12
+du[4] = ((rho_1 - rho_11 - rho_12 - rho_1m)) * beta2 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m))) * ((1 - S ) - ( (alpha22 *((z - 1) / z)*((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) + (alpha_0/z) + alpha_0 *((z - 1) / z)*((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) ))  +
+        ((rho_2 - rho_22 - rho_12 - rho_2m)) * beta1 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m))) * ((1 - S * e ) - ( (alpha_0 * ((z - 1) / z) * ((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) + (alpha_0 * (1+h*exp(-1))/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) ))-
+        2 * rho_12 * m
+
+#rho_1m
+du[5] = ((rho_1 - rho_11 - rho_12 - rho_1m)) * d + (rho_m - rho_mm - rho_1m - rho_2m) * beta1 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m))) * ((1 - S * e ) - ( (alpha_0 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) + alpha_0 * (1+h*exp(-1)) *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) )) -
+        rho_1m * m - rho_1m * (r + f*rho_1)
+
+#rho_2m
+du[6] = ((rho_2 - rho_22 - rho_12 - rho_2m)) * d + (rho_m - rho_mm - rho_1m - rho_2m) * beta2 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m)) * ((1 - S  ) - ( (alpha22 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) + alpha_0 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) ))) -
+        rho_2m * m - rho_2m * (r + f*rho_1)
+
+#rho_11
+du[7] = 2* ((rho_1 - rho_11 - rho_12 - rho_1m)) *  beta1 * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_1 - rho_11 - rho_12 - rho_1m)) / (1- rho_1-rho_2-rho_m) )) * ((1 - S * e ) - ( (alpha_0 *((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m)) * ((z - 1) / z) + (alpha_0/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) * ((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m))) )) -
+        2 * rho_11 * m
+
+#rho_22
+du[8] = 2* ((rho_2 - rho_22 - rho_12 - rho_2m)) * beta2 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_2 - rho_22 - rho_12 - rho_2m)) / (1- rho_1-rho_2-rho_m) )) * ((1 - S ) - ( (alpha22 *((rho_2 - rho_22 - rho_12 - rho_2m)/(1- rho_1-rho_2-rho_m)) * ((z - 1) / z) + (alpha22/z) + alpha_0 * ((z - 1) / z) * ((rho_1 - rho_11 - rho_12 - rho_1m)/(1- rho_1-rho_2-rho_m))) )) -
+        2 * rho_22 * m
+
+#rho_mm
+du[9] = 2 * (rho_m - rho_mm - rho_1m - rho_2m) * d - 2* rho_mm * (r + f * rho_1)
+
+end
+
+
+")
+
+
+
+PA_two_species_global_C_global_F_press = julia_eval("
+
+function PA_two_species_global_C_global_F_press(du,u,p,t)
+
+r,d,f,beta1,beta2,m,e,cintra,alpha_0,S,delta,z,h=p
+rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
+
+rho_0=(1- rho_1-rho_2-rho_m)
+rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
+rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
+rho_0m = rho_m - rho_mm - rho_1m - rho_2m 
+
+
+#rho_1
+du[1] =  rho_0 *  (delta * rho_1 + (1 - delta) * (((rho_10)) / rho_0)) * (beta1 * (1 - S * (1-e )) - 
+(cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) ) - rho_1 * m
+
+#rho_2
+du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (((rho_20)) / rho_0)) * (beta2 * (1 - S)  - 
+(cintra *rho_2 + alpha_0 * rho_1)) - rho_2 * m
+
+#rho_m
+du[3] =  rho_0 * d - rho_m * (r + f * rho_1)
+
+#rho_12
+du[4] = ((rho_10)) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_20)) / rho_0)) * 
+        (beta2 * (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1))  +
+        ((rho_20)) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * 
+        (((rho_10)) / rho_0)) * (beta1 * (1 - S * (1-e )) - 
+        (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) )-
+        2 * rho_12 * m
+
+#rho_1m
+du[5] = ((rho_10)) * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (((rho_10)) / rho_0)) * (beta1 * (1 - S * (1-e )) - 
+        (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
+        rho_1m * m - rho_1m * (r + f*rho_1)
+
+#rho_2m
+du[6] = ((rho_20)) * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (((rho_20)) / rho_0) * (beta2 * (1 - S  ) - 
+        ((cintra *rho_2 + alpha_0 *rho_1) ))) -
+        rho_2m * m - rho_2m * (r + f*rho_1)
+
+#rho_11
+du[7] = 2* ((rho_10)) *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_10)) / rho_0 )) * 
+        (beta1 *  (1 - S * (1-e )) - (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
+        2 * rho_11 * m
+
+#rho_22
+du[8] = 2* ((rho_20)) * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (((rho_20)) / rho_0 )) * (beta2 *  
+        (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1)) -
+        2 * rho_22 * m
+
+#rho_mm
+du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * rho_1)
+
+end
+
+
+")
+
+
 
 
 # C) CA analysis ----
 
 Get_CA_parameters = function() {
     return(c(
-        r = 0.05, d = 0.1, f = .9, beta = 0.8, m = 0.1, e = .1, emax = 1.2, cg = .1, alpha11 = .1,
+        r = 0.05, d = 0.1, f = .9, beta = 0.8, m = 0.1, e = .05,  alpha11 = .1,
         alpha12 = .1, alpha21 = .1, alpha22 = .1, S = 0, delta = .1, z = 4, leap=0.5
     ))
 }
@@ -693,8 +799,8 @@ CA_2_species = function(landscape, param) {
     delta = param[14]
     z = param[15]
 
-    colonization_1 = beta * (delta * rho_1 + (1 - delta) * neigh_1 / z) * (emax * (1 - S * (1 - e)) - (cg*(rho_1+rho_2)+(alpha11*(neigh_1/z) + alpha21*(neigh_2/z))))
-    colonization_2 = beta * (delta * rho_2 + (1 - delta) * neigh_2 / z) * (emax * (1 - S)           - (cg*(rho_1+rho_2)+(alpha22*(neigh_2/z) + alpha12*(neigh_1/z))))
+    colonization_1 = beta * (delta * rho_1 + (1 - delta) * neigh_1 / z) * ((1 - S * (1 - e)) - (cg*(rho_1+rho_2)+(alpha11*(neigh_1/z) + alpha21*(neigh_2/z))))
+    colonization_2 = beta * (delta * rho_2 + (1 - delta) * neigh_2 / z) * ((1 - S)           - (cg*(rho_1+rho_2)+(alpha22*(neigh_2/z) + alpha12*(neigh_1/z))))
 
 
     # calculate regeneration, degradation & mortality rate
@@ -835,8 +941,8 @@ Gillespie_tau_leaping_R = function(landscape, time, param) {
         rho_d = 1 - rho_1 - rho_2 - rho_0 # fraction degraded
 
         # calculate the rates
-        Rate_landscape[, , 1] = beta * (delta * rho_1 + (1 - delta) * neigh_1 / z) * (emax * (1 - S * (1 - e)) - (cg*(rho_1+rho_2)+(alpha11*(neigh_1/z) + alpha21*(neigh_2/z))))
-        Rate_landscape[, , 2] = beta * (delta * rho_2 + (1 - delta) * neigh_2 / z) * (emax * (1 - S ) - (cg*(rho_1+rho_2)+(alpha22*(neigh_2/z) + alpha12*(neigh_1/z))))
+        Rate_landscape[, , 1] = beta * (delta * rho_1 + (1 - delta) * neigh_1 / z) * ((1 - S * (1 - e)) - (cg*(rho_1+rho_2)+(alpha11*(neigh_1/z) + alpha21*(neigh_2/z))))
+        Rate_landscape[, , 2] = beta * (delta * rho_2 + (1 - delta) * neigh_2 / z) * ((1 - S ) - (cg*(rho_1+rho_2)+(alpha22*(neigh_2/z) + alpha12*(neigh_1/z))))
         Rate_landscape[, , 3] = d
         Rate_landscape[, , 4] = m
         Rate_landscape[, , 5] = m
@@ -890,7 +996,7 @@ Gillespie_tau_leaping_R = function(landscape, time, param) {
 }
 
 
-# 4) Spatial analysis ----
+# D) Spatial analysis ----
 
 #From Schneider et al., 2016 TE
 Get_patches = function(landscape, state) {
@@ -1096,3 +1202,61 @@ fitPL = function(psd, p_spanning) {
   
   return(out)
 } 
+
+
+
+# E) Temporal analysis ----
+
+
+Get_temporal_EWS=function(d,burning_phase=3000){
+  
+  colnames(d)=c("Time","Rho_1","Rho_2","Rho_0","Rho_d")
+  d$Rho_tot = d$Rho_1+d$Rho_2
+  
+  Temp_sd = c(var(d$Rho_1[-(1:burning_phase)]) , var(d$Rho_2[-(1:burning_phase)]),var(d$Rho_tot[-(1:burning_phase)]))
+  
+  AR1 = c(arima(d$Rho_1[-(1:burning_phase)], order=c(1,0,0))$coef[1],
+          arima(d$Rho_2[-(1:burning_phase)], order=c(1,0,0))$coef[1],
+          arima(d$Rho_tot[-(1:burning_phase)], order=c(1,0,0))$coef[1])
+  
+  
+  return(tibble(Species=c("1","2","Tot"),Temp_sp=Temp_sd,AR1=AR1))
+  
+}
+
+
+
+# F) Functional diversity ----
+
+
+Get_diversity_community=function(trait,densities){
+  
+  densities=as.numeric(densities) #to avoid errors
+  trait=as.numeric(trait)
+  
+  
+  trait=matrix(trait,length(trait),1)
+  colnames(trait)="trait1";rownames(trait)=paste0("Sp",1:length(trait))
+  
+  densities = matrix(densities,1,length(densities))
+  colnames(densities)=paste0("Sp",1:length(trait));rownames(densities)="comm1"
+  
+  
+  diversity=d_name=c()
+  for (type in c("FD","D")){ #we do that for functional diversity and species diversity
+    for (q in 0:2){
+      if (type=="D"){ div = hill_taxa(densities,q=q)}
+      if (type=="FD"){ div = hill_func(densities,trait,q=q)["FD_q",1]}
+      diversity=c(diversity,div)
+      d_name= c(d_name,paste0(type,"_",q))
+      
+    }
+  }
+  
+  #adding community-weighted mean of traits
+  d_diversity=as_tibble(matrix(diversity,1,6))
+  colnames(d_diversity)=d_name
+  return(d_diversity)
+}
+
+
