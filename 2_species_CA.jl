@@ -5,20 +5,20 @@ using StatsBase, RCall, Plots, Random, Agents, DifferentialEquations, BenchmarkT
 
 function Get_classical_param()
 
-    r = 0.05
-    d = 0.1
+    r = 0.01
+    d = 0.025
     f = 0.9
-    beta = 0.8
-    m = 0.1
+    beta = 1
+    m = 0.15
     e = 0.1
-    cg = 0.1
+    cg = 0
     alpha_0 = 0.1
     cintra = 0.2
     S = 0
     delta = 0.1
     z = 4
     tau_leap = 0.5
-    h=1
+    h = 1
 
     return Dict{String,Any}(
         "r" => r,
@@ -196,7 +196,7 @@ function Gillespie_tau_leeping(; landscape, param, time, type_competition, save=
             @rget neigh_1
             @rget neigh_2
 
-            Rate_landscape[:, :, 1] .= @. (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(beta * (1 - S * (1 - e)) - (cg * (rho_1 + rho_2) + (cintra * (neigh_1 / z) + alpha_0 * (1 + h* exp(-1)) * (neigh_2 / z))))
+            Rate_landscape[:, :, 1] .= @. (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(beta * (1 - S * (1 - e)) - (cg * (rho_1 + rho_2) + (cintra * (neigh_1 / z) + alpha_0 * (1 + h * exp(-1)) * (neigh_2 / z))))
             Rate_landscape[:, :, 1] .= Rate_landscape[:, :, 1] .* (landscape .== 0)
 
             Rate_landscape[:, :, 2] .= @. (delta * rho_2 + (1 - delta) * neigh_2 / z) * @.(beta * (1 - S) - (cg * (rho_1 + rho_2) + (cintra * (neigh_2 / z) + alpha_0 * (neigh_1 / z))))
@@ -449,7 +449,60 @@ end
 #endregion
 
 
-#region : Step 1-- Patch size distribution : different competition scenario  
+
+#
+#region : Step 1-- Clustering of species
+
+#Making the loop along interspecific competition gradient
+c_seq = collect(range(0, stop=0.3, length=30))
+S_seq = [0, 0.25, 0.5]
+intra_comp_seq = [0.3 0.5 0.7]
+param = Get_classical_param()
+size_landscape = 100
+ini = Get_initial_lattice(size_mat=size_landscape)
+replicate = 1
+param["cintra"] = 0.3
+count = 1
+scale_competition = ["global" "local"]
+disp_seq = [0.1 0.9]
+d2 = zeros(length(S_seq) * length(c_seq) * replicate * length(scale_competition) * length(intra_comp_seq), 12) #Allocating
+
+for disp in disp_seq
+    param["delta"] = disp
+    for scale_comp in scale_competition
+        for aii in intra_comp_seq
+            param["cintra"] = aii
+            for stress in S_seq
+                param["S"] = stress
+                for alpha_e in c_seq
+                    param["alpha_0"] = alpha_e
+                    for rep in 1:replicate
+
+                        name_landscape = "../Table/2_species/CA/Clustering_species/" * repr(disp) * "/Landscape_Scalecomp_" * scale_comp * "_Stress_" * repr(stress) * "_alpha0_" * repr(alpha_e) * "_cintra_" * repr(aii)
+
+
+
+                        d, state = Gillespie_tau_leeping(; landscape=copy(ini), param=copy(param), time=8000, type_competition=scale_comp, save=true, burning=1500, N_snap=5,
+                            name_save=name_landscape)
+
+
+                    end
+                end
+            end
+        end
+    end
+end
+
+
+
+
+
+
+
+#endregion
+
+
+#region : Step 2-- Patch size distribution : different competition scenario  
 
 S_seq = collect(range(0, stop=0.6, length=4))
 param = Get_classical_param()
@@ -503,7 +556,7 @@ end
 #endregion
 
 #
-#region : Step 2-- Fitting power laws for patch size distribution 
+#region : Step 3-- Fitting power laws for patch size distribution 
 # S varies for 3-4 competition strength
 
 max_time = 10000
@@ -544,150 +597,3 @@ end
 
 
 #endregion
-
-#
-#region : Step 3-- Patagonian steppe structure
-
-
-function Ca_2_species2(; landscape, param)
-
-
-    rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
-    rho_2 = length(findall((landscape .== 2))) / length(landscape) #fraction competitive
-    rho_f = length(findall((landscape .== 0))) / length(landscape) #fraction fertile
-    rho_d = 1 - rho_1 - rho_2 - rho_f # fraction degraded
-
-
-    # Neighbors :
-
-    #using simcol package from R 
-    @rput landscape
-    R"neigh_1= simecol::neighbors(x =landscape,state = 1, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
-    R"neigh_2= simecol::neighbors(x =landscape,state = 2, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
-    R"neigh_f= simecol::neighbors(x =landscape,state = 0, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
-    R"neigh_d= simecol::neighbors(x =landscape,state = -1, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
-
-    @rget neigh_1
-    @rget neigh_2
-    @rget neigh_f
-    @rget neigh_d
-
-    r = param["r"]
-    d = param["d"]
-    f = param["f"]
-    beta = param["beta"]
-    m = param["m"]
-    e = param["e"]
-    emax = param["emax"]
-    cg = param["cg"]
-    alpha11 = param["alpha11"]
-    alpha12 = param["alpha12"]
-    alpha21 = param["alpha21"]
-    alpha22 = param["alpha22"]
-    S = param["S"]
-    delta = param["delta"]
-    z = param["z"]
-
-
-    colonization1 = @. beta * ((1 - delta) * rho_1 + delta * neigh_1 / z) * @.(emax * (1 - S * (1 - e)) - (cg * (rho_1 + rho_2) + (alpha11 * (neigh_1 / z) + alpha21 * (neigh_2 / z))))
-    colonization2 = @. beta * (delta * rho_2 + (1 - delta) * neigh_2 / z) * @.(emax * (1 - S) - (cg * (rho_1 + rho_2) + (alpha22 * (neigh_2 / z) + alpha12 * (neigh_1 / z))))
-
-    # calculate regeneration, degradation & mortality rate
-    death = m
-    regeneration = @.(r + f * neigh_1 / z)
-    degradation = d
-
-    # Apply rules
-    rnum = reshape(rand(length(landscape)), Int64(sqrt(length(landscape))), Int64(sqrt(length(landscape))))# one random number between 0 and 1 for each cell
-    landscape_update = copy(landscape)
-
-    ## New vegetation
-    landscape_update[findall((landscape .== 0) .& (rnum .<= colonization1))] .= 1
-    landscape_update[findall((landscape .== 0) .& (rnum .> colonization1) .& (rnum .<= colonization1 .+ colonization2))] .= 2
-
-    ## New fertile
-    landscape_update[findall((landscape .== 1) .& (rnum .<= death))] .= 0
-    landscape_update[findall((landscape .== 2) .& (rnum .<= death))] .= 0
-    landscape_update[findall((landscape .== -1) .& (rnum .<= regeneration))] .= 0
-
-    ## New degraded 
-    landscape_update[findall((landscape .== 0) .& (rnum .> colonization1 .+ colonization2) .& (rnum .<= (colonization1 .+ colonization2 .+ degradation)))] .= -1
-
-    rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
-    rho_2 = length(findall((landscape .== 2))) / length(landscape) #fraction competitive
-    rho_f = length(findall((landscape .== 0))) / length(landscape) #fraction fertile
-    rho_d = 1 - rho_1 - rho_2 - rho_f # fraction degraded
-
-    return rho_1, rho_2, rho_f, rho_d, landscape_update
-
-end
-
-function Run_CA_2_species2(; time_sim, param, landscape)
-
-    d = Array{Float64}(undef, time_sim + 1, 5) #Allocating
-
-    rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
-    rho_2 = length(findall((landscape .== 2))) / length(landscape) #fraction competitive
-    rho_f = length(findall((landscape .== 0))) / length(landscape) #fraction fertile
-    rho_d = 1 - rho_1 - rho_2 - rho_f # fraction degraded
-
-    d[1, :] = [1 rho_1 rho_2 rho_f rho_d] #the dataframe 
-
-    @inbounds for k in 1:time_sim
-
-        rho_1, rho_2, rho_f, rho_d, landscape = Ca_2_species2(landscape=landscape, param=param)
-        @views d[k+1, :] = [k + 1 rho_1 rho_2 rho_f rho_d]
-
-    end
-
-    return landscape, d
-
-end
-
-#two examples for influence of dispersal range
-param = Get_classical_param()
-param["alpha11"] = 0.3
-param["alpha12"] = 0.01
-param["alpha21"] = 0.2
-param["alpha22"] = 0.01
-param["cg"] = 0.01
-param["S"] = 0.7
-param["tau_leap"] = 0.1
-size_landscape = 100
-ini = Get_initial_lattice(size_mat=size_landscape)
-max_time = 1000
-rep = 3
-
-#similar dispersal
-state, d = Run_CA_2_species(time_sim=max_time, param=copy(param), landscape=copy(ini),
-    save=false, burning=10, name_save="", N_snap=0)
-Plot_landscape(state)
-savefig("../Figures/2_species/CA/Patagonian_type_same_disp.png")
-
-
-#different dispersal
-state, d = Run_CA_2_species2(time_sim=max_time, param=copy(param), landscape=copy(ini))
-Plot_landscape(state)
-Plot_dynamics(d)
-savefig("../Figures/2_species/CA/Patagonian_type_different_disp.png")
-
-
-
-
-#endregion
-
-
-
-param["S"] = 0.2
-param["alpha_0"] = 0.25
-param["tau_leap"] = 0.25
-
-
-max_time = 8000
-d, state = Gillespie_tau_leeping(time=max_time, param=copy(param), landscape=copy(ini), type_competition="global", save=false)
-
-max_time = 8000
-d2, state2 = Run_CA_2_species(time=max_time, param=copy(param), landscape=copy(ini), save=false, type_competition="global")
-
-Plot_dynamics(d)
-Plot_dynamics(d2)

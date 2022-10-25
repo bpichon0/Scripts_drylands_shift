@@ -6,13 +6,13 @@ using StatsBase, RCall, Plots, StatsPlots, Random, DifferentialEquations, LaTeXS
 
 function Get_classical_param(; N_species=4, type_interaction="classic", alpha_0=0.1, cintra=0.2, scenario_trait="spaced", h=1)
 
-    r = 0.05
-    d = 0.1
+    r = 0.01
+    d = 0.025
     f = 0.9
-    beta = 0.8
-    m = 0.1
+    beta = 1
+    m = 0.15
     e = 0.1
-    cg = 0.1
+    cg = 0
     S = 0
     delta = 0.1
     z = 4
@@ -151,7 +151,28 @@ function Reorder_dynamics(sol)
 end
 
 function PA_N_species(du, u, p, t)
-    return ()
+
+    rho_1, rho_2, rho_m, rho_12, rho_1m, rho_2m, rho_11, rho_22, rho_mm = u
+
+    rho_0 = 1 - u[1:(p["Nsp"]+1)]
+    rho_i0 = [u[k] - rho_11 - rho_12 - rho_1m for k in 1:p["Nsp"]]
+    rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
+    rho_0m = rho_m - rho_mm - rho_1m - rho_2m
+
+    rho_0 = u[p["Nsp"]+1]
+    rho_d = u[p["Nsp"]+2]
+
+    for k in 1:p["Nsp"]
+        du[k] = rho_0 * (u[k] * (p["beta"] * (1 - p["S"] * (1 - p["trait"][k] * p["e"])) - (sum([p["alpha"][k, i] * u[i] for i in 1:p["Nsp"]])))) - u[k] * p["m"]
+    end
+    du[p["Nsp"]+1] = -p["d"] * rho_0 + rho_d * (p["r"] + p["f"] * (sum([p["trait"][i] * u[i] for i in 1:p["Nsp"]])))
+
+    for k in 1:p["Nsp"]
+        du[p["Nsp"]+1] = du[p["Nsp"]+1] - rho_0 * (u[k] * (p["beta"] * (1 - p["S"] * (1 - p["trait"][k] * p["e"])) - (sum([p["alpha"][k, i] * u[i] for i in 1:p["Nsp"]])))) + u[k] * p["m"]
+    end
+
+    du[p["Nsp"]+2] = p["d"] * rho_0 - rho_d * (p["r"] + p["f"] * (sum([p["trait"][i] * u[i] for i in 1:p["Nsp"]])))
+
 end
 
 
