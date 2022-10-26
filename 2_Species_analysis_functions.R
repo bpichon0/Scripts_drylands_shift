@@ -1314,7 +1314,7 @@ Get_diversity_community=function(trait,densities){
   for (type in c("FD","D")){ #we do that for functional diversity and species diversity
     for (q in 0:2){
       if (type=="D"){ div = hill_taxa(densities,q=q)}
-      if (type=="FD"){ div = hill_func(densities,trait,q=q)["FD_q",1]}
+      if (type=="FD"){ div = hill_func(densities,trait,q=q)}
       diversity=c(diversity,div)
       d_name= c(d_name,paste0(type,"_",q))
       
