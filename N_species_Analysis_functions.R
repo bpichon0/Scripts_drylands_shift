@@ -1,3 +1,4 @@
+rm(list = ls())
 x <- c(
   "tidyverse", "ggpubr", "latex2exp", "deSolve", "reshape2",
   "JuliaCall", "diffeqr", "simecol", "tseries", "phaseR","GGally",
@@ -28,24 +29,48 @@ dir.create("../Figures/N_species/MF", showWarnings = F)
 
 
 # Species niche : area and range
-Get_species_niche = function(d,Nsp,traits){
+Get_species_niche = function(d,Nsp){
   
-  d_melt=melt(d,measure.vars = paste0("Sp_",1:Nsp))%>%
-    mutate(., Trait=rep(traits,each=nrow(d)))
-  d_melt$value[d_melt$value<10^{-3}]=0
+  d_melt=melt(d,measure.vars = paste0("Sp_",1:Nsp))
+  d_melt$value[d_melt$value<10^(-3)]=0
+  delta_S=unique(round(abs(diff(d$Stress)),5))[1]
+  
   
   d_niche=tibble()
-  for (s in unique(d$Scena)){
-    for (c in unique(d$Rela_c)){ #for each scenario
-      for (sp in unique(d_melt$variable)){ #for each species
-        
-        d_sp=filter(d_melt,variable==sp,Rela_c==c,Scena==s)
-        d_niche=rbind(d_niche,tibble(Niche_range = abs(diff(range(d_sp$Stress[which(d_sp$value!=0)]))), #range of niche
-                                     Niche_area = sum(d_sp$value),
-                                     Species=sp,
-                                     Rela_c=c,
-                                     Scena=s,
-                                     Trait=unique(d_sp$Trait)))
+  for (ini in unique(d$Random_ini)){
+    for (f in unique(d$Facilitation)){
+      for (disp in unique(d$Dispersal)){
+        for (c in unique(d$Competition)){ #for each scenario
+          for (sp in unique(d_melt$variable)){ #for each species
+            
+            d_sp=filter(d_melt,variable==sp,Competition==c,Facilitation==f,Random_ini==ini,Dispersal==disp)
+            
+            d_D=filter(d_sp,Branch=="Degradation")
+            
+            # Tipping_point_D = d_D$Stress[min(which(diff(as.vector((d_D$value)))==min(diff(as.vector((d_D$value))))))]
+            
+            d_R=filter(d_sp,Branch=="Restoration")
+            # Tipping_point_R = d_R$Stress[min(which(diff(as.vector((d_R$value)))==min(diff(as.vector((d_R$value))))))]
+            
+            d_niche=rbind(d_niche,tibble(Niche_range_D = abs(diff(range(d_D$Stress[which(d_D$value!=0)]))), #range of niche degradation
+                                         Niche_range_R = abs(diff(range(d_R$Stress[which(d_R$value!=0)]))), #range of niche restoration
+                                         Delta_niche = abs(diff(range(d_D$Stress[which(d_D$value!=0)])))-abs(diff(range(d_R$Stress[which(d_R$value!=0)]))), #between degradation & restoration trajectories
+                                         Species=sp,
+                                         Dispersal=disp,
+                                         Competition=c,
+                                         Random_ini=ini,
+                                         Facilitation=f))
+            
+            #length(which(d_R$value>0))*delta_S
+            
+            
+            
+            
+            
+            
+            
+          }
+        }
       }
     }
   }

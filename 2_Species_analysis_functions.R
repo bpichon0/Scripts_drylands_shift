@@ -46,11 +46,15 @@ Get_MF_initial_state = function(type="equal") {
     if (type=="equal"){
       state = c(rho_1 = 0.4, rho_2 = 0.4, rho_m = 0.1, rho_0 = .1)
       names(state) = c("rho_1", "rho_2","rho_m","rho_0")
-    } else{
+    } else if (type=="random_D"){
       state1=runif(1)*.8
       state=c(state1,.8-state1,.1,.1)
-    }
-  }else{
+    } else if (type=="random_R"){
+      state1=runif(1)*.01
+      state=c(state1,.01-state1,.49,.5)
+      
+    } 
+    }else{
     state=c(rho_1 = type[1], rho_2 = type[2], rho_m = type[3], rho_0 = 1-sum(type))
     
   }
@@ -93,7 +97,21 @@ function MF_two_species_press(du,u,p,t)
 end")
 
 
+#MF varying trait
+MF_two_species_julia_varying_trait = julia_eval("
 
+function MF_two_species_varying_trait(du,u,p,t)
+
+  r,d,f,beta,m,e,cintra,alpha_0,S,h,psi_1,psi_2=p
+  rho_1,rho_2,rho_d,rho_0=u
+  
+  du[1] = rho_0 * ( rho_1 *  (beta * ( 1 - S * (1 - psi_1 * e)) - (cintra*rho_1 + alpha_0 * (1 + psi_1 * h * exp( - abs(psi_1 - psi_2))) * rho_2))) - rho_1 * m
+  du[2] = rho_0 * ( rho_2 *  (beta * ( 1 - S * (1 - psi_2 * e)) - (cintra*rho_2 + alpha_0 * (1 + psi_2 * h * exp( - abs(psi_1 - psi_2))) * rho_1))) - rho_2 * m
+  du[3] = d*rho_0 - rho_d*(r+f*(psi_1*rho_1+psi_2*rho_2))
+  du[4] = -d*rho_0 + rho_d*(r+f*(psi_1*rho_1+psi_2*rho_2)) - rho_0 * ( rho_1 *  (beta * ( 1 - S * (1 - psi_1 * e)) - (cintra*rho_1 + alpha_0 * (1 + psi_1 * h * exp( - abs(psi_1 - psi_2))) * rho_2 ))) -
+      rho_0 * ( rho_2 *  (beta *( 1 - S * (1 - psi_2 * e)) - (cintra*rho_2 + alpha_0 * (1 + psi_2 * h * exp( - abs(psi_1 - psi_2))) * rho_1 ))) + rho_2 * m + rho_1 * m
+
+end")
 
 
 # Hysteresis functions
@@ -308,7 +326,7 @@ du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 
 ( (cintra * (rho_20/rho_0) + alpha_0 * (rho_10/rho_0))  )  ) - rho_2 * m
 
 #rho_m
-du[3] =  rho_0 * d - rho_m * (r + f * (rho_10 / rho_0))
+du[3] =  rho_0 * d - rho_m * (r + f * (rho_1m / rho_m))
 
 #rho_12
 du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * 
@@ -321,12 +339,12 @@ du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)
 #rho_1m
 du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
         (cintra * ((z - 1) / z) * (rho_10/rho_0) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *(rho_20/rho_0))     ) -
-        rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (rho_10 / rho_0) ))
+        rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (rho_1m / rho_m) ))
 
 #rho_2m
 du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S  ) - 
         ( (cintra * ((z - 1) / z) * (rho_20/rho_0) + alpha_0 *  ((z - 1) / z) *(rho_10/rho_0)) )) -
-        rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (rho_10 / rho_0 )))
+        rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (rho_1m / rho_m )))
 
 #rho_11
 du[7] = 2* rho_10 *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0 )) * 
@@ -339,7 +357,7 @@ du[8] = 2* rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) 
         2 * rho_22 * m
 
 #rho_mm
-du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * ((z - 1) / z) * (rho_10 / rho_0))
+du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * ((z - 1) / z) * (rho_1m / rho_m))
 
 
 end
@@ -369,7 +387,7 @@ du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 
 (cintra *rho_2 + alpha_0 * rho_1)) - rho_2 * m
 
 #rho_m
-du[3] =  rho_0 * d - rho_m * (r + f * (rho_10 / rho_0))
+du[3] =  rho_0 * d - rho_m * (r + f * (rho_1m / rho_m))
 
 #rho_12
 du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * 
@@ -382,12 +400,12 @@ du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)
 #rho_1m
 du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
         (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
-        rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (rho_10 / rho_0) ))
+        rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (rho_1m / rho_m) ))
 
 #rho_2m
 du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S  ) - 
         ((cintra *rho_2 + alpha_0 *rho_1) )) -
-        rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (rho_10 / rho_0 )))
+        rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (rho_1m / rho_m )))
 
 #rho_11
 du[7] = 2* rho_10 *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0 )) * 
@@ -400,7 +418,7 @@ du[8] = 2* rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) 
         2 * rho_22 * m
 
 #rho_mm
-du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * ((z - 1) / z) * (rho_10 / rho_0))
+du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * ((z - 1) / z) * (rho_1m / rho_m))
 
 end
 
@@ -430,7 +448,7 @@ du[1] =  rho_0 * (delta * rho_1 + (1 - delta) * ((rho_10) / rho_0)) * (beta1 * (
 du[2] =  rho_0 * (delta * rho_2 + (1 - delta) * ((rho_20) / rho_0)) * (beta2 * (1 - S)  - ( (cintra *(rho_20/rho_0) + alpha_0 *(rho_10/rho_0)) )) - rho_2 * m
 
 #rho_m
-du[3] =  rho_0 * d - rho_m * (r + f * ((rho_10) / rho_0))
+du[3] =  rho_0 * d - rho_m * (r + f * (rho_1m / rho_m))
 
 #rho_12
 du[4] = (rho_10) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * ((rho_20) / rho_0)) * (beta2 * (1 - S ) - ( (cintra *((z - 1) / z)*(rho_20/rho_0) + (alpha_0/z) + alpha_0 *((z - 1) / z)*(rho_10/rho_0)) ))  +
@@ -439,11 +457,11 @@ du[4] = (rho_10) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * ((rho_20) / rh
 
 #rho_1m
 du[5] = (rho_10) * d + rho_0m * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * ((rho_10) / rho_0)) * (beta1 * (1 - S * e ) - ( (alpha_0 *(rho_10/rho_0) + alpha_0 * (1+h*exp(-1)) *(rho_20/rho_0)) )) -
-        rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * ((rho_10) / rho_0) ))
+        rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (rho_1m / rho_m) ))
 
 #rho_2m
 du[6] = (rho_20) * d + rho_0m * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * ((rho_20) / rho_0) * (beta2 * (1 - S  ) - ( (cintra *(rho_20/rho_0) + alpha_0 *(rho_10/rho_0)) ))) -
-        rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * ((rho_10) / rho_0 )))
+        rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (rho_1m / rho_m )))
 
 #rho_11
 du[7] = 2* (rho_10) * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * ((rho_10) / rho_0 )) * ( beta1 * (1 - S * e ) - ( (alpha_0 *(rho_10/rho_0) * ((z - 1) / z) + (alpha_0/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) * (rho_20/rho_0)) )) -
@@ -454,7 +472,7 @@ du[8] = 2* (rho_20) * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1
         2 * rho_22 * m
 
 #rho_mm
-du[9] = 2 * rho_0m * d - 2* rho_mm * (r + f * ((z - 1) / z) * ((rho_10) / rho_0))
+du[9] = 2 * rho_0m * d - 2* rho_mm * (r + f * ((z - 1) / z) * (rho_1m / rho_m))
 
 end
 
@@ -486,7 +504,7 @@ du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta2 * (1
 (cintra *rho_2 + alpha_0 * rho_1)) - rho_2 * m
 
 #rho_m
-du[3] =  rho_0 * d - rho_m * (r + f * (rho_10 / rho_0))
+du[3] =  rho_0 * d - rho_m * (r + f * (rho_1m / rho_m))
 
 #rho_12
 du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * 
@@ -499,12 +517,12 @@ du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)
 #rho_1m
 du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta1 * (1 - S * (1-e )) - 
         (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
-        rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (rho_10 / rho_0) ))
+        rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (rho_1m / rho_m) ))
 
 #rho_2m
 du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta2 * (1 - S  ) - 
         ((cintra *rho_2 + alpha_0 *rho_1) )) -
-        rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (rho_10 / rho_0 )))
+        rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (rho_1m / rho_m )))
 
 #rho_11
 du[7] = 2* rho_10 *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0 )) * 
@@ -517,7 +535,7 @@ du[8] = 2* rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) 
         2 * rho_22 * m
 
 #rho_mm
-du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * ((z - 1) / z) * (rho_10 / rho_0))
+du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * ((z - 1) / z) * (rho_1m / rho_m))
 
 end
 
@@ -786,7 +804,7 @@ du[2] = rho_0 * (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 - 
                                                                         (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) - rho_2 * m
 
 #rho_m
-du[3] = rho_0 * d - rho_m * (r + f * ( psi_1 * (rho_10 / rho_0) + psi_2 * (rho_20 / rho_0)))
+du[3] = rho_0 * d - rho_m * (r + f * ( psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m)))
 
 #rho_12
 du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) *
@@ -799,12 +817,12 @@ du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)
 #rho_1m
 du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
                                                                                                             (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
-        rho_1m * m - rho_1m * (r + f * ((1 / z) * psi_1 + ((z - 1) / z) * (psi_1 * (rho_10 / rho_0) + psi_2 * (rho_20 / rho_0)) ))
+        rho_1m * m - rho_1m * (r + f * ((1 / z) * psi_1 + ((z - 1) / z) * (psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m)) ))
 
 #rho_2m
 du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S * (1 - e * psi_2)) -
                                                                                                            (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) -
-        rho_2m * m - rho_2m * (r + f * ((1 / z) * psi_2 + ((z - 1) / z) * (psi_1 * (rho_10 / rho_0) + psi_2 * (rho_20 / rho_0))))
+        rho_2m * m - rho_2m * (r + f * ((1 / z) * psi_2 + ((z - 1) / z) * (psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m))))
 
 #rho_11
 du[7] = 2 * rho_10 * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) *
@@ -817,7 +835,7 @@ du[8] = 2 * rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1)
         2 * rho_22 * m
 
 #rho_mm
-du[9] = 2 * (rho_0m) * d - 2 * rho_mm * (r + f * ((z - 1) / z) * (psi_1 * (rho_10 / rho_0) + psi_2 * (rho_20 / rho_0)))
+du[9] = 2 * (rho_0m) * d - 2 * rho_mm * (r + f * ((z - 1) / z) * (psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m)))
 
 end
 
@@ -1192,7 +1210,7 @@ fitPL = function(psd, p_spanning) {
   
   "
   psd = patch size distribution 
-  p_spanning = lower limitnàfnthe up-bent power law
+  p_spanning = lower limitnï¿½fnthe up-bent power law
   
   "
   
@@ -1326,5 +1344,3 @@ Get_diversity_community=function(trait,densities){
   colnames(d_diversity)=d_name
   return(d_diversity)
 }
-
-
