@@ -222,7 +222,7 @@ for (Psi_sp1 in c(0,1)){
                                  "Coexistence/Species 1"="#9BBBB9",
                                  "Coexistence/Desert"="#C19E5E",
                                  "Desert"=  "#696969",
-                                 "Species 2/Species 1" = "#9B68A0"),
+                                 "Species 2/Species 1" = "#C998CE"),
                         labels=c("Coexistence","Species 2","Coexistence/Species 2","Species 1","Species 1/Desert",
                                  "Coexistence/Species 1",
                                  "Coexistence/Desert","Desert","Species 2/Species 1"))+
@@ -397,6 +397,20 @@ ggsave("../Figures/Final_figs/Figure_3.pdf",Figure_3_tot,width = 9,height = 9)
 
 # Figure 4: Scaling-up to species-rich communities : species versus community shifts----
 
+d_hysteresis=read.table("../Table/N_species/MF/Hysteresis_species.csv",sep=";")
+
+
+
+p0=ggplot(NULL)+
+  geom_point(data=d_hysteresis,aes(x=Trait,y=Hysteresis_scaled,color=as.factor(Competition)),size=1,width = .1,alpha=.5)+
+  the_theme+labs(y="Hysteresis size",color=TeX("$\\alpha_e$"),x=TeX("$\\psi$"),fill=TeX("$\\alpha_e$"))+
+  scale_color_manual(values=rev(c("#940000","#FF1F1F","#FFAFAF")))+
+  scale_fill_manual(values=rev(c("#940000","#FF1F1F","#FFAFAF")))+
+  ylim(0,.75)+ #to avoid outliers
+  facet_wrap(.~Facilitation,labeller = label_bquote(cols=f==.(Facilitation)))+
+  scale_x_continuous(breaks = c(0,.25,.5,.75,1))
+
+
 d_ASS_com=read.table("../Table/N_species/MF/d_ASS_com.csv",sep=";")
 d_ASS_sp=read.table("../Table/N_species/MF/d_ASS_sp.csv",sep=";")
 
@@ -427,8 +441,6 @@ p1=ggplot(d_all)+
        y="# Community scale tipping point")
 
 
-
-
 d_ASS_sp=read.table("../Table/N_species/MF/d_ASS_sp.csv",sep=";")
 N_replicate=40
 
@@ -454,8 +466,9 @@ p3=ggplot(d_ASS_sp, aes(x=Trait,y=Size_shift,fill=as.factor(Competition))) +
   scale_fill_manual(values=rev(c("#940000","#FF1F1F","#FFAFAF")))
 
 
-Figure_4 = ggarrange(ggarrange(p2,p3,ncol=2,labels=letters[1:2],common.legend = T,legend = "bottom"),
-                     ggarrange(ggplot()+theme_void(),p1,ggplot()+theme_void(),ncol=3,labels = c("",letters[3],""),widths = c(1,3,1)),
+Figure_4 = ggarrange(ggarrange(p2+theme(strip.background.y = element_blank(),strip.text.y = element_blank())
+                               ,p3,ncol=2,labels=letters[1:2],common.legend = T,legend = "bottom"),
+                     ggarrange(ggplot()+theme_void(),p0,ggplot()+theme_void(),ncol=3,labels = c("",letters[3],""),widths = c(1,8,1)),
                      nrow=2,heights = c(1.5,1),hjust = -3)
 ggsave("../Figures/Final_figs/Figure_4.pdf",Figure_4,width = 9,height = 8)
 
@@ -527,43 +540,7 @@ p1=ggplot(d_niche%>%
   geom_tile(aes(x=Facilitation,y=alpha_0,fill=value))+
   the_theme+
   scale_fill_gradient2(low = "red",mid = "white",high = "blue")+
-  labs(x="Facilitation ( f )",y=TeX(r'(Competition strength \ $\alpha_e)'),fill="Niche expansion (%)")
-
-
-# 
-# load(file="../Table/2_species/PA/Comparing_net_effects.RData")
-# d_net=d_all[[1]];d_RNE=d_all[[2]]
-# d_RNE[,3:6][d_RNE[,3:6] > 2]=NA
-# d_RNE[,3:6][d_RNE[,3:6] < -1]=NA
-# 
-# 
-# 
-# p2_1=ggplot(d_RNE%>%
-#             melt(., measure.vars=c("NintA_comp"))%>%
-#             filter(.,Disp==.1,Scale=="LocalF_GlobalC")%>%
-#             mutate(., variable=recode_factor(variable,"NintA_st"='Stress-tolerant',"NintA_comp"="Competitive")))+
-#   geom_tile(aes(x=S,y=alpha_0,fill=value))+
-#   the_theme+labs(x="Stress (S)",y=TeX(r'(Competition strength \ $\alpha_e)'),fill=expression(Nint[A]))+
-#   scale_fill_gradient2(low="#F73030",mid="white",high="#185BB9")+
-#   geom_hline(yintercept = c(unique(d_RNE$alpha_0)[round(50/3)],.3))+
-#   geom_text(data=tibble(lab=c("c","d"),y=c(0.11,0.31),x=c(1.05,1.05)),aes(x=x,y=y,label=lab))
-# 
-# for (i in 1:2){
-#   
-#   assign(paste0("p2_",i+1),
-#          ggplot(d_RNE%>%
-#                   melt(., measure.vars=c("NintA_comp"))%>%
-#                   filter(.,Disp==.1,Scale=="LocalF_GlobalC",alpha_0 == c(unique(d_RNE$alpha_0)[round(50/3)],.3)[i])%>%
-#                   mutate(., variable=recode_factor(variable,"NintA_st"='Stress-tolerant',"NintA_comp"="Competitive")))+
-#            geom_line(aes(x=S,y=value))+
-#            the_theme+labs(x="Stress (S)",y=expression(Nint[A]))+
-#            geom_hline(yintercept = 0,linetype=0)
-#          )
-#   
-# }
-# 
-# p2_right=ggarrange(p2_3+theme(axis.title.x = element_blank(),axis.ticks.x = element_blank(),axis.text.x = element_blank()),p2_2,nrow=2,labels = letters[3:4])
-# p2=ggarrange(p2_1,p2_right,labels=c(LETTERS[2],""))
+  labs(x="Facilitation ( f )",y=TeX(r'(Competition strength \ $\alpha_e)'),fill="% of competitive species niche change")
 
 
 #niche varying traits

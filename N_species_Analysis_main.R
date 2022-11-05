@@ -414,7 +414,7 @@ d_hysteresis$Trait=sapply(1:nrow(d_hysteresis),function(x){
   return(rev(seq(0,1,length.out=Nsp))[d_hysteresis$Species[x]])
 })
 
-write.table(d_hysteresis,"../Table/N_species/MF/Hysteresis_species.csv",sep=";")
+# write.table(d_hysteresis,"../Table/N_species/MF/Hysteresis_species.csv",sep=";")
 
 
 
@@ -439,7 +439,6 @@ ggsave("../Figures/N_species/MF/Species_level/Hystersis_size_not_scaled.pdf",p,w
 
 p=ggplot(NULL)+
   geom_point(data=d_hysteresis,aes(x=Trait,y=Hysteresis_scaled,color=as.factor(Competition)),size=1,width = .1,alpha=.5)+
-  geom_smooth(data=d_hysteresis,aes(x=Trait,y=Hysteresis_scaled,color=as.factor(Competition)),size=1,alpha=.5,se = F)+
   the_theme+labs(y="Hysteresis size",color=TeX("$\\alpha_e$"),x=TeX("$\\psi$"),fill=TeX("$\\alpha_e$"))+
   scale_color_manual(values=rev(c("#940000","#FF1F1F","#FFAFAF")))+
   scale_fill_manual(values=rev(c("#940000","#FF1F1F","#FFAFAF")))+

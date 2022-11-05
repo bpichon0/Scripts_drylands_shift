@@ -411,7 +411,7 @@ for (branch in branch_seq){ #branch bifurcation diagrams
 }
 
 d2[d2 < epsilon] = 0
-colnames(d2) = c("eq", "S", "alpha_0", "Type","Species","Branches")
+colnames(d2) = c("Eq", "S", "alpha_0", "Type","Species","Branches")
 
 net_effect =sapply(seq(1, nrow(d2) , by = 2),function(x){
   return((d2$Eq[x+1] - d2$Eq[x]) / epsilon)
@@ -427,14 +427,23 @@ appender <- function(string) {
   TeX(paste("$\\alpha_e = $", string))  
 }
 
-p=ggplot(d_net %>%
-           mutate(., alpha_0=as.factor(round(alpha_0,2)))%>%
-           filter(., Branches=="Degradation")) +
+ggarrange(
+  ggplot(d3 %>%melt(.,measure.vars=c("V1","V2"))%>%
+         mutate(., alpha_0=as.factor(round(alpha_0,2)))) +
+  geom_line(aes(x = S, y = value, color = variable),lwd=1,alpha=.5) +
+  the_theme+scale_color_manual(values=c("blue","green"),labels=c("V1"= "Stess-tolerant","V2"="Competitive"))+
+  geom_hline(yintercept = 0,linetype=9)+
+  facet_grid(Branches~alpha_0,labeller=label_bquote(cols = alpha[e] == .(alpha_0)))+
+  labs(x="Stress (S)",alpha=TeX('$\\alpha_e$'),color="Species",y=TeX(r'(Net effect \ \ $\frac{\partial \rho_{\psi_i}}{\partial \beta_j}$)'))
+  ,
+  ggplot(d_net %>%
+           mutate(., alpha_0=as.factor(round(alpha_0,2)))) +
   geom_line(aes(x = S, y = value, color = as.factor(Species)),lwd=1,alpha=.5) +
   the_theme+scale_color_manual(values=c("blue","green"),labels=c("1"= "Stess-tolerant","2"="Competitive"))+
   geom_hline(yintercept = 0,linetype=9)+
-  facet_wrap(.~alpha_0)+
+  facet_grid(Branches~alpha_0,labeller=label_bquote(cols = alpha[e] == .(alpha_0)))+
   labs(x="Stress (S)",alpha=TeX('$\\alpha_e$'),color="Species",y=TeX(r'(Net effect \ \ $\frac{\partial \rho_{\psi_i}}{\partial \beta_j}$)'))
+  ,nrow=2)
 
 ggsave(paste0("../Figures/2_species/MF/Net_effects_MF.pdf"),p,width = 7,height = 4)
 
@@ -639,6 +648,9 @@ p2=ggarrange(p_3+xlab(""),p_2+xlab(""),p_1,nrow = 3,common.legend = T,legend = "
 
 
 ggsave("../Figures/2_species/MF/Multistability.pdf",ggarrange(p,p2,ncol = 2,widths = c(1.5,1)),width = 10,height = 6)
+
+
+
 
 ## 6) Niche expansion ----
 
@@ -1296,7 +1308,7 @@ for (Psi_sp1 in psi1_seq){
                                  "Coexistence/Stress_tolerant"="#9BBBB9",
                                  "Coexistence/Desert"="#C19E5E",
                                  "Desert"=  "#696969",
-                                 "Species 2/Stress_tolerant" = "#9B68A0"),
+                                 "Species 2/Stress_tolerant" = "#C998CE"),
                         labels=c("Coexistence","Species 2","Coexistence/Species 2","Stress-tolerant","Stress-tolerant/Desert",
                                  "Coexistence/Stress-tolerant",
                                  "Coexistence/Desert","Desert","Species 2/Stress-tolerant"))+
@@ -1473,6 +1485,184 @@ for (Psi_sp1 in psi1_seq){
   }
 }
 
+
+
+
+## 9) Niche species, varying traits ----
+### a) Simulation ----
+
+tspan = c(0, 2000) #to avoid long transient
+t = seq(0, 2000, by = 1)
+julia_library("DifferentialEquations")
+julia_assign("tspan", tspan)
+
+N_rep = 100
+S_seq = seq(0,1,length.out=N_rep)
+alpha_seq = seq(0, .3, length.out = 3)
+f_seq=c(.3,.9)
+trait_sp2_seq=seq(0,1,length.out=50)
+trait1_seq=c(0,1)
+
+
+
+d_niche=tibble() #initializing the tibble
+
+for (psi_sp1 in trait1_seq){ #varying the trait of sp1
+  
+  for (facil in f_seq){ #varying facilitation strength
+    
+    for (alpha0 in alpha_seq) { #varying competition
+      
+      for (trait_2 in trait_sp2_seq){
+        
+        #Setting the parameters
+        param=Get_MF_parameters()
+        
+        param["f"]=facil
+        param["alpha_0"]=alpha0
+        param["psi_1"]=psi_sp1 #we fixed to stress-tolerant species 
+        param["psi_2"]=trait_2 #and vary the other species
+        
+        
+        
+        # 1) Competitive species alone
+        
+        state=Get_MF_initial_state(c(0,.8,.1))
+        julia_assign("state", state)
+        d2 = tibble()
+        
+        for (S in S_seq) {
+          
+          param["S"] = S
+          
+          julia_assign("p", param)
+          prob = julia_eval("ODEProblem(MF_two_species_varying_trait, state, tspan, p)")
+          
+          
+          sol = de$solve(prob, de$Tsit5(), saveat = t)
+          d = as.data.frame(t(sapply(sol$u, identity)))
+          colnames(d) = c("rho_1", "rho_2", "rho_m","rho_0")
+          
+          d2 = rbind(d2, d[nrow(d), ] %>% add_column(S = S,Sp="Competitive"))
+          
+          
+        }
+        d2[d2 < 10^-4] = 0
+        
+        
+        S_critic2_alone=abs(diff(range(d2$S[which(d2$rho_2 !=0 )]))) #range of values where competitive species is
+        
+        
+        
+        # 2) Stress-tolerant species alone
+        
+        state=Get_MF_initial_state(c(0.8,0,.1))
+        julia_assign("state", state)
+        d2 = tibble()
+        
+        for (S in S_seq) {
+          
+          param["S"] = S
+          
+          julia_assign("p", param)
+          prob = julia_eval("ODEProblem(MF_two_species_varying_trait, state, tspan, p)")
+          
+          
+          sol = de$solve(prob, de$Tsit5(), saveat = t)
+          d = as.data.frame(t(sapply(sol$u, identity)))
+          colnames(d) = c("rho_1", "rho_2", "rho_m","rho_0")
+          
+          d2 = rbind(d2, d[nrow(d), ] %>% add_column(S = S,Sp="Stress-tolerant"))
+          
+          
+        }
+        d2[d2 < 10^-4] = 0
+        
+        
+        S_critic1_alone=abs(diff(range(d2$S[which(d2$rho_1 !=0 )]))) 
+        
+        
+        
+        #3) Coexisting species
+        
+        state=Get_MF_initial_state(c(0.4,0.4,.1))
+        julia_assign("state", state)
+        d2 = tibble()
+        
+        for (S in S_seq) { #varying the stress 
+          
+          param["S"] = S
+          julia_assign("p", param)
+          
+          julia_assign("p", param)
+          prob = julia_eval("ODEProblem(MF_two_species_varying_trait, state, tspan, p)")
+          
+          sol = de$solve(prob, de$Tsit5(), saveat = t)
+          d = as.data.frame(t(sapply(sol$u, identity)))
+          
+          colnames(d) = c("rho_1", "rho_2", "rho_m","rho_0")
+          
+          d2 = rbind(d2, d[nrow(d),] %>% add_column(S = S, Sp="Both"))
+          
+        }
+        d2[d2 < 10^-4] = 0
+        d2$rho_plus = d2$rho_1 + d2$rho_2
+        
+        S_critic1_both = abs(diff(range(d2$S[which(d2$rho_1 !=0 )]))) 
+        S_critic2_both = abs(diff(range(d2$S[which(d2$rho_2 !=0 )]))) 
+        
+        
+        d_niche=rbind(d_niche,tibble(
+          Facilitation = facil, alpha_0 = alpha0, Psi1 = psi_sp1, Psi2 = trait_2,
+          Delta_niche_1 = 100 * (S_critic1_both - S_critic1_alone) / S_critic1_alone,  #making it a percentage of initial niche
+          Delta_niche_2 = 100 * (S_critic2_both - S_critic2_alone) / S_critic2_alone)) #making it a percentage of initial niche
+        
+        
+      } #end varying trait loop
+      
+    } #end competition loop
+    
+  } #end facilitation loop
+  
+} #end sp1 trait loop
+
+write.table(d_niche,"../Table/2_species/MF/Niche_expansion_varying_traits.csv",sep=";")
+
+
+
+
+### b) Analysis ----
+
+d_niche = read.table("../Table/2_species/MF/Niche_expansion_varying_traits.csv",sep=";")
+d_niche = do.call(data.frame,lapply(d_niche,function(x) replace(x, is.infinite(x), NA)))
+
+
+p=ggplot(NULL)+
+  geom_path(data=d_niche%>%
+              melt(., measure.vars=c("Delta_niche_1","Delta_niche_2"))%>%
+              mutate(., variable=recode_factor(variable,"Delta_niche_1"="Species 1","Delta_niche_2"="Species 2"))%>%
+              mutate(., Delta_psi=abs(Psi1-Psi2),
+                     Facilitation=as.factor(Facilitation),
+                     alpha_0=as.factor(alpha_0)),
+            aes(x=Delta_psi,y=value,group=interaction(alpha_0,Facilitation),color=alpha_0),lwd=1)+
+  geom_point(data=d_niche%>%
+               melt(., measure.vars=c("Delta_niche_1","Delta_niche_2"))%>%
+               mutate(., variable=recode_factor(variable,"Delta_niche_1"="Species 1","Delta_niche_2"="Species 2"))%>%
+               mutate(., Delta_psi=abs(Psi1-Psi2),
+                      Facilitation=as.factor(Facilitation),
+                      alpha_0=as.factor(alpha_0))%>%
+               filter(., Psi2 %in% unique(.$Psi2)[seq(1,length(unique(.$Psi2)),by =5)]), #to only have 10 points
+             aes(x=Delta_psi,y=value,shape=Facilitation,color=alpha_0),fill="white",size=2)+
+  facet_grid(variable~Psi1,scales="free",labeller = label_bquote(cols = psi[1] == .(Psi1)))+
+  geom_hline(yintercept = 0,linetype=9)+
+  scale_shape_manual(values=c(21,22))+
+  scale_color_manual(values=c("#91D4DE","#26A8D2","#06247B"))+
+  labs(y = "Niche change (%)", x = TeX(r'(Trait difference \ |$\psi_1-\psi_2|)'),
+       color=TeX(r'(Competition strength \ $\alpha_e)'),
+       shape=TeX(r'(Facilitation \ $\f)')) +
+  the_theme
+
+ggsave("../Figures/2_species/MF/Niche_expansion_varying_traits.pdf",p,width = 7,height = 6)
 
 
 
@@ -2291,13 +2481,20 @@ d_state$all_state=all_state
 
 for (scale in c("local","global")){
   
-  d2t=transform(d_state%>% 
-                  filter(., Scena %in% c(paste0(scale,"_C_global_F"),paste0(scale,"_C_local_F")))%>%
-                  mutate(., Stress=round(Stress,6),alpha_0=round(alpha_0,6)),
-                Delta = factor(Delta, levels=c(.1,.9), labels=c("delta : 0.1", "delta : .9")),
-                Scena=factor(Scena,levels=c(paste0(scale,"_C_global_F"),paste0(scale,"_C_local_F")),
-                             labels=c("Global facilitation","Local facilitation")))
-  
+  if (scale=="local"){
+    d2t=d_state%>%
+      filter(., Scena %in% c(paste0(scale,"_C_global_F"),paste0(scale,"_C_local_F")))%>%
+      mutate(., Stress=round(Stress,6),alpha_0=round(alpha_0,6))%>%
+      mutate(., Scena=recode_factor(Scena,"local_C_global_F"="Global facilitation","local_C_local_F"="Local facilitation"))
+    
+    
+  } else {
+    d2t=d_state%>%
+      filter(., Scena %in% c(paste0(scale,"_C_global_F"),paste0(scale,"_C_local_F")))%>%
+      mutate(., Stress=round(Stress,6),alpha_0=round(alpha_0,6))%>%
+      mutate(., Scena=recode_factor(Scena,"global_C_global_F"="Global facilitation","global_C_local_F"="Local facilitation"))
+  }
+
   color_rho = c("Coexistence" = "#D8CC7B", "Competitive" = "#ACD87B", "Desert" = "#696969", "Stress_tolerant" = "#7BD8D3")
   
   p=ggplot(d2t%>%
@@ -2319,35 +2516,39 @@ for (scale in c("local","global")){
                                "Coexistence/Desert"="#C19E5E",
                                "Desert"=  "#696969"
                                ))+
-    facet_grid(Scena~Delta,labeller=labeller(Delta=label_parsed))+
+    facet_grid(Scena~Delta,labeller=label_bquote(cols = delta == .(Delta)))+
     the_theme+theme(strip.text.x = element_text(size=12))
   
   ggsave(paste0("../Figures/2_species/PA/Multistability/Fixed_traits/Multistability_",scale,"_competition.pdf"),p,width = 7,height = 6)
   
   
+  if (scale=="local"){
+    d2t=d2%>%
+      filter(., Scena %in% c(paste0(scale,"_C_global_F"),paste0(scale,"_C_local_F")))%>%
+      mutate(., Stress=round(Stress,6),alpha_0=round(alpha_0,6))%>%
+      mutate(., Scena=recode_factor(Scena,"local_C_global_F"="Global facilitation","local_C_local_F"="Local facilitation"))
+    
+    
+  } else {
+    d2t=d2%>%
+      filter(., Scena %in% c(paste0(scale,"_C_global_F"),paste0(scale,"_C_local_F")))%>%
+      mutate(., Stress=round(Stress,6),alpha_0=round(alpha_0,6))%>%
+      mutate(., Scena=recode_factor(Scena,"global_C_global_F"="Global facilitation","global_C_local_F"="Local facilitation"))
+  }
   
   
-  d2t=transform(d2%>%filter(., alpha_0 %in% c(0,.3,unique(d2$alpha_0)[50]))%>% 
-                  filter(., Scena %in% c(paste0(scale,"_C_global_F"),paste0(scale,"_C_local_F"))),
-                Delta = factor(Delta, levels=c(.1,.9), labels=c("delta : 0.1", "delta : .9")),
-                Scena=factor(Scena,levels=c(paste0(scale,"_C_global_F"),paste0(scale,"_C_local_F")),
-                             labels=c("Global facilitation","Local facilitation")),
-                alpha_0 = factor(alpha_0, levels=c(0,unique(d2$alpha_0)[50],.3), labels=c("alpha[0] : 0", "alpha[0] : 0.15",
-                                                                       "alpha[0] : 0.3")))
   
-  
-  
-  
-  p=ggplot(d2t%>%melt(., measure.vars=c("Stress_tolerant","Competitive")))+
+  p=ggplot(d2t%>%filter(., alpha_0 %in% c(0,.3,unique(d2$alpha_0)[50]))
+           %>%melt(., measure.vars=c("Stress_tolerant","Competitive")))+
     geom_line(aes(x=Stress,y=value,linetype=Branches,color=variable))+
-    facet_grid(Scena+Delta~alpha_0,labeller=labeller(Delta=label_parsed,alpha_0=label_parsed))+
+    facet_grid(Scena+Delta~alpha_0,labeller=label_bquote(rows = delta == .(Delta),cols = alpha[e] == .(alpha_0)))+
     the_theme+theme(strip.text.x = element_text(size=12))+
     scale_color_manual(values=as.character(color_rho[c(4,2)]))+
     labs(x="Stress (S)",y="Densities",linetype="",color="")
   
   ggsave(paste0("../Figures/2_species/PA/Multistability/Fixed_traits/Bifu_bistability_species_",scale,"_competition.pdf"),width = 8,height = 7)
   
-  p=ggplot(d2t)+
+  p=ggplot(d2t%>%filter(., alpha_0 %in% c(0,.3,unique(d2$alpha_0)[50])))+
     geom_line(aes(x=Stress,y=Rho_plus,linetype=Branches))+
     facet_grid(Scena+Delta~alpha_0,labeller=labeller(Delta=label_parsed,alpha_0=label_parsed))+
     the_theme+theme(strip.text.x = element_text(size=12))+
@@ -2360,13 +2561,49 @@ for (scale in c("local","global")){
   d2t$CSI=v[1]*d2t$Stress_tolerant+v[2]*d2t$Competitive
   
   
-  p=ggplot(d2t)+
+  p=ggplot(d2t%>%filter(., alpha_0 %in% c(0,.3,unique(d2$alpha_0)[50])))+
     geom_point(aes(x=Stress,y=CSI),size=.5,alpha=.5,shape=21)+
     facet_grid(Scena+Delta~alpha_0,labeller=labeller(Delta=label_parsed,alpha_0=label_parsed))+
     the_theme+theme(strip.text.x = element_text(size=12))+
     labs(x="Stress (S)",y="Community index",linetype="",color="")
   
   ggsave(paste0("../Figures/2_species/PA/Multistability/Fixed_traits/CSI_",scale,"_competition.pdf"),width = 8,height = 7)
+  
+  
+  #Hysteresis size
+  
+  d_hysteresis=tibble()
+  for (a0 in unique(d2t$alpha_0)){
+    for (disp in unique(d2t$Delta)){
+      for (scena in unique(d2t$Scena)){
+        
+        d_fil=filter(d2t,alpha_0==a0,Delta==disp,Scena==scena)
+        d_fil=d_fil[order(d_fil$Branches,d_fil$Stress),]
+        d_hysteresis=rbind(d_hysteresis,tibble(Competition=a0,Delta=disp,Scena=scena,
+                                               hysteresis_com_not_scaled = abs(sum(d_fil$Rho_plus[1:100]-d_fil$Rho_plus[101:200])),
+                                               hysteresis_com_scaled = abs(sum(d_fil$Rho_plus[1:100]-d_fil$Rho_plus[101:200]))/(sum(d_fil$Rho_plus[1:100]+d_fil$Rho_plus[101:200])/2),
+                                               hysteresis_STol_not_scaled = abs(sum(d_fil$Stress_tolerant[1:100]-d_fil$Stress_tolerant[101:200])),
+                                               hysteresis_STol_scaled = abs(sum(d_fil$Stress_tolerant[1:100]-d_fil$Stress_tolerant[101:200]))/(sum(d_fil$Stress_tolerant[1:100]+d_fil$Stress_tolerant[101:200])/2),
+                                               hysteresis_Comp_not_scaled = abs(sum(d_fil$Competitive[1:100]-d_fil$Competitive[101:200])),
+                                               hysteresis_Comp_scaled = abs(sum(d_fil$Competitive[1:100]-d_fil$Competitive[101:200]))/(sum(d_fil$Competitive[1:100]+d_fil$Competitive[101:200])/2)
+                                               ))
+      }
+    }
+  }
+  
+
+  p=ggplot(d_hysteresis%>%melt(., measure.vars=c("hysteresis_STol_scaled","hysteresis_Comp_scaled","hysteresis_com_scaled"))%>%
+             mutate(., variable=recode_factor(variable,"hysteresis_STol_scaled"="Stress-tolerant","hysteresis_Comp_scaled"="Competitive",
+                                              "hysteresis_com_scaled"="Community" )))+
+    geom_point(aes(x=Competition,y=value,color=variable),size=1.25,alpha=.5)+
+    facet_grid(Scena~Delta,labeller=label_bquote(cols = delta == .(Delta)),scales = "free")+
+    the_theme+theme(strip.text.x = element_text(size=12))+
+    labs(x=TeX("$\\alpha_e$"),y="Hysteresis size",linetype="",color="")+
+    scale_color_manual(values=c(as.character(color_rho[c(4,2)]),"black"))
+  
+  
+  ggsave(paste0("../Figures/2_species/PA/Multistability/Fixed_traits/Hysteresis_",scale,"_competition.pdf"),width = 7,height = 5)
+  
   
 }
 
@@ -3310,7 +3547,7 @@ for (f in f_seq){
                                      "Coexistence/Stress_tolerant"="#9BBBB9",
                                      "Coexistence/Desert"="#C19E5E",
                                      "Desert"=  "#696969",
-                                     "Species 2/Stress_tolerant" = "#9B68A0"),
+                                     "Species 2/Stress_tolerant" = "#C998CE"),
                             labels=c("Coexistence","Species 2","Coexistence/Species 2","Stress-tolerant","Stress-tolerant/Desert",
                                      "Coexistence/Stress-tolerant",
                                      "Coexistence/Desert","Desert","Species 2/Stress-tolerant"))+
@@ -4408,647 +4645,5 @@ p_tot=ggarrange(p_2+geom_hline(yintercept = 1),
                 p_1+geom_hline(yintercept = 1),ncol=3,common.legend = T,legend = "bottom")
 ggsave("../Figures/2_species/CA/Clustering_mecanisms_CA.pdf",width = 7,height = 4)
 
-
-
-
-
-## 2) Patch size distribution ----
-### a) Example  ----
-
-mapping(100,100)
-S_seq=seq(0,.6,length.out=4)
-N_rep = 3 
-
-d_freq=d_size=tibble()
-display_landscape=tibble()
-for (stress in S_seq){
-  for (rep in 1:N_rep){
-    print(stress)
-    if (stress == 0){
-      stress="0.0"
-    }
-    if (stress == 1){
-      stress="1.0"
-    }
-    
-    landscape=as.matrix(read.table(paste0("../Table/2_species/CA/Patch_size/Example_sim/Landscape_size_100_stress_",stress,"_",rep,".csv"),sep=","))
-    
-    if (rep==1){
-      display_landscape = rbind(display_landscape, as_tibble(melt(landscape)) %>% add_column(., S = stress))
-      
-    }
-    
-    Freq_patches=Get_frequency_number_patches(landscape)
-    d_freq=rbind(d_freq,Freq_patches$Patches_frequency%>%add_column(., S=stress,Nrep=rep))
-    d_size=rbind(d_size,Freq_patches$Patches_size%>%add_column(., S=stress,Nrep=rep))
-  }
-}
-
-
-
-p1=ggplot(d_freq)+geom_point(aes(x=log(Size),log(Frequency),color=Species))+
-  the_theme+labs(x="Patch size (k)",y="Frequency patch > k")+
-  facet_wrap(.~S)+scale_color_manual(values=c("gray40",as.character(color_rho[c(4,2)])))
-
-p2=ggplot(display_landscape) +
-  geom_tile(aes(x = Var1, y = Var2, fill = as.character(value))) +
-  theme_transparent() +
-  scale_fill_manual(values =  c("1" = "#7BD8D3", "2" = "#ACD87B", "0" = "#D8CC7B", "-1" = "#696969")
-                    , labels = c("Stress tol", "Competitive", "Fertile", "Desert")) +
-  theme(panel.border = element_blank()) +
-  theme(legend.position = "bottom") +
-  labs(fill = "")+
-  facet_wrap(.~S)
-
-p_tot=ggarrange(p1,p2,nrow=2,labels=LETTERS[1:2])
-ggsave("../Figures/2_species/CA/Patch_size/Example_PSD.pdf",p_tot,width = 7,height = 10)
-
-
-
-### b) Analyzing the simulations for different competition regimes ----
-
-
-# the simulations were made on Julia (Step 1 : Patch size distribution : different competition scenario)
-
-mapping(100,100)
-S_seq=seq(0,.6,length.out=4)
-N_rep = 3 
-
-for (scena in c("global","local")[2]){
-  for (alpha0 in c("0.0", "0.25", "0.5")){
-  
-    d_freq=d_size=d_max_size=tibble()
-    display_landscape=tibble()
-  
-    for (stress in S_seq){
-      
-      for (rep in 1:N_rep){
-        
-        print(stress)
-        
-        if (stress == 0){
-          stress="0.0"
-        }
-        if (stress == 1){
-          stress="1.0"
-        }
-        
-        landscape=as.matrix(read.table(paste0("../Table/2_species/CA/Patch_size/Competition_regime/Landscape_size_100_stress_",stress,"_",scena,"_",rep,"_relat_compet_",alpha0,".csv"),sep=","))
-        if (rep==1 & length(unique(as.numeric(landscape)))>2){ #i.e. we have vegetation
-          display_landscape = rbind(display_landscape, as_tibble(melt(landscape)) %>% add_column(., S = stress))
-        }
-
-        Freq_patches=Get_frequency_number_patches(landscape)
-        d_freq=rbind(d_freq,Freq_patches$Patches_frequency%>%add_column(., S=stress,Nrep=rep))
-        d_size=rbind(d_size,Freq_patches$Patches_size%>%add_column(., S=stress,Nrep=rep))
-        d_max_size=rbind(d_max_size,d_size%>%group_by(Species,S)%>%summarise(max_patch=max(patch_size),.groups = "keep")) #max across replicates
-      }
-    }
-
-    p1=ggplot(d_freq)+geom_point(aes(x=log(Size),log(Frequency),color=Species))+
-      the_theme+labs(x="Patch size (k)",y="Frequency patch > k")+
-      facet_wrap(.~S,labeller = label_both)+scale_color_manual(values=c("gray40",as.character(color_rho[c(4,2)])))
-
-    p2=ggplot(display_landscape) +
-      geom_tile(aes(x = Var1, y = Var2, fill = as.character(value))) +
-      theme_transparent() +
-      scale_fill_manual(values =  c("1" = "#7BD8D3", "2" = "#ACD87B", "0" = "#D8CC7B", "-1" = "#696969")
-                        , labels = c("Stress tol", "Competitive", "Fertile", "Desert")) +
-      theme(panel.border = element_blank()) +
-      theme(legend.position = "bottom") +
-      labs(fill = "")+
-      facet_grid(.~S,labeller = label_both)
-
-    p_tot=ggarrange(p1,p2,nrow=2,labels=LETTERS[1:2],heights = c(1,.5))
-    ggsave(paste0("../Figures/2_species/CA/Patch_size/Patch_size_distribution_",scena,"_Intersp_comp_",alpha0,".pdf"),p_tot,width = 7,height = 8)
-  }
-}
-
-
-
-#
-
-
-
-### c) Fitting Power law ----
-mapping(100,100)
-n_save = 25
-alpha0 = c("0.0", "0.25", "0.5")
-
-#doing the loop on simulations
-for (scena in c("global","local")[-2]){
-  
-  if (scena=="global"){
-    S_seq = c(seq(0, 0.8, length.out=30),seq(0.8,.9,length.out=4)[-1])
-  } else{
-    S_seq = seq(0, 0.8, length.out=30)
-  }
-  
-  for (stress in S_seq){
-    d_PL=tibble()
-
-    stress=round(stress, 2)
-
-    if (stress == 0){
-      stress="0.0"
-    }
-    if (stress == 1){
-      stress="1.0"
-    }
-
-    for (alpha_0 in alpha0){
-      print(alpha_0)
-
-      for (n in 1:n_save){
-
-
-        #get landscape
-        landscape=as.matrix(read.table(paste0("../Table/2_species/Patch_size/Big_sim/Landscape_",scena,"_S_",stress,
-                                    "_alpha0_", alpha_0,"_nsave_", n , ".csv"),sep=","))
-
-
-
-        #psd = patch size distribution
-        Freq_patches=Get_frequency_number_patches(landscape)
-        d_psd=Freq_patches$Patches_frequency
-        colnames(d_psd) =  c("n","p","size","Species")
-
-        #perform analysis for each species or for global vegetation
-        for (sp in c("+","1","2")){
-
-          best_model= NA
-          psd_sp=filter(d_psd,Species==sp)
-          # if (n==21 & alpha_0=="0.0" & stress==0.61 & scena==1) best_model=2
-
-          # 1: check if desert for the focal species
-
-          if(sum(landscape %in% c(1,2))/length(landscape) <0.01& sp=="+" |
-             sum(landscape %in% c(1))/length(landscape) <0.01   & sp=="1"  |
-             sum(landscape %in% c(2))/length(landscape) <0.01 & sp=="2" ){ best_model = 1 }
-
-          # 2: check if vegetated for all vegetation
-          if(is.na(best_model) & sum(landscape %in% c(2))/length(landscape) >= 0.70  & sp=="2" |
-             is.na(best_model) & sum(landscape %in% c(1,2))/length(landscape) >= 0.70  & sp=="+" |
-             is.na(best_model) & sum(landscape %in% c(1))/length(landscape) >= 0.70  & sp=="1")  {
-            best_model = 5
-          }
-
-          # 3: fit power law models and compare via AIC via function
-
-          if(is.na(best_model)) {
-
-
-            p_spanning <- tail(psd_sp$p,1)
-
-            result <- fitPL(psd_sp, p_spanning)
-
-            best_model = result$best
-          }
-
-          class = c("DEG", "DOWN","PL", "UP", "COV")[best_model]
-
-          if (class %in% c("DEG","COV")){alpha=NA}
-          if (class %in% c("UP")){alpha=coefficients(result$TPLup)["alpha"]}
-          if (class %in% c("DOWN")){alpha=coefficients(result$TPLdown)["alpha"]}
-          if (class %in% c("PL")){alpha=coefficients(result$PL)["alpha"]}
-
-          d_PL=rbind(d_PL,tibble(Class=class,Max_patch=max(psd_sp$size),Alpha_expo=alpha,N_rep=n,
-                                 Species=sp,alpha_0=alpha_0,Stress=stress))
-
-        } #end loop species
-
-      } #end loop replicates
-
-    } #end loop alpha0
-
-    write.table(d_PL,paste0("../Table/2_species/CA/PL_summary/PL_",scena,"_S_",stress,".csv"),sep=";")
-
-  } # end loop stress
-
-  
-  
-  #merging dataframes
-  d_PL=tibble()
-  for ( i in round(S_seq,2)){if (i==0) {i = "0.0"}
-    d_PL=rbind(d_PL,read.table(paste0("../Table/2_species/PL_summary/PL_",scena,"_S_",i,".csv"),sep=";"))}
-  
-  d_PL$Max_patch[is.infinite(d_PL$Max_patch)]=0
-  
-  d_PL$Class[which(d_PL$Species=="2" & d_PL$a21==4 & d_PL$Class=="PL")]="DOWN"
-  
-  #for graphical purposes
-  appender <- function(string) {
-    TeX(paste("$\\alpha_e = $", string))}
-  
-  
-  color_sp=c("+"="gray70","1"=as.character(color_rho[4]),"2"= as.character(color_rho[2]))
-  color_class_PL =  c("COV"="#68B15E", "UP"= "#ECD57A",   "DOWN" ="#D22D2D","PL"="#E88D35",   "DEG"="#ADA9A9")
-  
-  #Max patch size colored by species
-  d_PL_maxsize_sp=d_PL%>%
-    group_by(., Species,alpha_0,Stress)%>%
-    summarise(.groups = "keep",Max_patch=mean(Max_patch))
-  
-  
-  p=ggplot(NULL)+
-    geom_point(data=d_PL,aes(x=Stress,Max_patch,color=Species),size=.5,alpha=.3)+
-    geom_line(data=d_PL_maxsize_sp,aes(x=Stress,Max_patch,color=Species),lwd=.9)+
-    the_theme+labs(x="Stress (S)", y="Max patch size",color="")+
-    facet_wrap(.~alpha_0,labeller = as_labeller(appender, default = label_parsed))+
-    scale_color_manual(values=color_sp,
-                       labels=c("+"="All vegetation","1"="Stress-tolerant","2"= "Competitive"))+
-    scale_y_log10()
-  
-  ggsave(paste0("../Figures/2_species/CA/Patch_size/Max_patch_size_by_species_",scena,".pdf"),p,width = 7,height = 4)
-  
-  
-  #Max patch size colored by PL class
-  d_PL2=transform(d_PL,
-                  alpha_0 = factor(alpha_0, levels=c(0,.25,.5), labels=c("alpha[e] : 0", "alpha[e] : 0.25",
-                                                                         "alpha[e] : 0.5")),
-                  Species=factor(Species,levels=c("+","1","2"),labels=c("Total vegetation","Stress-tolerant","Competitive")))
-  
-  
-  d_PL_maxsize_class=d_PL%>%
-    group_by(., Species,alpha_0,Stress,Class)%>%
-    summarise(.groups = "keep",Max_patch=mean(Max_patch))
-  
-  d_PL_maxsize_class=transform(d_PL_maxsize_class,
-                               alpha_0 = factor(alpha_0, levels=c(0,.25,.5), labels=c("alpha[e] : 0", "alpha[e] : 0.25",
-                                                                                      "alpha[e] : 0.5")),
-                               Species=factor(Species,levels=c("+","1","2"),labels=c("Total vegetation","Stress-tolerant","Competitive")))
-  
-  p2=ggplot(NULL)+
-    geom_point(data=d_PL2,aes(x=Stress,Max_patch,color=Class),size=.5,alpha=.3)+
-    geom_line(data=d_PL_maxsize_class,aes(x=Stress,Max_patch,color=Class),lwd=.9)+
-    the_theme+labs(x="Stress (S)", y="Max patch size",color="")+
-    facet_grid(Species~alpha_0,labeller=labeller(alpha_0=label_parsed))+
-    scale_color_manual(values=color_class_PL,
-                       labels=c("COV"="Covered","UP"="Up-bent PL","DOWN"= "Down-bent PL", "PL"="PL","DEG"="Degraded"))+
-    scale_y_log10()
-  
-  ggsave(paste0("../Figures/2_species/CA/Patch_size/Max_patch_size_by_PL_class_",scena,".pdf"),p2,width = 7,height = 5)
-  
-  
-  
-  #Exponent PL by species
-  
-  d_PL_lambda_sp=d_PL%>%
-    group_by(., Species,alpha_0,Stress)%>%
-    summarise(.groups = "keep",Alpha_expo=mean(Alpha_expo))
-  
-  p3=ggplot(NULL)+
-    geom_line(data=d_PL_lambda_sp,aes(x=Stress,-Alpha_expo,color=Species),lwd=.9)+
-    geom_point(data=d_PL,aes(x=Stress,-Alpha_expo,color=Species),size=.5,alpha=.3)+
-    the_theme+labs(x="Stress (S)",  y = TeX(r'(PL exponent \ \  $\lambda)'),color="")+
-    facet_wrap(.~alpha_0,labeller = as_labeller(appender, default = label_parsed))+
-    scale_color_manual(values=color_sp,
-                       labels=c("+"="All vegetation","1"="Stress-tolerant","2"= "Competitive"))
-  
-  ggsave(paste0("../Figures/2_species/CA/Patch_size/PL_exponent_by_species_",scena,".pdf"),p3,width = 7,height = 4)
-  
-  
-  #Exponent PL by PL class
-  d_PL_lambda_class=d_PL%>%
-    group_by(., Species,alpha_0,Stress,Class)%>%
-    summarise(.groups = "keep",Alpha_expo=mean(Alpha_expo))
-  
-  d_PL_lambda_class=transform(d_PL_lambda_class,
-                              alpha_0 = factor(alpha_0, levels=c(0,.25,.5), labels=c("alpha[e] : 0", "alpha[e] : 0.25",
-                                                                                     "alpha[e] : 0.5")),
-                              Species=factor(Species,levels=c("+","1","2"),labels=c("Total vegetation","Stress-tolerant","Competitive")))
-  
-  d_PL2=transform(d_PL,
-                  alpha_0 = factor(alpha_0, levels=c(0,.25,.5), labels=c("alpha[e] : 0", "alpha[e] : 0.25",
-                                                                         "alpha[e] : 0.5")),
-                  Species=factor(Species,levels=c("+","1","2"),labels=c("Total vegetation","Stress-tolerant","Competitive")))
-  p4=ggplot(NULL)+
-    geom_line(data=d_PL_lambda_class,aes(x=Stress,-Alpha_expo,color=Class,group=interaction(Class,Species,alpha_0)),lwd=.9)+
-    geom_point(data=d_PL2%>%mutate(., alpha_0=as.character(alpha_0)),aes(x=Stress,-Alpha_expo,color=Class),alpha=.3,size=.5)+
-    the_theme+labs(x="Stress (S)", y = TeX(r'(PL exponent \ \  $\lambda)'),color="")+
-    facet_grid(Species~alpha_0,labeller=labeller(alpha_0=label_parsed))+
-    scale_color_manual(values=color_class_PL,
-                       labels=c("COV"="Covered","UP"="Up-bent PL","DOWN"= "Down-bent PL", "PL"="PL","DEG"="Degraded"))
-  
-  ggsave(paste0("../Figures/2_species/CA/Patch_size/PL_exponent_by_PL_class_",scena,".pdf"),p4,width = 7,height = 5)
-  
-  
-} #end loop scale competition
-
-  
-#
-### d) Analyzing species dynamics ----
-
-mapping(100,100)
-n_save = 25
-alpha_seq = c("0.0", "0.25", "0.5")
-d_vege=tibble()
-#doing the loop on simulations
-for (scena in c("local","global")){
-  
-  if (scena=="global"){
-    S_seq = c(seq(0, 0.8, length.out=30),seq(0.8,.9,length.out=4)[-1])
-  } else{
-    S_seq = seq(0, 0.8, length.out=30)
-  }
-  
-  for (stress in S_seq){
-
-    stress=round(stress, 2)
-    
-    if (stress == 0){
-      stress="0.0"
-    }
-    if (stress == 1){
-      stress="1.0"
-    }
-    
-    for (alpha0 in alpha_seq){
-      
-      for (n in 1:n_save){
-        
-        
-        #get landscape
-        landscape=as.matrix(read.table(paste0("../Table/2_species/Patch_size/Big_sim/Landscape_",scena,"_S_",stress,
-                                              "_alpha0_", alpha0,"_nsave_", n , ".csv"),sep=","))
-        
-        d_vege=rbind(d_vege,tibble(Rho_1=sum(landscape==1)/length(landscape),
-                               Rho_2=sum(landscape==2)/length(landscape),Rho_p=sum(landscape %in% c(1,2))/length(landscape),N_rep=n,
-                               alpha_0=alpha0,Stress=as.numeric(stress)))
-      } #end loop replicates
-    } #end loop a12
-  } # end loop stress
-  
-  
-  
-  d_vege_merged=d_vege%>%
-    group_by(.,alpha_0,Stress)%>%
-    summarise(.,Rho_1=mean(Rho_1),Rho_2=mean(Rho_2),Rho_p=mean(Rho_p),.groups = "keep" )
-  
-  color_sp=c("Rho_p"="gray70","Rho_1"=as.character(color_rho[4]),"Rho_2"= as.character(color_rho[2]))
-  appender <- function(string) {
-    TeX(paste("$\\alpha_e = $", string))}
-  
-  
-  
-  p=ggplot(NULL)+
-    geom_path(data=d_vege_merged%>% melt(., id.vars=c("alpha_0","Stress")),
-              aes(x=Stress,value,color=variable,group=variable),lwd=1)+
-    geom_path(data=d_vege%>%melt(., id.vars=c("alpha_0","Stress","N_rep")),
-              aes(x=Stress,value,color=variable,group=interaction(variable,N_rep)),alpha=.17)+
-    the_theme+labs(x="Stress (S)", y="Patch density",color="")+
-    facet_wrap(.~alpha_0,labeller = as_labeller(appender, default = label_parsed))+
-    scale_color_manual(values=color_sp,
-                       labels=c("Rho_p"="All vegetation","Rho_1"="Stress-toletant","Rho_2"= "Competitive"))
-  
-  ggsave(paste0("../Figures/2_species/CA/Species_dynamics_CA_",scena,".pdf"),p,width = 7,height = 4)
-  
-  
-} #end loop scenarios competition
-
-
-
-
-#
-# Step 4) Testing EWS on spatial dynamics ----
-rm(list = ls())
-source("./2_Species_analysis_functions.R")
-
-# Here we test the spatial EWS on the whole dynamics. We used the previous simulations of the PL exponent
-# For each replicate, we compute the slope of variance, skewness and near-neighbor correlation (Moran I) along stress gradient
-
-
-mapping(100,100)
-n_save = 25
-alpha_seq = c("0.0", "0.25", "0.5")
-
-
-Spatial_EWS=tibble()
-for (scena in c("local","global")){
-  
-  if (scena=="global"){
-    S_seq = c(seq(0, 0.8, length.out=30),seq(0.8,.9,length.out=4)[-1])
-  } else{
-    S_seq = seq(0, 0.8, length.out=30)
-  }
-  
-  for (n in 1:n_save){
-
-    for (alpha0 in alpha_seq){
-      
-      for (sp in c(1,2,"+")){
-        
-        all_landscape=list()
-        u=1
-        for (stress in S_seq){
-          
-          
-          stress=round(stress, 2)
-          
-          if (stress == 0){
-            stress="0.0"
-          }
-          if (stress == 1){
-            stress="1.0"
-          }
-          
-          #get landscape
-          landscape=as.matrix(read.table(paste0("../Table/2_species/Patch_size/Big_sim/Landscape_",scena,"_S_",stress,
-                                                "_alpha0_", alpha0,"_nsave_", n , ".csv"),sep=","))
-          
-          if (sp=="+"){
-            landscape[landscape %in% c(1,2)]=1
-            landscape[landscape<1]=0
-            landscape=landscape>0
-          } else {
-            landscape[landscape != as.numeric(sp)]=0
-            landscape[landscape == as.numeric(sp)]=1
-            landscape=landscape>0
-          }
-          
-          all_landscape[[u]] = landscape # putting all landscapes in a list in order to use spatial warnings package
-          
-          u=u+1
-        } #end loop stress
-        
-        # Getting the spatial EWS using spatialwarning package
-        generic_sp=as_tibble(as.data.frame(generic_sews(all_landscape,subsize = 5,moranI_coarse_grain = T)))%>%
-          mutate(.,matrixn=rep(S_seq,each=4))%>%
-          rename(., Stress=matrixn)%>%
-          add_column(., alpha_0=as.numeric(alpha0),
-                     replicate=n,Species=sp)
-        
-        fit_spatial_ews=tibble()
-        
-        # Applying linear regression along stress gradient and saving the slope for each measure
-        for (measure in unique(generic_sp$indic)[-4]){ #deleting the mean
-          
-          generic_sp_measure=filter(generic_sp,indic==measure)
-          slope_measure=lm(value~Stress,data=generic_sp_measure)$coefficients[2] #getting the slope
-          
-          test_slope = summary(lm(value~Stress,data=generic_sp_measure))$coefficients[2,4]
-          
-          fit_spatial_ews=rbind(fit_spatial_ews,tibble(Slope=slope_measure,Metric=measure, #merging data
-                                                       alpha_0=unique(generic_sp$alpha_0),Rep=unique(generic_sp$replicate),
-                                                       Species=sp,Signif = test_slope))
-          
-        }
-        
-        Spatial_EWS=rbind(Spatial_EWS,fit_spatial_ews) #merging to the main df
-        
-      }#end species loop
-      
-    } #end loop a12
-  
-  } # end loop replicate
-  write.table(Spatial_EWS,paste0("../Table/2_species/CA/EWS_spatial/Spatial_EWS_",scena,".csv"),sep=";")
-  
-  
-  #Analysing data and ploting graphs
-  
-  
-  Spatial_EWS=as_tibble(mutate(Spatial_EWS,Metric=recode_factor(Metric,"skewness"="Skewness","moran"="Moran's I","variance"="Variance"),
-                               Species=as.character(Species),
-                               alpha_0=as.numeric(alpha_0),
-                               Signif=as.numeric(Signif),
-                               Metric=as.character(Metric)))
-  
-  Spatial_EWS_replicate=Spatial_EWS%>%
-    group_by(Species,alpha_0,Metric)%>%
-    summarise(.groups = "keep",Mean_slope=mean(Slope),Sd_slope=sd(Slope))
-  
-  
-  
-  color_sp=c("gray70",as.character(color_rho[4]),as.character(color_rho[2]))
-  
-  p=ggplot(NULL)+
-    geom_jitter(data=Spatial_EWS,aes(x=as.numeric(alpha_0),y=Slope,color=Species,fill=Species),alpha=.5,width = 0.025,height = 0)+
-    geom_errorbar(data=Spatial_EWS_replicate,aes(x=as.numeric(alpha_0),y=Mean_slope,
-                                                 ymin=Mean_slope-Sd_slope,
-                                                 ymax=Mean_slope+Sd_slope,fill=Species), shape=21,width=0,color="black") +
-    geom_point(data=Spatial_EWS_replicate,aes(x=as.numeric(alpha_0),y=Mean_slope,fill=Species),color="black",shape=21,size=3)+
-    scale_color_manual(values=color_sp,
-                       labels=c("+"="Total vegetation",
-                                "1"="Stress-tolerant",
-                                "2"="Competitive"))+
-    scale_fill_manual(values=color_sp,
-                      labels=c("+"="Total vegetation",
-                               "1"="Stress-tolerant",
-                               "2"="Competitive"))+
-    facet_wrap(.~Metric,scales = "free")+the_theme+
-    labs(y="Slope",x=TeX(r'(Competition strength \ $\alpha_e)'),color="",fill="")+
-    geom_hline(yintercept = 0,linetype=9,lwd=.1)+
-    scale_x_continuous(breaks = c(0,.25,.5))
-  
-  ggsave(paste0("../Figures/2_species/CA/Spatial_EWS_",scena,".pdf"),width = 8,height = 4)
-  
-  
-} #end loop scenarios competition
-
-
-
-
-
-
-
-# Step 5) Testing Temporal EWS ----
-
-rm(list = ls())
-source("./2_Species_analysis_functions.R")
-
-# Here we test the spatial EWS on the whole dynamics. We used the previous simulations of the PL exponent
-# For each replicate, we compute the slope of variance, skewness and near-neighbor correlation (Moran I) along stress gradient
-
-
-mapping(100,100)
-n_save = 25
-alpha_seq = c("0.0", "0.25", "0.5")
-
-
-Temporal_EWS=tibble()
-for (scena in c("local","global")){
-  
-  if (scena=="global"){
-    S_seq = c(seq(0, 0.8, length.out=30),seq(0.8,.9,length.out=4)[-1])
-  } else{
-    S_seq = seq(0, 0.8, length.out=30)
-  }
-  
-  for (alpha0 in alpha_seq){
-    
-    d_dyn=tibble()
-    
-    all_landscape=list()
-    u=1
-    for (stress in S_seq){
-      stress=round(stress, 2)
-      
-      if (stress == 0){
-        stress="0.0"
-      }
-      if (stress == 1){
-        stress="1.0"
-      }
-      
-      for (n in 1:n_save){
-        for (sp in c(1,2,"+")){
-          
-          
-          
-          #get landscape
-          landscape=as.matrix(read.table(paste0("../Table/2_species/Patch_size/Big_sim/Landscape_",scena,"_S_",stress,
-                                                "_alpha0_", alpha0,"_nsave_", n , ".csv"),sep=","))
-          
-          if (sp=="+"){
-            landscape[landscape %in% c(1,2)]=1
-            landscape[landscape<1]=0
-            landscape=landscape>0
-          } else {
-            landscape[landscape != as.numeric(sp)]=0
-            landscape[landscape == as.numeric(sp)]=1
-            landscape=landscape>0
-          }
-          
-          d_dyn=rbind(d_dyn,tibble(Sp=c(as.character(sp)),
-                                   Rho=length(landscape[landscape==T])/length(landscape),
-                                   Rep=n,Stress=stress,
-                                   alpha_0=alpha0))
-          
-          all_landscape[[u]] = landscape # putting all landscapes in a list in order to use spatial warnings package
-          
-          u=u+1
-        } #end species loop
-        
-      }# end loop replicate 
-      
-      
-    }#end loop stress
-    
-    
-    t=d_dyn%>%
-      group_by(Sp,Stress,alpha_0)%>%
-      summarise(Rho_m=as.numeric(mean(Rho)),.groups = "keep")%>%
-      mutate(Rho_m=as.numeric(Rho_m),Stress=as.numeric(Stress))%>%
-      as.data.frame(.)
-      
-    ggplot(t)+
-      geom_path(aes(x=Stress,y=Rho_m,color=Sp))
-      
-    
-    for (a0 in unique(d_dyn$alpha_0)){
-        for (stress in unique(d_dyn$Stress)){
-          d_fil=filter(d_dyn,alpha_0==a0,Stress==stress)%>%
-            spread(Sp,Rho)
-          
-          
-          
-        }
-    }
-    
-    
-    
-  } #end loop a12
-  
-}
 
 
