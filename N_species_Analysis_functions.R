@@ -1,7 +1,7 @@
 rm(list = ls())
 x <- c(
   "tidyverse", "ggpubr", "latex2exp", "deSolve", "reshape2",
-  "JuliaCall", "diffeqr", "simecol", "tseries", "phaseR","GGally",
+   "simecol", "tseries", "phaseR","GGally",
   "ggquiver", "scales", "boot", "spatialwarnings","simecol","igraph","hillR"
 )
 lapply(x, require, character.only = TRUE)
@@ -228,4 +228,5 @@ Get_diversity_community=function(trait,densities){
   colnames(d_diversity)=d_name
   return(d_diversity)
 }
+
 

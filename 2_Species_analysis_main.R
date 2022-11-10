@@ -838,7 +838,7 @@ ggsave(paste0("../Figures/2_species/MF/Niche_expansion_MF_facilitation.pdf"),p,w
 
 
 
-## 7) Comparing Net-effects and RII ----
+## 7) Neighboring effects ----
 ### a) Simulation ----
 
 tspan = c(0, 10000)
@@ -850,7 +850,7 @@ S_seq = seq(0, 1, length.out = Nsim)
 c_seq = seq(0,.3, length.out = Nsim)
 epsilon=10^(-9)
 
-d_RNE=d_Net_effect=tibble()
+d_RNE=tibble()
 
 
 for (S in S_seq) {
@@ -899,44 +899,7 @@ for (S in S_seq) {
     
     d_RNE = rbind(d_RNE, d[nrow(d), ] %>% add_column(S = S, alpha_0 = comp,Sp="Both"))
     
-    # 2) Net-effects 
-    
-    param=Get_MF_parameters()  
-    param=c(param[1:3],"beta1"=1,"beta2"=1,param[5:10])
-    
-    for (sp in 1:2) { #for both species
-      
-      param["S"] = S
-      param["alpha_0"] = comp # update parameters
-      julia_assign("p", param)
 
-      
-      # first without press perturbation
-      
-      prob = julia_eval("ODEProblem(MF_two_species_press, state, tspan, p)")
-      sol = de$solve(prob, de$Tsit5(), saveat = t)
-      d = as.data.frame(t(sapply(sol$u, identity)))
-      mean_densities=as_tibble(t(get_mean_densities(d)))[,c(1,2)[-sp]]
-      colnames(mean_densities)="Densities"
-      
-      d_Net_effect = rbind(d_Net_effect, mean_densities %>% add_column(S = S, alpha_0 = comp, Type = "control",Species=c(1,2)[sp])) 
-
-      
-      # with press perturbation on growth rate proxy
-      param[paste0("beta",sp)] = param[paste0("beta",sp)] + epsilon # press
-      julia_assign("p", param)
-      
-      prob = julia_eval("ODEProblem(MF_two_species_press, state, tspan, p)")
-      sol = de$solve(prob, de$Tsit5(), saveat = t)
-      d = as.data.frame(t(sapply(sol$u, identity)))
-      mean_densities=as_tibble(t(get_mean_densities(d)))[,c(1,2)[-sp]]
-      colnames(mean_densities)="Densities"
-      
-      d_Net_effect = rbind(d_Net_effect, mean_densities %>% add_column(S = S, alpha_0 = comp, Type = "press",Species=c(1,2)[sp]))
-      
-      param[paste0("beta",sp)] = 1
-    }
-    
     
   }
 }
@@ -956,40 +919,13 @@ d_RNE[,3:6][is.na(d_RNE[,3:6])] = NA
 
 
 
-d_Net_effect[d_Net_effect < epsilon] = 0
-colnames(d_Net_effect) = c("Eq", "S", "alpha_0", "Type","Species","Branches")
-
-net_effect =sapply(seq(1, nrow(d_Net_effect) , by = 2),function(x){
-  return((d_Net_effect$Eq[x+1] - d_Net_effect$Eq[x]) / epsilon)
-})
-
-d_net=d_Net_effect%>%
-  filter(., Type=="control")%>%
-  select(.,-Type)
-d_net$value=net_effect
-
-#for latex format in facet
-appender <- function(string) {
-  TeX(paste("$\\alpha_e = $", string))  
-}
-
-
-d_all=list(d_net,d_RNE)
+d_all=d_RNE
 save(file="../Table/2_species/MF/Comparing_net_effects.RData",d_all)
 
 ### b) Analysis ----
 load(file="../Table/2_species/MF/Comparing_net_effects.RData")
-d_net=d_all[[1]];d_RNE=d_all[[2]]
+d_net=d_all
 
-
-d_net$value[d_net$value>10]=NA
-d_net$value[d_net$value < -10]=NA
-
-ggplot(d_net)+
-  geom_tile(aes(x=S,y=alpha_0,fill=value))+
-  facet_wrap(.~Species)+
-  the_theme+
-  scale_fill_gradient2(low="red",mid="white",high="blue")
 
 
 p1=ggplot(d_RNE%>%
@@ -2227,33 +2163,35 @@ for (hcomp in h_seq){
 
 ## 2) CSI and random initial communities ----
 
-tspan = c(0, 10000)
-t = seq(0, 10000, by = 1)
+tspan = c(0, 2000)
+t = seq(0, 2000, by = 1)
 julia_library("DifferentialEquations")
 julia_assign("tspan", tspan)
 
 
-n_random_ini=50
+n_random_ini=20
 d2 = tibble()
-S_seq = seq(0,1, length.out = 100)
-c_seq=c(.3)
-name_scena=c("global_C_local_F","global_C_global_F")
-delta_seq=c(.1,.9)
+S_seq = seq(0,1, length.out = 30)[1]
+c_seq=seq(0,.3,length.out=30)[30]
+name_scena=c("global_C_local_F","global_C_global_F")[1]
+disp=.1
 
-for (disp in delta_seq) {
+for (a0 in c_seq) {
   
-  for (scena_ID in 1:2){ #for each scenario of species pairs
+  for (scena_ID in 1:length(name_scena)){ #for each scenario of species pairs
     
     for (S in S_seq) { #varying dispersal scale
       
       for (n_ini in 1:n_random_ini){ # for each combination, we draw random communities
         
-        state =Get_PA_initial_state(Get_MF_initial_state(type="random")[-4])
+        type_random=ifelse(n_ini<11,"random_D","random_R")
+        
+        state =Get_PA_initial_state(Get_MF_initial_state(type=type_random)[-4])
         julia_assign("state", state)
         param=Get_PA_parameters()
         param["cintra"]=.3
         param["S"] = S
-        param["alpha_0"] = .3
+        param["alpha_0"] = a0
         param["delta"]=disp
         julia_assign("p", param)
         
@@ -2273,7 +2211,7 @@ for (disp in delta_seq) {
         d = as.data.frame(t(sapply(sol$u, identity)))
         colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
         
-        d2 = rbind(d2, d[nrow(d), ] %>% add_column(S = S, alpha_0 = .3,n_ini=n_ini,Scena=name_scena[scena_ID],Delta=disp))
+        d2 = rbind(d2, d[nrow(d), ] %>% add_column(S = S, alpha_0 = a0,n_ini=n_ini,Scena=name_scena[scena_ID],Delta=disp))
       }
     }
   }
@@ -2899,7 +2837,7 @@ p=ggplot(d_RNE_analysis%>%filter(., H==1))+
 ggsave("../Figures/2_species/PA/Fraction_positive_RNE.pdf",width = 7,height = 6)
 
 
-## 5) Net effects from partial derivative ----
+## 5) Net effects fixed traits ----
 ### a) Simulation ----
 
 tspan = c(0, 30000)
@@ -2910,82 +2848,70 @@ state = Get_PA_initial_state(Get_MF_initial_state(c(.4,.4,.1)))
 julia_assign("state", state)
 
 N_sim = 100;epsilon=10^(-8)
-name_scena=c("global_C_local_F","local_C_local_F")
-disp_seq=c(.1,.9)
-c_seq = seq(0, .3, length.out = N_sim)
+C_for_analyse = c(0,.15,.3)
 S_seq = seq(0, 1, length.out = N_sim)
+disp_seq=c(.1,.9)
 
 d_niche=d_RNE=d_all_dyn=tibble() 
 d2 = d3 = tibble()
 param=Get_PA_parameters()  
 param=c(param[1:3],"beta1"=1,"beta2"=1,param[5:12])
-param["cintra"]=.3
-C_for_analyse = seq(0, .3, length.out = N_sim)[c(1,N_sim/2,N_sim)]
 
 
 
-for (scena_ID in 1:2){ 
+
+
   
-  for (comp in C_for_analyse) {
+for (comp in C_for_analyse) {
+  
+  for (disp in disp_seq){
     
-    for (disp in disp_seq){
+    for (S in S_seq) {
       
-      for (S in S_seq) {
+      for (sp in 1:2) { #for both species
         
-        for (sp in 1:2) { #for both species
-          
-          param["S"] = S
-          param["alpha_0"] = comp # update parameters
-          param["delta"] = disp
-          julia_assign("p", param)
-          
-          
-          # first without press perturbation
-          if (scena_ID==1){
-            prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F_press, state, tspan, p)")
-          }else if (scena_ID==2){  
-            prob = julia_eval("ODEProblem(PA_two_species_local_C_local_F_press, state, tspan, p)")
-          }
-          
-          sol = de$solve(prob, de$Tsit5(), saveat = t)
-          d = as.data.frame(t(sapply(sol$u, identity)))
-          d2 = rbind(d2, as_tibble(mean(d[(nrow(d)-5000):nrow(d),c(1,2)[-sp]])) %>%
-                       add_column(S = S, alpha_0 = comp, Type = "control",Species=c(1,2)[sp],
-                                  Scena=name_scena[scena_ID],Disp=disp)) 
-          d3 = rbind(d3, as_tibble(d[nrow(d),]) %>% add_column(S = S, alpha_0 = comp))
-          
-          
-          
-          # with press perturbation on growth rate proxy
-          
-          param[paste0("beta",sp)] = param[paste0("beta",sp)] + epsilon # press
-          julia_assign("p", param)
-          
-          
-          if (scena_ID==1){
-            julia_assign("p", param)
-            prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F_press, state, tspan, p)")
-          }else if (scena_ID==2){  
-            julia_assign("p", param)
-            prob = julia_eval("ODEProblem(PA_two_species_local_C_local_F_press, state, tspan, p)")
-          }
-          
-          
-          sol = de$solve(prob, de$Tsit5(), saveat = t)
-          d = as.data.frame(t(sapply(sol$u, identity)))
-          d2 = rbind(d2, as_tibble(mean(d[(nrow(d)-5000):nrow(d),c(1,2)[-sp]])) %>%
-                       add_column(S = S, alpha_0 = comp, Type = "press",Species=c(1,2)[sp],
-                                  Scena=name_scena[scena_ID],Disp=disp))
-          
-          param[paste0("beta",sp)] = 1
-        }
+        param["S"] = S
+        param["alpha_0"] = comp # update parameters
+        param["delta"] = disp
+        julia_assign("p", param)
+        
+        
+        # first without press perturbation
+        
+        prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F_press, state, tspan, p)")
+        
+        
+        sol = de$solve(prob, de$Tsit5(), saveat = t)
+        d = as.data.frame(t(sapply(sol$u, identity)))
+        d2 = rbind(d2, as_tibble(mean(d[(nrow(d)-3000):nrow(d),c(1,2)[-sp]])) %>%
+                     add_column(S = S, alpha_0 = comp, Type = "control",Species=c(1,2)[sp],
+                                Disp=disp)) 
+        d3 = rbind(d3, as_tibble(d[nrow(d),]) %>% add_column(S = S, alpha_0 = comp))
+        
+        # with press perturbation on growth rate proxy
+        
+        param[paste0("beta",sp)] = param[paste0("beta",sp)] + epsilon # press
+        julia_assign("p", param)
+        
+        
+        julia_assign("p", param)
+        prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F_press, state, tspan, p)")
+        
+        sol = de$solve(prob, de$Tsit5(), saveat = t)
+        d = as.data.frame(t(sapply(sol$u, identity)))
+        d2 = rbind(d2, as_tibble(mean(d[(nrow(d)-3000):nrow(d),c(1,2)[-sp]])) %>%
+                     add_column(S = S, alpha_0 = comp, Type = "press",Species=c(1,2)[sp],
+                                Disp=disp))
+        
+        param[paste0("beta",sp)] = 1
       }
     }
   }
 }
+
   
 d2[d2 < epsilon] = 0
-colnames(d2) = c("Eq", "S", "alpha_0", "Type","Species","Scena","Disp")
+colnames(d2) = c("Eq", "S", "alpha_0", "Type","Species","Disp")
 
 
 write.table(d2,"../Table/2_species/PA/Net_effects_partial_deriv_PA.csv",sep=";")
@@ -2998,9 +2924,6 @@ d2=read.table("../Table/2_species/PA/Net_effects_partial_deriv_PA.csv",sep=";")
 
 
 
-N_sim = 100;epsilon=10^(-8)
-c_seq = seq(0, .3, length.out = N_sim)
-C_for_analyse = seq(0, .3, length.out = N_sim)[c(1,N_sim/2,N_sim)]
 
 net_effect =sapply(seq(1, nrow(d2) , by = 2),function(x){
   return((d2$Eq[x+1] - d2$Eq[x]) / epsilon)
@@ -3012,10 +2935,6 @@ d_net=d2%>%
   select(.,-Type)
 d_net$value=net_effect
 
-d_net=transform(d_net,
-                Disp = factor(Disp, levels=c(.1,.9), labels=c("delta : 0.1", "delta : .9")),
-                Scena=factor(Scena,levels=c("global_C_local_F","local_C_local_F"),
-                             labels=c("Global competition","Local competition")))
 
 for (id_plot in 1:3){
   assign(paste0("p_",id_plot),
@@ -3023,20 +2942,18 @@ for (id_plot in 1:3){
            geom_line(aes(x = S, y = value, color = as.factor(Species)),lwd=1,alpha=.5) +
            the_theme+scale_color_manual(values=c("blue","green"),labels=c("1"= "Stess_tol","2"="Competitive"))+
            geom_hline(yintercept = 0,linetype=9)+
-           facet_grid(Scena~Disp,labeller=labeller(Disp=label_parsed))+
+           facet_wrap(.~Disp,labeller=label_bquote(cols = delta == .(Disp)))+
            labs(x="Stress (S)",alpha=TeX('$\\alpha_e$'),color="Species",y=TeX(r'(Net effect \ \ $\frac{\partial \rho_{\psi_i}}{\partial \beta_j}$)'))  )
 }
 
 p=ggarrange(p_1,p_2,p_3,ncol=3,common.legend = T,legend = "bottom")
 
 
-ggsave(paste0("../Figures/2_species/MF/Net_effects_","main","_",func_MF,".pdf"),p_tot,width = 8,height = 5)
+ggsave(paste0("../Figures/2_species/PA/Net_effects_PA.pdf"),p_tot,width = 8,height = 5)
 
 
-## 6) Comparing Net-effects and RII ----
+## 6) Neighboring effects fixed traits ----
 ### a) Simulation ----
-
-
 
 tspan = c(0, 2000) #to avoid long transient
 t = seq(0, 2000, by = 1)
@@ -3049,7 +2966,7 @@ epsilon=10^(-9)
 disp_seq=c(.1,.9)
 scale_seq=c("LocalF_GlobalC","LocalF_LocalC","GlobalF_GlobalC","GlobalF_LocalC")
 
-d_RNE=d_Net_effect=tibble()
+d_RNE=tibble()
 
 
 for (scale in scale_seq){
@@ -3195,88 +3112,6 @@ for (scale in scale_seq){
                                                          Dispersal=disp))
         
         
-        
-        # 
-        # # 2) Net-effects 
-        # 
-        # param=Get_PA_parameters()  
-        # param=c(param[1:3],"beta1"=1,"beta2"=1,param[5:12])
-        # 
-        # for (sp in 1:2) { #for both species
-        #   
-        #   param["S"] = S
-        #   param["alpha_0"] = comp # update parameters
-        #   julia_assign("p", param)
-        #   
-        #   
-        #   # first without press perturbation
-        #   
-        #   if (scale == "LocalF_GlobalC"){ 
-        #     
-        #     julia_assign("p", param)
-        #     prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F, state, tspan, p)")
-        #     
-        #   }
-        #   if (scale == "LocalF_LocalC"){ 
-        #     
-        #     julia_assign("p", param)
-        #     prob = julia_eval("ODEProblem(PA_two_species_local_C_local_F, state, tspan, p)")
-        #     
-        #   }
-        #   if (scale == "GlobalF_GlobalC"){ 
-        #     
-        #     julia_assign("p", param)
-        #     prob = julia_eval("ODEProblem(PA_two_species_global_C_global_F, state, tspan, p)")
-        #     
-        #   }
-        #   if (scale == "GlobalF_LocalC"){ 
-        #     
-        #     julia_assign("p", param)
-        #     prob = julia_eval("ODEProblem(PA_two_species_local_C_global_F, state, tspan, p)")
-        #     
-        #   }
-        #   sol = de$solve(prob, de$Tsit5(), saveat = t)
-        #   d = as.data.frame(t(sapply(sol$u, identity)))
-        #   mean_densities=as_tibble(t(get_mean_densities(d)))[,c(1,2)[-sp]]
-        #   colnames(mean_densities)="Densities"
-        #   
-        #   d_Net_effect = rbind(d_Net_effect, mean_densities %>% add_column(S = S, 
-        #                                                                    alpha_0 = comp, 
-        #                                                                    Type = "control",
-        #                                                                    Species=c(1,2)[sp],
-        #                                                                    Scale_comp=scale,
-        #                                                                    Dispersal=disp)) 
-        #   
-        #   
-        #   # with press perturbation on growth rate proxy
-        #   param[paste0("beta",sp)] = param[paste0("beta",sp)] + epsilon # press
-        #   julia_assign("p", param)
-        #   
-        #   if (scale_c == "Local"){ 
-        #     
-        #     julia_assign("p", param)
-        #     prob = julia_eval("ODEProblem(PA_two_species_local_C_local_F_press, state, tspan, p)")
-        #     
-        #   }else{  
-        #     
-        #     julia_assign("p", param)
-        #     prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F_press, state, tspan, p)")
-        #     
-        #   }
-        #   sol = de$solve(prob, de$Tsit5(), saveat = t)
-        #   d = as.data.frame(t(sapply(sol$u, identity)))
-        #   mean_densities=as_tibble(t(get_mean_densities(d)))[,c(1,2)[-sp]]
-        #   colnames(mean_densities)="Densities"
-        #   
-        #   d_Net_effect = rbind(d_Net_effect, mean_densities %>% add_column(S = S, 
-        #                                                                    alpha_0 = comp, 
-        #                                                                    Type = "press",
-        #                                                                    Species=c(1,2)[sp],
-        #                                                                    Scale_comp=scale,
-        #                                                                    Dispersal=disp))
-        #   
-        #   param[paste0("beta",sp)] = 1
-        #}
       }
     }
   }
@@ -3299,31 +3134,13 @@ d_RNE=tibble(S=d_both$S,alpha_0=d_both$alpha_0,
 d_RNE[,3:6][is.na(d_RNE[,3:6])] = NA
 
 
-# 
-# d_Net_effect[d_Net_effect < epsilon] = 0
-# colnames(d_Net_effect) = c("Eq", "S", "alpha_0", "Type","Species","Branches")
-# 
-# net_effect =sapply(seq(1, nrow(d_Net_effect) , by = 2),function(x){
-#   return((d_Net_effect$Eq[x+1] - d_Net_effect$Eq[x]) / epsilon)
-# })
-# 
-# d_net=d_Net_effect%>%
-#   filter(., Type=="control")%>%
-#   select(.,-Type)
-# d_net$value=net_effect
-# 
-# #for latex format in facet
-# appender <- function(string) {
-#   TeX(paste("$\\alpha_e = $", string))  
-# }
-d_net=tibble()
 
-d_all=list(d_net,d_RNE)
+d_all=d_RNE
 save(file="../Table/2_species/PA/Comparing_net_effects.RData",d_all)
 
 ### b) Analysis ----
 load(file="../Table/2_species/PA/Comparing_net_effects.RData")
-d_net=d_all[[1]];d_RNE=d_all[[2]]
+d_RNE=d_all
 
 
 
@@ -3570,8 +3387,8 @@ for (f in f_seq){
         
         #Bifurcation diagram species
         p=ggplot(d2%>%melt(., measure.vars=c("Stress_tolerant","Competitive"))%>%
-                   filter(., Psi2 %in% unique(d_state$Psi2)[c(1,75,100)])%>%
-                   mutate(Psi2=round(abs(Psi1-Psi2),2))%>%
+                   filter(., Psi2 %in% unique(d_state$Psi2)[c(2,75,100)])%>%
+                   mutate(Psi2=round(abs(Psi2),3))%>%
                    filter(., alpha_0!=.1))+
           geom_line(aes(x = Stress, y = value, color = variable,linetype=Branches),lwd=.8) +
           labs(x = "Stress (S)", y = "Density", color = "",linetype="") +
@@ -3580,7 +3397,7 @@ for (f in f_seq){
           scale_linetype_manual(values=c(1,9))+
           theme(legend.text = element_text(size = 9),strip.text.y = element_text(size=9))+
           facet_grid(Psi2~alpha_0, scales = "free",  
-                     labeller = label_bquote(cols = alpha[e] == .(alpha_0), rows = abs(psi[1] - psi[2]) == .(Psi2)))
+                     labeller = label_bquote(cols = alpha[e] == .(alpha_0), rows = psi[2] == .(Psi2)))
         
         
         
@@ -3590,7 +3407,7 @@ for (f in f_seq){
 
         #Community index
         p=ggplot(d2%>%
-                   filter(., Psi2 %in% unique(d2$Psi2)[c(1,75,100)])%>%
+                   filter(., Psi2 %in% unique(d2$Psi2)[c(2,75,100)])%>%
                    mutate(Psi2=round(abs(Psi1-Psi2),2))%>%
                    filter(., alpha_0!=.1))+
           geom_point(aes(x = Stress, y = CSI),size=.7,shape=21,alpha=.4) +
@@ -3605,69 +3422,49 @@ for (f in f_seq){
         
         
         
-        #Computing hysteresis size : species scale
-        d_hysteresis=tibble()
+        #Restoration and degradation points
+        d_tipping=tibble()
         for (a0 in unique(d2$alpha_0)){
           for (psi in unique(d2$Psi2)){
+            for (direction in unique(d2$Branches)){
+              
+              d_a0=filter(d2,alpha_0==a0,Psi2==psi,Branches==direction)
+              
+              if (direction=="Restoration") d_a0=d_a0[order(d_a0$Stress,decreasing = T),]
+              
+              density_C=d_a0$Competitive
+              stress_C=stress_ST=d_a0$Stress
+                
+              if (direction=="Restoration"){ #initially absent
+                
+                stress_C=stress_C[-c(1:min(which(abs(diff(density_C))>0)))]
+                density_C=density_C[-c(1:min(which(abs(diff(density_C))>0)))]
+                Tipping_C = stress_C[1]
+                
+              } else{
+                
+                Tipping_C = stress_C[min(which(density_C==0))-1]
+                
+              }
+              
+              d_tipping=rbind(d_tipping,tibble(Competition=a0,Psi2=psi,Branch=direction,
+                                               Tipping_C = Tipping_C))
             
-            d_a0=filter(d2,alpha_0==a0,Psi2==psi)
-            d_a0=d_a0[order(d_a0$Branches,d_a0$Stress),]
-            
-            d_hysteresis=rbind(d_hysteresis,tibble(Competition=a0,Psi2=psi,
-                                                   Hysteresis_com=abs(sum(d_a0$Rho_plus[1:100]-d_a0$Rho_plus[101:200])),
-                                                   Hysteresis_STol=abs(sum(d_a0$Stress_tolerant[1:100]-d_a0$Stress_tolerant[101:200])),
-                                                   Hysteresis_Comp=abs(sum(d_a0$Competitive[1:100]-d_a0$Competitive[101:200])),
-                                                   Hysteresis_com_scaled=abs(sum(d_a0$Rho_plus[1:100]-d_a0$Rho_plus[101:200]))/(sum(d_a0$Rho_plus[1:100]+rev(d_a0$Rho_plus[101:200]))/2),
-                                                   Hysteresis_STol_scaled=abs(sum(d_a0$Stress_tolerant[1:100]-d_a0$Stress_tolerant[101:200]))/(sum(d_a0$Stress_tolerant[1:100]+rev(d_a0$Stress_tolerant[101:200]))/2),
-                                                   Hysteresis_Comp_scaled=abs(sum(d_a0$Competitive[1:100]-d_a0$Competitive[101:200]))/(sum(d_a0$Competitive[1:100]+rev(d_a0$Competitive[101:200]))/2)
-            ))
-            
-            
+            }
           }
         }
         
-        
-        
-        
-        pdf(paste0("../Figures/2_species/PA/Multistability/Varying_traits/Hysteresis_size_Psi1_",Psi_sp1,"_dispersal_",disp,"_facilitation_",f,".pdf"),p,width = 7,height = 4)
-        
-        print(ggplot(d_hysteresis%>%melt(., measure.vars=c("Hysteresis_STol","Hysteresis_Comp")))+
-                geom_point(aes(x = Psi2, y = value,color=variable),size=.5) +
-                labs(x = TeX("$\\psi_2$"), y = "Hysteresis size", color = "",linetype="") +
-                the_theme +
-                theme(legend.text = element_text(size = 9),strip.text.y = element_text(size=9))+
-                facet_grid(.~Competition, scales = "free",  
-                           labeller = label_bquote(cols = alpha[e] == .(Competition)))+
-                scale_color_manual(values=as.character(color_rho[c(4,2)])))
-        
-        print(ggplot(d_hysteresis%>%melt(., measure.vars=c("Hysteresis_STol_scaled","Hysteresis_Comp_scaled")))+
-                geom_point(aes(x = Psi2, y = value,color=variable),size=.5) +
-                labs(x = TeX("$\\psi_2$"), y = "Hysteresis size", color = "",linetype="") +
-                the_theme +
-                theme(legend.text = element_text(size = 9),strip.text.y = element_text(size=9))+
-                facet_grid(.~Competition, scales = "free",  
-                           labeller = label_bquote(cols = alpha[e] == .(Competition)))+
-                scale_color_manual(values=as.character(color_rho[c(4,2)])))
-        
-        
-        print(ggplot(d_hysteresis%>%melt(., measure.vars=c("Hysteresis_com")))+
-                geom_point(aes(x = Psi2, y = value),size=.5) +
-                labs(x = TeX("$\\psi_2$"), y = "Hysteresis size", color = "",linetype="") +
-                the_theme +
-                theme(legend.text = element_text(size = 9),strip.text.y = element_text(size=9))+
-                facet_grid(.~Competition, scales = "free",  
-                           labeller = label_bquote(cols = alpha[e] == .(Competition))))
-        
-        print(ggplot(d_hysteresis%>%melt(., measure.vars=c("Hysteresis_com_scaled")))+
-                geom_point(aes(x = Psi2, y = value),size=.5) +
-                labs(x = TeX("$\\psi_2$"), y = "Hysteresis size", color = "",linetype="") +
-                the_theme +
-                theme(legend.text = element_text(size = 9),strip.text.y = element_text(size=9))+
-                facet_grid(.~Competition, scales = "free",  
-                           labeller = label_bquote(cols = alpha[e] == .(Competition))))
-        
-        
-        dev.off()
+        p=ggplot(d_tipping)+
+          geom_smooth(aes(x=Psi2,y=Tipping_C,color=Branch,group=interaction(Competition,Branch)),se = F)+
+          the_theme+facet_grid(.~Competition,labeller = label_bquote(cols=alpha[e]==.(Competition)))+
+          labs(x=TeX(r'(Trait species 2, \ $\psi_2)'),y="Tipping point",color="")+
+          scale_color_manual(values=c("black","blue"))+
+          scale_x_continuous(sec.axis = sec_axis(trans = ~ (1-.x) ,
+                                                 name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)'),
+                                                 breaks = c(0,.25,.5,.75,1),labels = c("0","0.25","0.5","0.75","1")),
+                             breaks = c(0,.25,.5,.75,1),labels = c("0","0.25","0.5","0.75","1"))
+          
+        ggsave(paste0("../Figures/2_species/PA/Multistability/Varying_traits/Tipping_points_Psi1_",Psi_sp1,"_dispersal_",disp,"_facilitation_",f,".pdf"),p,width = 7,height = 4)        
         
         
         
@@ -3755,8 +3552,8 @@ for (f in f_seq){
         
         
         p=ggplot(d2%>%melt(., measure.vars=c("Stress_tolerant","Competitive"))%>%
-                   filter(., Psi2 %in% unique(d_state$Psi2)[c(1,75,100)])%>%
-                   mutate(Psi2=round(abs(Psi1-Psi2),2))%>%
+                   filter(., Psi2 %in% unique(d_state$Psi2)[c(2,75,100)])%>%
+                   mutate(Psi2=round(Psi2,3))%>%
                    filter(., alpha_0!=.1))+
           geom_line(aes(x = Stress, y = value, color = variable,linetype=Branches),lwd=.8) +
           labs(x = "Stress (S)", y = "Density", color = "",linetype="") +
@@ -3765,7 +3562,7 @@ for (f in f_seq){
           scale_linetype_manual(values=c(1,9))+
           theme(legend.text = element_text(size = 9),strip.text.y = element_text(size=9))+
           facet_grid(Psi2~alpha_0, scales = "free",  
-                     labeller = label_bquote(cols = alpha[e] == .(alpha_0), rows = abs(psi[1] - psi[2]) == .(Psi2)))
+                     labeller = label_bquote(cols = alpha[e] == .(alpha_0), rows = psi[1] == .(Psi2)))
         
         
         
@@ -3788,70 +3585,52 @@ for (f in f_seq){
         ggsave(paste0("../Figures/2_species/PA/Multistability/Varying_traits/CSI_varying_traits_Psi1_",Psi_sp1,"_dispersal_",disp,"_facilitation_",f,".pdf"),p,width = 7,height = 4)
         
         
+
         
         
-        
-        #Computing hysteresis size
-        d_hysteresis=tibble()
+        #Restoration and degradation points
+        d_tipping=tibble()
         for (a0 in unique(d2$alpha_0)){
           for (psi in unique(d2$Psi2)){
-            
-            d_a0=filter(d2,alpha_0==a0,Psi2==psi)
-            d_a0=d_a0[order(d_a0$Branches,d_a0$Stress),]
-            
-            d_hysteresis=rbind(d_hysteresis,tibble(Competition=a0,Psi2=psi,
-                                                   Hysteresis_com=abs(sum(d_a0$Rho_plus[1:100]-d_a0$Rho_plus[101:200])),
-                                                   Hysteresis_Comp=abs(sum(d_a0$Stress_tolerant[1:100]-d_a0$Stress_tolerant[101:200])),
-                                                   Hysteresis_STol=abs(sum(d_a0$Competitive[1:100]-d_a0$Competitive[101:200])),
-                                                   Hysteresis_com_scaled=abs(sum(d_a0$Rho_plus[1:100]-d_a0$Rho_plus[101:200]))/(sum(d_a0$Rho_plus[1:100]+rev(d_a0$Rho_plus[101:200]))/2),
-                                                   Hysteresis_Comp_scaled=abs(sum(d_a0$Stress_tolerant[1:100]-d_a0$Stress_tolerant[101:200]))/(sum(d_a0$Stress_tolerant[1:100]+rev(d_a0$Stress_tolerant[101:200]))/2),
-                                                   Hysteresis_STol_scaled=abs(sum(d_a0$Competitive[1:100]-d_a0$Competitive[101:200]))/(sum(d_a0$Competitive[1:100]+rev(d_a0$Competitive[101:200]))/2)
-            ))
-            
-            
+            for (direction in unique(d2$Branches)){
+              
+              d_a0=filter(d2,alpha_0==a0,Psi2==psi,Branches==direction)
+              
+              if (direction=="Restoration") d_a0=d_a0[order(d_a0$Stress,decreasing = T),]
+              
+              density_ST=d_a0$Stress_tolerant
+              stress_ST=stress_ST=d_a0$Stress
+              
+              if (direction=="Restoration"){ #initially absent
+                
+                stress_ST=stress_ST[-c(1:min(which(abs(diff(density_ST))>0)))]
+                density_ST=density_ST[-c(1:min(which(abs(diff(density_ST))>0)))]
+                Tipping_ST = stress_ST[1]
+                
+              } else{
+                
+                Tipping_ST = stress_ST[min(which(density_ST==0))-1]
+                
+              }
+              
+              d_tipping=rbind(d_tipping,tibble(Competition=a0,Psi2=psi,Branch=direction,
+                                               Tipping_ST = Tipping_ST))
+              
+            }
           }
         }
         
+        p=ggplot(d_tipping)+
+          geom_smooth(aes(x=Psi2,y=Tipping_ST,color=Branch,group=interaction(Competition,Branch)),se = F)+
+          the_theme+facet_grid(.~Competition,labeller = label_bquote(cols=alpha[e]==.(Competition)))+
+          labs(x=TeX(r'(Trait species 1, \ $\psi_1)'),y="Tipping point",color="")+
+          scale_color_manual(values=c("black","blue"))+
+          scale_x_continuous(sec.axis = sec_axis(trans = ~ (.x) ,
+                                                 name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)'),
+                                                 breaks = c(0,.25,.5,.75,1),labels = c("0","0.25","0.5","0.75","1")),
+                             breaks = c(0,.25,.5,.75,1),labels = c("0","0.25","0.5","0.75","1"))
         
-        pdf(paste0("../Figures/2_species/PA/Multistability/Varying_traits/Hysteresis_size_Psi1_",Psi_sp1,"_dispersal_",disp,"_facilitation_",f,".pdf"),p,width = 7,height = 4)
-        
-        print(ggplot(d_hysteresis%>%melt(., measure.vars=c("Hysteresis_STol","Hysteresis_Comp")))+
-                geom_point(aes(x = Psi2, y = value,color=variable),size=.5) +
-                labs(x = TeX("$\\psi_2$"), y = "Hysteresis size", color = "",linetype="") +
-                the_theme +
-                theme(legend.text = element_text(size = 9),strip.text.y = element_text(size=9))+
-                facet_grid(.~Competition, scales = "free",  
-                           labeller = label_bquote(cols = alpha[e] == .(Competition)))+
-                scale_color_manual(values=as.character(color_rho[c(4,2)])))
-        
-        print(ggplot(d_hysteresis%>%melt(., measure.vars=c("Hysteresis_STol_scaled","Hysteresis_Comp_scaled")))+
-                geom_point(aes(x = Psi2, y = value,color=variable),size=.5) +
-                labs(x = TeX("$\\psi_2$"), y = "Hysteresis size", color = "",linetype="") +
-                the_theme +
-                theme(legend.text = element_text(size = 9),strip.text.y = element_text(size=9))+
-                facet_grid(.~Competition, scales = "free",  
-                           labeller = label_bquote(cols = alpha[e] == .(Competition)))+
-                scale_color_manual(values=as.character(color_rho[c(4,2)])))
-        
-        
-        print(ggplot(d_hysteresis%>%melt(., measure.vars=c("Hysteresis_com")))+
-                geom_point(aes(x = Psi2, y = value),size=.5) +
-                labs(x = TeX("$\\psi_2$"), y = "Hysteresis size", color = "",linetype="") +
-                the_theme +
-                theme(legend.text = element_text(size = 9),strip.text.y = element_text(size=9))+
-                facet_grid(.~Competition, scales = "free",  
-                           labeller = label_bquote(cols = alpha[e] == .(Competition))))
-        
-        print(ggplot(d_hysteresis%>%melt(., measure.vars=c("Hysteresis_com_scaled")))+
-                geom_point(aes(x = Psi2, y = value),size=.5) +
-                labs(x = TeX("$\\psi_2$"), y = "Hysteresis size", color = "",linetype="") +
-                the_theme +
-                theme(legend.text = element_text(size = 9),strip.text.y = element_text(size=9))+
-                facet_grid(.~Competition, scales = "free",  
-                           labeller = label_bquote(cols = alpha[e] == .(Competition))))
-        
-        
-        dev.off()
+        ggsave(paste0("../Figures/2_species/PA/Multistability/Varying_traits/Tipping_points_Psi1_",Psi_sp1,"_dispersal_",disp,"_facilitation_",f,".pdf"),p,width = 7,height = 4)        
         
         
         
@@ -3861,28 +3640,28 @@ for (f in f_seq){
 }
 
 
-## 8) Clustering between species fixed traits : 28/10 not related to problematic ----
+## 8) Clustering between species fixed traits  ----
 ### a) Simulation ----
 
 
-tspan = c(0, 7000) #to avoid long transient
-t = seq(0, 7000, by = 1)
+tspan = c(0, 2000) #to avoid long transient
+t = seq(0, 2000, by = 1)
 julia_library("DifferentialEquations")
 julia_assign("tspan", tspan)
 
 N_rep = 50
-S_seq = c(0,.1,.25,.4)
-alpha_seq = seq(0, .3, length.out = N_rep)
+S_seq = c(.6,.65,.7,.73,.77)
+alpha_seq = c(0,.2)
 f_seq=.9
-delta_seq=c(.1, .9)
-cintra_seq=c(.3,.5,.7)
+delta_seq=seq(0,1,length.out=N_rep)
+cintra_seq=c(.3)
 
 
-name_scena=c("local_C_local_F","global_C_global_F","local_C_global_F","global_C_local_F")
+name_scena=c("global_C_global_F","global_C_local_F")
 
 d_clustering=tibble() #initializing the tibble
 
-for (scena_ID in 1:4){ #for each scenario of species pairs
+for (scena_ID in 1:2){ #for each scenario of species pairs
   
   for (disp in delta_seq){ #varying dispersal scale
     
@@ -3915,22 +3694,12 @@ for (scena_ID in 1:4){ #for each scenario of species pairs
             param["alpha_0"] = alpha0
             julia_assign("p", param)
             
-            if (scena_ID==1){ #local C, local F
-              
-              julia_assign("p", param)
-              prob = julia_eval("ODEProblem(PA_two_species_local_C_local_F, state, tspan, p)")
-              
-            }else if (scena_ID==2){  #global C, global F
+            if (scena_ID==1){  #global C, global F
               
               julia_assign("p", param)
               prob = julia_eval("ODEProblem(PA_two_species_global_C_global_F, state, tspan, p)")
               
-            }else if (scena_ID==3){  #local C, global F
-              
-              julia_assign("p", param)
-              prob = julia_eval("ODEProblem(PA_two_species_local_C_global_F, state, tspan, p)")
-              
-            }else if (scena_ID==4){ #global C, local F
+            }else if (scena_ID==2){ #global C, local F
               
               julia_assign("p", param)
               prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F, state, tspan, p)")
@@ -3979,7 +3748,7 @@ d_clustering = read.table("../Table/2_species/PA/Clustering_PA.csv",sep=";")
 
 
 d_clustering$c12=d_clustering$c11=d_clustering$c22=0
-name_scena=c("local_C_local_F","global_C_global_F","local_C_global_F","global_C_local_F")
+name_scena=c("global_C_global_F","global_C_local_F")
 
 for (nr in 1:nrow(d_clustering)){
   
@@ -4014,7 +3783,7 @@ for (nr in 1:nrow(d_clustering)){
   }
   
   if (rho_1 > 0){
-    q1_1 = rho_1 / rho_1 #average number of species 1 around species 1 
+    q1_1 = rho_11 / rho_1 #average number of species 1 around species 1 
     c11 = q1_1 / rho_1
   } else{
     q1_1 = 0
@@ -4028,107 +3797,30 @@ for (nr in 1:nrow(d_clustering)){
   
   
 }
-write.table(d_clustering,"../Table/2_species/PA/Clustering_PA.csv",sep=";")
-
-
-pdf("../Figures/2_species/PA/Clustering_all_figs.pdf",width = 7,height = 6)
-name_scena=c("local_C_local_F","global_C_global_F","local_C_global_F","global_C_local_F")
-
-for (scena_name in unique(d_clustering$Scena)){
-  
-  for (disp in c(0.1,.9)){
-    
-    print(ggplot(d_clustering%>%
-                   filter(., delta==disp,Scena==scena_name)%>%
-                   melt(., measure.vars=c("Rho_1","Rho_2")))+
-            geom_point(aes(x=as.numeric(alpha_0),y=value,color=variable),size=.5,alpha=.7)+
-            geom_hline(yintercept = 0)+
-            facet_grid(cintra~S,labeller=label_bquote(cols = Stress == .(S),rows = alpha[ii] == .(cintra) ))+
-            the_theme+labs(x=TeX("$\\alpha_e$"),y="Densities")+
-            scale_color_manual(values=as.character(color_rho[c(2,4)]))+
-            ggtitle(paste0(scena_name,", delta = ",disp)))
-    
-    print(ggplot(d_clustering%>%
-                   filter(., delta==disp,Scena==scena_name)%>%
-                   group_by(., cintra,alpha_0,S,delta)%>%
-                   summarise(.,.groups ="keep",c12=mean(c12) ))+
-            geom_point(aes(x=as.numeric(alpha_0),y=c12))+
-            geom_hline(yintercept = 1,linetype=9,lwd=.5)+
-            facet_grid(cintra~S,labeller=label_bquote(cols = Stress == .(S),rows = alpha[ii] == .(cintra) ))+
-            the_theme+labs(x=TeX("$\\alpha_e$"),y=TeX("$\\c_{12}$"))+
-            scale_y_log10())
-    
-    print(ggplot(d_clustering%>%
-                   filter(., delta==disp,Scena==scena_name)%>%
-                   group_by(., cintra,alpha_0,S,delta)%>%
-                   summarise(.,.groups ="keep",c11=mean(c11) ))+
-            geom_point(aes(x=as.numeric(alpha_0),y=c11))+
-            geom_hline(yintercept = 1,linetype=9,lwd=.5)+
-            facet_grid(cintra~S,labeller=label_bquote(cols = Stress == .(S),rows = alpha[ii] == .(cintra) ))+
-            the_theme+labs(x=TeX("$\\alpha_e$"),y=TeX("$\\c_{11}$"))+
-            scale_y_log10())
-    
-    print(ggplot(d_clustering%>%
-                   filter(., delta==disp,Scena==scena_name)%>%
-                   group_by(., cintra,alpha_0,S,delta)%>%
-                   summarise(.,.groups ="keep",c22=mean(c22) ))+
-            geom_point(aes(x=as.numeric(alpha_0),y=c22))+
-            geom_hline(yintercept = 1,linetype=9,lwd=.5)+
-            facet_grid(cintra~S,labeller=label_bquote(cols = Stress == .(S),rows = alpha[ii] == .(cintra) ))+
-            the_theme+labs(x=TeX("$\\alpha_e$"),y=TeX("$\\c_{22}$"))+
-            scale_y_log10())
-    
-  }
-}
-
-dev.off()
-
-
-#Making a clean figure of the mechanisms
-
-
-d_clustering = read.table("../Table/2_species/PA/Clustering_PA.csv",sep=";")
-name_scena=c("local_C_local_F","global_C_global_F","local_C_global_F","global_C_local_F")
-
-name_mesu=c("c12","c11","c22")
-yname=c(TeX("$c_{12}$"),TeX("$c_{11}$"),TeX("$c_{22}$"))
-
-for (measu in 1:3){
-  assign(paste0("p_",measu),ggplot(d_clustering%>%
-                                     filter(., Scena %in% name_scena[c(1,4)],S==.25,cintra==.3,alpha_0 %in% unique(d_clustering$alpha_0)[seq(1,50,by=2)])%>%
-                                     melt(., measure.vars=name_mesu[measu])%>%
-                                     mutate(., Scena=recode_factor(Scena,"global_C_local_F"="Global","local_C_local_F"="Local")))+
-           geom_point(aes(x=as.numeric(alpha_0),y=value,shape=as.factor(delta),color=Scena))+
-           the_theme+
-           labs(x=TeX("$\\alpha_{e}$"),y=yname[measu],color="Scale competition",shape=TeX("$\\delta$"))+
-           scale_shape_manual(values=c(0,1))+
-           scale_color_manual(values=c("#8108A9","#DAAF42"))
-  )
-}
-p_tot=ggarrange(p_2+ylim(2,5),p_3+geom_hline(yintercept = 1),p_1+geom_hline(yintercept = 1),ncol=3,common.legend = T,legend = "bottom")
-ggsave("../Figures/2_species/PA/Clustering_mecanisms.pdf",width = 7,height = 4)
 
 
 
+d_clustering=mutate(d_clustering, Scena=recode_factor(Scena,"global_C_global_F"="Global facilitation","global_C_local_F"="Local facilitation"))
 
-d_clustering = read.table("../Table/2_species/PA/Clustering_PA.csv",sep=";")
 
 
 p=ggplot(d_clustering%>%
-           filter(., Scena %in% name_scena[c(1,4)],S==.25,alpha_0 %in% unique(d_clustering$alpha_0)[seq(1,50,by=2)])%>%
-           melt(., measure.vars="c12")%>%
-           mutate(., Scena=recode_factor(Scena,"global_C_local_F"="Global","local_C_local_F"="Local")))+
-  geom_point(aes(x=as.numeric(alpha_0),y=value,shape=as.factor(delta),color=Scena))+
-  the_theme+
-  facet_wrap(.~cintra,labeller=label_bquote(cols = alpha[0] == .(cintra) ))+
-  labs(x=TeX("$\\alpha_{e}$"),y=TeX("$\\c_{12}$"),color="Scale competition",shape=TeX("$\\delta$"))+
-  scale_shape_manual(values=c(0,1))+
-  scale_color_manual(values=c("#8108A9","#DAAF42"))+
-  geom_hline(yintercept = 1)+
-  theme(strip.text.x = element_text(size=12))
+               filter(., alpha_0==.2)%>%
+               group_by(., cintra,alpha_0,S,delta,Scena)%>%
+               summarise(.,.groups ="keep",c11=mean(c11) ))+
+  geom_point(aes(x=as.numeric(delta),y=c11),size=1.5,alpha=.7,shape=1)+
+  facet_grid(Scena~S,labeller=label_bquote(cols = Stress == .(S)),scales = "free")+
+  the_theme+labs(x=TeX("$\\delta$"),y=expression(paste("Stress-tolerant clustering (c"[11],")")))+
+  scale_color_manual(values=as.character(color_rho[c(2,4)]))+
+  geom_hline(yintercept = 1)
 
 
-ggsave("../Figures/2_species/PA/Clustering_mecanisms_intraspecific.pdf",p,width = 7,height = 4)
+
+
+ggsave("../Figures/2_species/PA/Clustering_11_dispersal.pdf",p,width = 7,height = 4)
+
+
+
 
 
 
@@ -4158,7 +3850,7 @@ for (psi_sp1 in trait1_seq){ #varying the trait of sp1
     for (alpha0 in alpha_seq) { #varying competition
       
       for (trait_2 in trait_sp2_seq){
-
+        
         #Setting the parameters
         param=Get_PA_parameters()
         
@@ -4181,19 +3873,19 @@ for (psi_sp1 in trait1_seq){ #varying the trait of sp1
           
           julia_assign("p", param)
           prob = julia_eval("ODEProblem(PA_two_species_varying_trait, state, tspan, p)")
-            
+          
           
           sol = de$solve(prob, de$Tsit5(), saveat = t)
           d = as.data.frame(t(sapply(sol$u, identity)))
           colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
           
           d2 = rbind(d2, d[nrow(d), ] %>% add_column(S = S,Sp="Competitive"))
-
-                    
+          
+          
         }
         d2[d2 < 10^-4] = 0
-
-                
+        
+        
         S_critic2_alone=abs(diff(range(d2$S[which(d2$rho_2 !=0 )]))) #range of values where competitive species is
         
         
@@ -4220,21 +3912,21 @@ for (psi_sp1 in trait1_seq){ #varying the trait of sp1
           colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
           
           d2 = rbind(d2, d[nrow(d), ] %>% add_column(S = S,Sp="Stress_tolerant"))
-
+          
         }
         
         d2[d2 < 10^-4] = 0
-
+        
         S_critic1_alone=abs(diff(range(d2$S[which(d2$rho_1 !=0 )]))) 
         
         
         
         #3) Coexisting species
         
-        state=Get_PA_initial_state()
+        state=Get_PA_initial_state(c(0.4,.4,.1))
         julia_assign("state", state)
         
-
+        
         d2 = tibble()
         
         for (S in S_seq) { #varying the stress 
@@ -4251,7 +3943,7 @@ for (psi_sp1 in trait1_seq){ #varying the trait of sp1
           colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
           
           d2 = rbind(d2, d[nrow(d),] %>% add_column(S = S, Sp="Both"))
-
+          
         }
         d2[d2 < 10^-4] = 0
         d2$rho_plus = d2$rho_1 + d2$rho_2
@@ -4259,7 +3951,7 @@ for (psi_sp1 in trait1_seq){ #varying the trait of sp1
         S_critic1_both = abs(diff(range(d2$S[which(d2$rho_1 !=0 )]))) 
         S_critic2_both = abs(diff(range(d2$S[which(d2$rho_2 !=0 )]))) 
         
-                
+        
         d_niche=rbind(d_niche,tibble(
           Facilitation = f, alpha_0 = alpha0, Psi1 = psi_sp1, Psi2 = trait_2,
           Delta_niche_1 = 100 * (S_critic1_both - S_critic1_alone) / S_critic1_alone,  #making it a percentage of initial niche
@@ -4267,19 +3959,21 @@ for (psi_sp1 in trait1_seq){ #varying the trait of sp1
         
         
       } #end varying trait loop
-
+      
     } #end competition loop
     
   } #end facilitation loop
-
+  
 } #end sp1 trait loop
-
 write.table(d_niche,"../Table/2_species/PA/Niche_expansion_varying_traits.csv",sep=";")
+
+
 
 
 ### b) Analysis ----
 
-d_niche = read.table("../Table/2_species/PA/Niche_expansion_varying_traits.csv",sep=";")
+
+d_niche = read.table(paste0("../Table/2_species/PA/Niche_expansion_varying_traits.csv"),sep=";")
 d_niche = do.call(data.frame,lapply(d_niche,function(x) replace(x, is.infinite(x), NA)))
 d_niche$Delta_niche_1[102]=NA
 
@@ -4316,23 +4010,22 @@ ggsave("../Figures/2_species/PA/Niche_expansion_varying_traits.pdf",p,width = 7,
 
 
 
-## 10) RII analysis, varying traits : Not so interesting I guess ----
+## 10) Neighboring effects, varying traits ----
 ### a) Simulation ----
 
 
 
-tspan = c(0, 7000) #to avoid long transient
-t = seq(0, 7000, by = 1)
+tspan = c(0, 2000) #to avoid long transient
+t = seq(0, 2000, by = 1)
 julia_library("DifferentialEquations")
 julia_assign("tspan", tspan)
 
-N_rep = 100
+N_rep = 50
 S_seq = seq(0,1,length.out=N_rep)
 alpha_seq = seq(0, .3, length.out = 3)
-f_seq=c(.3,.9)
-trait_sp2_seq=seq(0,1,length.out=3)
+f_seq=c(.9)
+trait_sp2_seq=seq(0,1,length.out=50)
 trait1_seq=c(0,1)
-
 
 
 d_RII=tibble() #initializing the tibble
@@ -4353,10 +4046,11 @@ for (psi_sp1 in trait1_seq){ #varying the trait of sp1
         param["psi_1"]=psi_sp1 #we fixed to stress-tolerant species 
         param["psi_2"]=trait_2 #and vary the other species
         
-
-        # 1) Competitive species alone
         
+        # 1) Competitive species alone
+      
         state=Get_PA_initial_state(c(0,.8,.1))
+        
         julia_assign("state", state)
         d2 = tibble()
         
@@ -4380,11 +4074,11 @@ for (psi_sp1 in trait1_seq){ #varying the trait of sp1
         
         # 2) Stress-tolerant species alone
         
-        state=Get_PA_initial_state(c(0.8,0,.1))
+        
+        state=Get_PA_initial_state(c(.8,0,.1))
         julia_assign("state", state)
         
         d2 = tibble()
-        S_seq = seq(0, 1, length.out = 100)
         
         for (S in S_seq) {
           
@@ -4403,14 +4097,13 @@ for (psi_sp1 in trait1_seq){ #varying the trait of sp1
           
         }
         
-
+        
         
         
         #3) Coexisting species
         
-        state=Get_PA_initial_state()
+        state=Get_PA_initial_state(c(.4,.4,.1))
         julia_assign("state", state)
-        
         
         d2 = tibble()
         
@@ -4431,7 +4124,7 @@ for (psi_sp1 in trait1_seq){ #varying the trait of sp1
           
         }
         d_RII[d_RII < 10^-4] = 0
-
+        
         
       } #end varying trait loop
       
@@ -4447,7 +4140,7 @@ write.table(d_RII,"../Table/2_species/PA/RII_varying_traits.csv",sep=";")
 
  
 ### b) Analysis ----
-d_RII=read.table("../Table/2_species/PA/RII_varying_traits.csv",sep=";")
+d_RII=read.table(paste0("../Table/2_species/PA/RII_varying_traits.csv"),sep=";")
 
 d_compe=filter(d_RII,Sp=="Competitive")
 d_stesstol=filter(d_RII,Sp=="Stress_tolerant")
@@ -4461,17 +4154,155 @@ d_RII=tibble(S=d_both$S,alpha_0=d_both$alpha_0, Psi1=d_both$Psi1,Psi2=d_both$Psi
 d_RII[,3:6][is.na(d_RII[,3:6])] = NA
 
 
-ggplot(d_RII %>%
-         melt(., measure.vars=c("NintA_st","NintA_comp")) %>%
-         mutate(., variable = recode_factor(variable, "NintA_st" = "Stress-tolerant", "NintA_comp" = "Competitive"))) +
-  geom_line(aes(x=S,y=value,color=variable),lwd=.75)+the_theme+
-  geom_hline(yintercept = 0,linetype=9)+
-  theme(legend.text = element_text(size = 12))+
-  labs(x="Stress (S)",y="RII",color="")+ylim(-1,2)+
-  scale_color_manual(values=c(as.character(color_rho)[c(4,2)]))+
-  facet_grid(Psi1+Psi2~Facilitation+alpha_0,scales="free",labeller = label_both)+
-  theme(legend.text = element_text(hjust = 5))
+p1=ggplot(d_RII %>%filter(., Psi1==1)%>%
+            melt(., measure.vars=c("NintA_st","NintA_comp")) %>%
+            mutate(., variable = recode_factor(variable, "NintA_st" = "Species 1", "NintA_comp" = "Species 2"))) +
+  geom_tile(aes(x=round(S,5),y=round(Psi2,5),fill=as.numeric(value)))+
+  facet_grid(variable~alpha_0,labeller = label_bquote(cols= alpha[e] == .(alpha_0)))+
+  scale_fill_gradient2(low="#F73030",mid="white",high="#185BB9")+
+  the_theme+ggtitle(TeX("$\\psi_1 = 1$"))+
+  labs(x="Stress, S",y=TeX(r'(Trait species 2, \ $\psi_2)'),fill=TeX("$NInt_A$"))
 
+p2=ggplot(d_RII %>%filter(., Psi1==0)%>%
+            melt(., measure.vars=c("NintA_st","NintA_comp")) %>%
+            mutate(., variable = recode_factor(variable, "NintA_st" = "Species 2", "NintA_comp" = "Species 1"))) +
+  geom_tile(aes(x=round(S,5),y=round(Psi2,5),fill=as.numeric(value)))+
+  facet_grid(variable~alpha_0,labeller = label_bquote(cols= alpha[e] == .(alpha_0)))+
+  scale_fill_gradient2(low="#F73030",mid="white",high="#185BB9")+
+  the_theme+ggtitle(TeX("$\\psi_2 = 0$"))+
+  labs(x="Stress, S",y=TeX(r'(Trait species 1, \ $\psi_1)'),fill=TeX("$NInt_A$"))
+
+p_tot=ggarrange(p1+theme(axis.title.x = element_blank(),axis.line.x = element_blank(),axis.ticks.x = element_blank()),
+                p2+theme(strip.background.x = element_blank(),strip.text.x = element_blank()),
+                nrow=2,labels = letters[1:2],common.legend = T,legend = "bottom")
+
+ggsave("../Figures/2_species/PA/NInt_A_varying_traits.pdf",p_tot,width = 7,height = 8)
+
+  
+## 11) Net effects varying traits (not interesting I guess) ----
+### a) Simulation ----
+
+tspan = c(0, 15000)
+t = seq(0, 15000, by = 1)
+julia_library("DifferentialEquations")
+julia_assign("tspan", tspan)
+state = Get_PA_initial_state(Get_MF_initial_state(c(.4,.4,.1)))
+julia_assign("state", state)
+
+N_sim = 100;epsilon=10^(-8)
+psi2_seq= seq(0,1,length.out=5)
+psi1_seq=c(1,0)
+S_seq = seq(0, 1, length.out = N_sim)
+C_seq=c(0,.15,.3)
+
+d2 = d3 = tibble()
+
+
+
+
+for (psi1 in psi1_seq){
+
+  for (comp in C_seq) {
+    
+    for (psi2 in psi2_seq){
+      
+      for (S in S_seq) {
+        
+        for (sp in 1:2) { #for both species
+          
+          param=Get_PA_parameters()  
+          param["S"] = S
+          param["alpha_0"] = comp # update parameters
+          param["psi_2"] = psi2
+          param["psi_1"] = psi1
+          julia_assign("p", param)
+          
+          
+          # first without press perturbation
+          
+          prob = julia_eval("ODEProblem(PA_two_species_varying_trait, state, tspan, p)")
+          
+          
+          sol = de$solve(prob, de$Tsit5(), saveat = t)
+          d = as.data.frame(t(sapply(sol$u, identity)))
+          d2 = rbind(d2, as_tibble(mean(d[(nrow(d)):nrow(d),c(1,2)[-sp]])) %>%
+                       add_column(S = S, alpha_0 = comp, Type = "control",Species=c(1,2)[sp],
+                                  Psi1=psi1,Psi2=psi2)) 
+          d3 = rbind(d3, as_tibble(d[nrow(d),]) %>% add_column(S = S, alpha_0 = comp,Psi1=psi1,Psi2=psi2))
+          
+          # with press perturbation on growth rate proxy
+          
+          param=Get_PA_parameters()  
+          param=c(param[1:3],"beta1"=1,"beta2"=1,param[5:12])
+          param[paste0("beta",sp)] = param[paste0("beta",sp)] + epsilon # press
+          param["S"] = S
+          param["alpha_0"] = comp # update parameters
+          param["psi_2"] = psi2
+          param["psi_1"] = psi1
+          julia_assign("p", param)
+          
+          
+          julia_assign("p", param)
+          prob = julia_eval("ODEProblem(PA_two_species_varying_trait_press, state, tspan, p)")
+          
+          sol = de$solve(prob, de$Tsit5(), saveat = t)
+          d = as.data.frame(t(sapply(sol$u, identity)))
+          d2 = rbind(d2, as_tibble(mean(d[(nrow(d)):nrow(d),c(1,2)[-sp]])) %>%
+                       add_column(S = S, alpha_0 = comp, Type = "press",Species=c(1,2)[sp],
+                                  Psi1=psi1,Psi2=psi2))
+          
+          param[paste0("beta",sp)] = 1
+        }
+      }
+    }
+  }
+}
+
+
+d2[d2 < epsilon] = 0
+colnames(d2) = c("Eq", "S", "alpha_0", "Type","Species","Psi1","Psi2")
+
+
+write.table(d2,"../Table/2_species/PA/Net_effect_varying_traits.csv",sep=";")
+
+
+
+### b) Analysis ----
+
+
+epsilon=10^(-8)
+d2=read.table("../Table/2_species/PA/Net_effect_varying_traits.csv",sep=";")
+
+net_effect =sapply(seq(1, nrow(d2) , by = 2),function(x){
+  return((d2$Eq[x+1] - d2$Eq[x]) / epsilon)
+})
+
+
+d_net=d2%>%
+  filter(., Type=="control")%>%
+  select(.,-Type)
+d_net$value=net_effect
+
+p1=ggplot(d_net%>%filter(.,Species==1))+
+  geom_line(aes(x=S,y=value,color=as.factor(alpha_0),group=interaction(Psi1,Psi2,alpha_0,Species)))+
+  facet_grid(Psi1~Psi2,labeller = label_bquote(rows=psi[1]==.(Psi1),cols=psi[2]==.(Psi2)))+
+  scale_fill_manual(values=rev(c("#940000","#FF1F1F","#FFAFAF")))+
+  labs(x="Stress, S",y="Net effect",color=TeX("$\\alpha_e$"))+
+  the_theme
+  
+p2=ggplot(d_net%>%filter(.,Species==2))+
+  geom_line(aes(x=S,y=value,color=as.factor(alpha_0),group=interaction(Psi1,Psi2,alpha_0,Species)))+
+  facet_grid(Psi1~Psi2,labeller = label_bquote(rows=psi[1]==.(Psi1),cols=psi[2]==.(Psi2)))+
+  scale_fill_manual(values=rev(c("#940000","#FF1F1F","#FFAFAF")))+
+  labs(x="Stress, S",y="Net effect",color=TeX("$\\alpha_e$"))+
+  the_theme
+
+
+p_tot=ggarrange(p1+theme(axis.title.x = element_blank(),axis.line.x = element_blank(),axis.ticks.x = element_blank()),
+                p2+theme(strip.background.x = element_blank(),strip.text.x = element_blank()),
+                nrow=2,labels = letters[1:2],common.legend = T,legend = "bottom")
+
+ggsave("../Figures/2_species/PA/Net_effects_varying_traits.pdf",p_tot,width = 7,height = 8)
 
 
 # Step 3) CA between both species : example and clustering ----

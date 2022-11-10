@@ -172,7 +172,7 @@ d$Rho_p=rowSums(d[,1:Nsp])
 d[d<10^(-4)]=0
 
 d$CSI = sapply(1:nrow(d),function(x){
-  set.seed(123)
+  set.seed(432)
   u=runif(Nsp)
   return(sum(d[x,1:Nsp]*u))})
 
@@ -218,30 +218,6 @@ pR=ggplot(d%>%filter(., Branch=="Restoration"))+
   the_theme+labs(y="Species density",color=expression(paste(bar(psi),"    ")))+ggtitle("Restoration")+
   scale_color_gradientn(colors = color_Nsp(Nsp),na.value = "black")
 ggsave("../Figures/N_species/MF/Global_cover_random_ini.pdf",ggarrange(pD,pR,nrow = 2),width = 7,height = 10)
-
-
-
-
-
-p=ggplot(d)+
-  geom_line(aes(x=Stress,y=CSI,color=Branch,group=interaction(Branch,Random_ini)),size=1)+
-  facet_grid(Competition~Facilitation,labeller = label_bquote(rows=alpha[e]==.(Competition), cols=f==.(Facilitation)))+
-  the_theme+labs(y="Community index",color=expression(paste(bar(psi),"    ")))+ggtitle("Restoration")+
-  scale_color_manual(values = c("red","blue"),na.value = "black")
-
-ggsave("../Figures/N_species/MF/Global_cover_random_ini.pdf",ggarrange(pD,pR,nrow = 2),width = 7,height = 10)
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -495,6 +471,25 @@ ggsave("../Figures/N_species/MF/Nb_tipping_community_versus_species.pdf",p,width
 
 
 
+d=read.table('../Table/N_species/MF/Random_ini.csv',sep=";")
+Nsp=15
+
+pdf("../Figures/N_species/MF/Test_random_sp_bifu.pdf",width = 7,height = 8)
+for (a0 in unique(d$Competition)){
+  for (f0 in unique(d$Facilitation)){
+    for (ini in unique(d$Random_ini)){
+      
+      print( ggplot(filter(d,Competition==a0,Facilitation==f0,Random_ini==ini)%>%
+                      melt(., measure.vars=paste0("Sp_",1:Nsp)))+
+               geom_line(aes(x=Stress,y=value,color=Branch))+
+               the_theme+
+               facet_wrap(.~variable)+
+               ggtitle(paste0("alpha = ",a0,", f0 = ",f0,", and ini = ",ini)))
+    }
+  }
+}
+dev.off()
+
 
 
 ### d) Community level : Hysteresis size ----
@@ -652,4 +647,46 @@ for (f in unique(d$Facilitation)){
 }
 
 
+
+
+### f) Number of shifts at the community scale ----
+
+d=read.table('../Table/N_species/MF/Random_ini.csv',sep=";")
+
+d_ASS_com=tibble()
+for (a0 in unique(d$Competition)){
+  for (f0 in unique(d$Facilitation)){
+    for (branch in unique(d$Branch)){
+      for (stress in unique(d$Stress)){
+        d_fil=filter(d,Competition==a0,Facilitation==f0,Branch==branch,Stress==stress)
+        d_ASS_com=rbind(d_ASS_com,tibble(Stress=stress,Branch=branch,Facilitation=f0,Competition=a0,ASS=(unique(round(d_fil$CSI,2)))))
+      }
+    }
+  }
+}
+
+#check for problems when rounding
+save_d=d_ASS_com
+for (i in 1:(nrow(d_ASS_com)-1)){
+  if (d_ASS_com$Facilitation[i]==d_ASS_com$Facilitation[i+1] &
+      d_ASS_com$Competition[i]==d_ASS_com$Competition[i+1] & 
+      d_ASS_com$Branch[i]==d_ASS_com$Branch[i+1] &
+      d_ASS_com$Stress[i]==d_ASS_com$Stress[i+1] & 
+      abs(d_ASS_com$ASS[i]-d_ASS_com$ASS[i+1]) < 0.02){
+    save_d=save_d[-i,]
+  }
+}
+d_ASS=save_d%>%
+  group_by(., Facilitation,Competition,Branch,Stress)%>%
+  summarise(., .groups = "keep",Nb_ASS=length(ASS))
+
+
+ggplot(d_ASS)+
+  geom_point(aes(x=Stress,y=Nb_ASS,color=interaction(Competition)),alpha=.3,size=1)+
+  geom_smooth(aes(x=Stress,y=Nb_ASS,color=interaction(Competition)),se = F)+
+  the_theme+
+  facet_grid(Facilitation~Branch,labeller = label_bquote(rows = f ==.(Facilitation)))+
+  scale_color_manual(values=rev(c("#940000","#FF1F1F","#FFAFAF")))+
+  labs(x="Stress, S",y="Number of alternative stable states",color=TeX("$\\alpha_e$"))
+  
 
