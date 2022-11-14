@@ -197,7 +197,7 @@ Plot_dynamics(d=d2, Nsp=2)
 
 
 
-#region : Final simulation 1 = random ini
+#region : 15sp Final simulation 1 = random ini
 
 N_sim = 50
 N_sim2 = 3
@@ -284,7 +284,7 @@ end
 #endregion
 
 
-#region : Final simulation 2 = equal ini
+#region : 15sp Final simulation 2 = equal ini
 
 N_sim = 100
 N_sim2 = 3
@@ -369,3 +369,90 @@ end
 
 
 #endregion
+
+
+#region : 30sp Testing random ini 
+
+
+
+
+#endregion
+
+
+
+N_sim = 40
+N_sim2 = 3
+N_random_ini = 100
+
+Nsp = 35
+a0_seq = collect(range(0, 0.3, length=N_sim2))[3]
+f_seq = collect(range(0, 0.9, length=3))[3]
+tspan = (0.0, 20000)
+branches = ["Degradation", "Restoration"]
+delta_seq = collect(range(0.1, 0.9, length=2))[1]
+
+
+N_tot_sim = N_sim * length(a0_seq) * length(f_seq) * length(delta_seq) * 2 * N_random_ini
+
+
+for random_ini in 1:100
+
+    frac = rand(Nsp) #taking relative proportion of species
+    #frac = zeros(Nsp) .+ 1
+
+    for a0 in a0_seq
+
+        for disp in delta_seq
+
+            global p = Get_classical_param(N_species=Nsp, type_interaction="classic",
+                alpha_0=a0, scenario_trait="spaced", cintra=0.3, h=1)
+
+            p["delta"] = disp
+
+            for facil in f_seq
+
+                p["f"] = facil
+
+                d = zeros(N_sim * 2, Nsp + 8)
+                dt = 1
+
+                for branch_bifu in 1:length(branches)
+
+                    if branch_bifu == 1 # Degradation
+                        state = (frac / sum(frac)) * 0.8 #normalizing the sum to 80% of vegetation cover
+                        push!(state, 0.1)
+                        push!(state, 0.1)
+                        S_seq = collect(range(0, 1, length=N_sim))
+
+                    else #Restoration
+                        state = (frac / sum(frac)) * 0.01 #normalizing the sum to 1% of vegetation cover
+                        push!(state, 0.49)
+                        push!(state, 0.5)
+                        S_seq = reverse(collect(range(0, 1, length=N_sim))) #to gradually decrease the level of stress
+
+                    end
+
+                    for stress in S_seq
+
+                        p["S"] = stress
+
+                        prob = ODEProblem(MF_N_species, state, tspan, p)
+                        sol = solve(prob, Tsit5())
+                        d2 = Reorder_dynamics(sol)
+
+
+                        d[dt, :] = push!(d2[size(d2)[1], 1:(p["Nsp"]+2)], random_ini, a0, disp, facil, branch_bifu, stress)
+                        dt = dt + 1
+                    end
+                end
+                CSV.write("../Table/N_species/MF/35_sp/Sim_Nrandom_" * repr(random_ini) *
+                          "_a0_" * repr(a0) *
+                          "_delta_" * repr(disp) *
+                          "_f_" * repr(facil) * ".csv", Tables.table(d), writeheader=false)
+
+
+
+            end
+        end
+    end
+end

@@ -609,14 +609,30 @@ end
 
 #testing
 
-ini = Get_initial_lattice(size_mat=100)
+ini = Get_initial_lattice(size_mat=100, frac=[0.8, 0, 0.1, 0.1])
 p = Get_classical_param()
-p["psi2"] = 0.9
+p["r"] = 0.0001
+p["d"] = 0.2
+p["m"] = 0.1
+p["e"] = 0
+p["alpha_0"] = 0
+
+s_seq = collect(range(0, 1, length=15))
+
+for s in s_seq
+    p["S"] = s
+    run_D, land_D = Gillespie_tau_leeping(landscape=copy(ini), param=p, time=1500, type_competition="global")
+
+    display(Plot_landscape(land_D))
+    display(Plot_dynamics(run_D))
+
+end
+
 p["delta"] = 0.9
 p["S"] = 0.3
-run_D, land_D = Gillespie_tau_leeping(landscape=copy(ini), param=p, time=4000, type_competition="global")
+run_D, land_D = Gillespie_tau_leeping(landscape=copy(ini), param=p, time=500, type_competition="global")
 Plot_dynamics(run_D)
 
 ini = Get_initial_lattice(size_mat=100, frac=[0.005, 0.005, 0.49, 0.5])
-run_R, land_R = Gillespie_tau_leeping(landscape=copy(ini), param=p, time=4000, type_competition="global")
+run_R, land_R = Gillespie_tau_leeping(landscape=copy(ini), param=p, time=500, type_competition="global")
 Plot_dynamics(run_R)

@@ -115,7 +115,7 @@ Compute_hysteresis = function(d, Nsp = 15,tresh=0.01){
       for (com_compo in unique(d$Community_compo)){
         
         d2=filter(d,Rela_c==rela_c,Scena==scena,Community_compo==com_compo)
-
+        
         for (sp in 1:Nsp) {
           d2_sp = d2[, c(paste0("Sp_", sp), "Stress", "Branch")]
           d2_sp[,1][d2_sp[,1]<10^{-4}]=0
@@ -123,14 +123,14 @@ Compute_hysteresis = function(d, Nsp = 15,tresh=0.01){
           
           biomass_D = filter(d2_sp, Branch == "Degradation")
           biomass_R = filter(d2_sp, Branch == "Restoration")
-
+          
           hysteresis_area = sum(biomass_D[, 1] - rev(biomass_R[, 1]))
           
           if (abs(min(diff(as.vector(t(biomass_D[,1])))))>tresh){
-          
+            
             hysteresis_range = biomass_D$Stress[min(which(diff(as.vector(t(biomass_D[,1])))==min(diff(as.vector(t(biomass_D[,1]))))))]  -
-                               biomass_R$Stress[min(which(diff(as.vector(t(biomass_R[,1])))==min(diff(as.vector(t(biomass_R[,1]))))))]
-          
+              biomass_R$Stress[min(which(diff(as.vector(t(biomass_R[,1])))==min(diff(as.vector(t(biomass_R[,1]))))))]
+            
           }else {hysteresis_range=0}
           
           d_hysteresis = rbind(d_hysteresis, tibble(Hysteresis_area = hysteresis_area, 
@@ -163,12 +163,12 @@ Plot_landscape = function(landscape,Nsp=15){
 Co_occurrence_matrix = function(df,traits){
   color_CA = color_Nsp(length(traits))
   color_edge=c("red","blue")
-    
+  
   d=df %>%
     pivot_wider(names_from = c("Var1"), values_from = value)%>%
     select(., -Var2)%>%
     replace(is.na(.), 0) #Get adjacency matrix
-    
+  
   d=d[-1,-1] #Removing fertile patches
   
   d[d > -1.96 & d < 1.96]=0;d[d < -1.96]=-1;d[d > 1.96] = 1  
@@ -219,7 +219,7 @@ Get_diversity_community=function(trait,densities){
       if (type=="FD"){ div = hill_func(densities,trait,q=q)["FD_q",1]}
       diversity=c(diversity,div)
       d_name= c(d_name,paste0(type,"_",q))
-
+      
     }
   }
   
