@@ -1,16 +1,16 @@
 # Other) Recruitment rate & 4 grid matrices----
 rm(list = ls())
-library(tidyverse)
+source("./Dryland_shift_functions.R")
 d = expand_grid(emax = 1, e = .1, S = seq(0, 1, length.out = 200), psi = c(0, .5, 1))
 
 p = ggplot(d) +
-    geom_line(aes(x = S, y = emax * (1 - S * (1 - e * psi)), color = as.factor(psi), group = psi)) +
-    scale_color_manual(values = c("blue", "green", "red")) +
+    geom_line(aes(x = S, y = emax * (1 - S * (1 - e * psi)), color = as.factor(psi), group = psi),size=1) +
+    scale_color_manual(values = color_Nsp(9)[c(2,5,8)]) +
     theme_classic() +
     theme(legend.position = "bottom") +
     labs(
-        x = "S",
-        y = TeX("$(1-S (1-e \\psi_i))$"), color = TeX("$\\psi_i$")
+        x = "Stress, S",
+        y = TeX(r'($Recruitment rate,  (1-S (1-e \psi_i)))'), color = TeX("$\\psi_i$")
     )
 
 
@@ -2653,7 +2653,6 @@ S_seq = seq(0, 1, length.out = N_rep)
 alpha_seq = seq(0, .3, length.out = N_rep2)
 f_seq=seq(0,1,length.out=N_rep2)
 delta_seq=c(.1, .9)
-h_seq=c(1,1.5)[1]
 
 
 name_scena=c("global_C_local_F","global_C_global_F")
@@ -2664,179 +2663,176 @@ for (scena_ID in 1:2){ #for each scenario of species pairs
   
   for (disp in delta_seq){ #varying dispersal scale
     
-    for (h in h_seq){ #varying competitive advantage strength
+
       
-      for (f in f_seq){ #varying facilitation strength
-        
-        for (alpha0 in alpha_seq) {
-          
-          
-          #Setting the parameters
-          param=Get_PA_parameters()
-          
-          param["cintra"]=.3
-          param["f"]=f
-          param["h"]=h
-          param["delta"]=disp
-          param["alpha_0"]=alpha0
-          
-          
-          
-          # 1) Competitive species alone
-          
-          state=Get_PA_initial_state(c(0,.8,.1))
-          julia_assign("state", state)
-          d2 = d3 = tibble()
-          
-          for (S in S_seq) {
-            
-            param["S"] = S
-            
-            if (scena_ID==1){ #global C, local F
-              
-              julia_assign("p", param)
-              prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F, state, tspan, p)")
-              
-            }else if (scena_ID==2){  #global C, global F
-              
-              julia_assign("p", param)
-              prob = julia_eval("ODEProblem(PA_two_species_global_C_global_F, state, tspan, p)")
-              
-            }
-            
-            sol = de$solve(prob, de$Tsit5(), saveat = t)
-            d = as.data.frame(t(sapply(sol$u, identity)))
-            colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
-            
-            d2 = rbind(d2, d[nrow(d), ] %>% add_column(S = S,Sp="Competitive"))
-            d3 = rbind(d3, d[nrow(d), ] %>% add_column(S = S,Sp="Competitive",alpha_0=alpha0))
-            
-          }
-          d2[d2 < 10^-4] = 0
-          d3[d3 < 10^-4] = 0
-          
-          S_critic2_alone=abs(diff(range(d2$S[which(d2$rho_2 !=0 )]))) #range of values where competitive species is
-          
-          
-          
-          # 2) Stress-tolerant species alone
-          
-          state=Get_PA_initial_state(c(0.8,0,.1))
-          julia_assign("state", state)
-          
-          d2 = tibble()
-          S_seq = seq(0, 1, length.out = 100)
-          
-          for (S in S_seq) {
-            
-            param["S"] = S
-            julia_assign("p", param)
-            
-            if (scena_ID==1){ #global C, local F
-              
-              julia_assign("p", param)
-              prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F, state, tspan, p)")
-              
-            }else if (scena_ID==2){  #global C, global F
-              
-              julia_assign("p", param)
-              prob = julia_eval("ODEProblem(PA_two_species_global_C_global_F, state, tspan, p)")
-              
-            }
-            
-            
-            sol = de$solve(prob, de$Tsit5(), saveat = t)
-            d = as.data.frame(t(sapply(sol$u, identity)))
-            colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
-            
-            d2 = rbind(d2, d[nrow(d), ] %>% add_column(S = S,Sp="Stress_tolerant"))
-            d3 = rbind(d3, d[nrow(d), ] %>% add_column(S = S,Sp="Stress_tolerant",alpha_0=alpha0))
-            
-          }
-          
-          d2[d2 < 10^-4] = 0
-          d3[d3 < 10^-4] = 0
-          
-          S_critic1_alone=abs(diff(range(d2$S[which(d2$rho_1 !=0 )]))) 
-          
-          
-          
-          #3) Coexisting species
-          
-          state=Get_PA_initial_state()
-          julia_assign("state", state)
-          
-          #varying the global interspecific competition
-          
-          d2 = tibble()
-          
-          for (S in S_seq) { #varying the stress 
-            
-            param["S"] = S
-            param["alpha_0"] = alpha0
-            julia_assign("p", param)
-            
-            if (scena_ID==1){ #global C, local F
-              
-              julia_assign("p", param)
-              prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F, state, tspan, p)")
-              
-            }else if (scena_ID==2){  #global C, global F
-              
-              julia_assign("p", param)
-              prob = julia_eval("ODEProblem(PA_two_species_global_C_global_F, state, tspan, p)")
-              
-            }
-            
-            sol = de$solve(prob, de$Tsit5(), saveat = t)
-            d = as.data.frame(t(sapply(sol$u, identity)))
-            
-            colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
-            
-            d2 = rbind(d2, d[nrow(d),] %>% add_column(S = S, Sp="Both"))
-            d3 = rbind(d3, d[nrow(d), ] %>% add_column(S = S,Sp="Both",alpha_0=alpha0))
-            
-          }
-          d2[d2 < 10^-4] = 0
-          d3[d3 < 10^-4] = 0
-          colnames(d2) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm", "S", "alpha_0")
-          d2$rho_plus = d2$rho_1 + d2$rho_2
-          
-          S_critic1_both = abs(diff(range(d2$S[which(d2$rho_1 !=0 )]))) 
-          S_critic2_both = abs(diff(range(d2$S[which(d2$rho_2 !=0 )]))) 
-          
-          
-          
-          
-          #Putting niche in the tibble
-          
-          d_niche=rbind(d_niche,tibble(
-            Facilitation = f, Local_disp = disp, H = h, Scena = name_scena[scena_ID], alpha_0 =alpha0,
-            Delta_niche_1 = 100 * (S_critic1_both - S_critic1_alone) / S_critic1_alone,  #making it a percentage of initial niche
-            Delta_niche_2 = 100 * (S_critic2_both - S_critic2_alone) / S_critic2_alone)) #making it a percentage of initial niche
-          
-          
-          
-          d3$rho_plus = d3$rho_1 + d3$rho_2
-          
-          
-          d_compe=filter(d3,Sp=="Competitive")
-          d_stesstol=filter(d3,Sp=="Stress_tolerant")
-          d_both=filter(d3,Sp=="Both")
-          
-          d_RNE=rbind(d_RNE,tibble(S=d_both$S,alpha_0=d_both$alpha_0, Facilitation=f,H=h,Local_disp=disp,Scena=name_scena[scena_ID], 
-                                   RNE_stress_tol = (d_both$rho_1-d_stesstol$rho_1)/(d_both$rho_1+d_stesstol$rho_1),
-                                   RNE_competitive = (d_both$rho_2-d_compe$rho_2)/(d_both$rho_2+d_compe$rho_2)))
-          
-          
-          d_all_dyn=rbind(d3,d_all_dyn)
-          
-          
-        } #end competition loop
-        
-      } #end facilitation loop
+    for (f in f_seq){ #varying facilitation strength
       
-    } #end h loop
+      for (alpha0 in alpha_seq) {
+        
+        
+        #Setting the parameters
+        param=Get_PA_parameters()
+        
+        param["cintra"]=.3
+        param["f"]=f
+        param["delta"]=disp
+        param["alpha_0"]=alpha0
+        
+        
+        
+        # 1) Competitive species alone
+        
+        state=Get_PA_initial_state(c(0,.8,.1))
+        julia_assign("state", state)
+        d2 = d3 = tibble()
+        
+        for (S in S_seq) {
+          
+          param["S"] = S
+          
+          if (scena_ID==1){ #global C, local F
+            
+            julia_assign("p", param)
+            prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F, state, tspan, p)")
+            
+          }else if (scena_ID==2){  #global C, global F
+            
+            julia_assign("p", param)
+            prob = julia_eval("ODEProblem(PA_two_species_global_C_global_F, state, tspan, p)")
+            
+          }
+          
+          sol = de$solve(prob, de$Tsit5(), saveat = t)
+          d = as.data.frame(t(sapply(sol$u, identity)))
+          colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
+          
+          d2 = rbind(d2, d[nrow(d), ] %>% add_column(S = S,Sp="Competitive"))
+          d3 = rbind(d3, d[nrow(d), ] %>% add_column(S = S,Sp="Competitive",alpha_0=alpha0))
+          
+        }
+        d2[d2 < 10^-4] = 0
+        d3[d3 < 10^-4] = 0
+        
+        S_critic2_alone=abs(diff(range(d2$S[which(d2$rho_2 !=0 )]))) #range of values where competitive species is
+        
+        
+        
+        # 2) Stress-tolerant species alone
+        
+        state=Get_PA_initial_state(c(0.8,0,.1))
+        julia_assign("state", state)
+        
+        d2 = tibble()
+        S_seq = seq(0, 1, length.out = 100)
+        
+        for (S in S_seq) {
+          
+          param["S"] = S
+          julia_assign("p", param)
+          
+          if (scena_ID==1){ #global C, local F
+            
+            julia_assign("p", param)
+            prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F, state, tspan, p)")
+            
+          }else if (scena_ID==2){  #global C, global F
+            
+            julia_assign("p", param)
+            prob = julia_eval("ODEProblem(PA_two_species_global_C_global_F, state, tspan, p)")
+            
+          }
+          
+          
+          sol = de$solve(prob, de$Tsit5(), saveat = t)
+          d = as.data.frame(t(sapply(sol$u, identity)))
+          colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
+          
+          d2 = rbind(d2, d[nrow(d), ] %>% add_column(S = S,Sp="Stress_tolerant"))
+          d3 = rbind(d3, d[nrow(d), ] %>% add_column(S = S,Sp="Stress_tolerant",alpha_0=alpha0))
+          
+        }
+        
+        d2[d2 < 10^-4] = 0
+        d3[d3 < 10^-4] = 0
+        
+        S_critic1_alone=abs(diff(range(d2$S[which(d2$rho_1 !=0 )]))) 
+        
+        
+        
+        #3) Coexisting species
+        
+        state=Get_PA_initial_state()
+        julia_assign("state", state)
+        
+        #varying the global interspecific competition
+        
+        d2 = tibble()
+        
+        for (S in S_seq) { #varying the stress 
+          
+          param["S"] = S
+          param["alpha_0"] = alpha0
+          julia_assign("p", param)
+          
+          if (scena_ID==1){ #global C, local F
+            
+            julia_assign("p", param)
+            prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F, state, tspan, p)")
+            
+          }else if (scena_ID==2){  #global C, global F
+            
+            julia_assign("p", param)
+            prob = julia_eval("ODEProblem(PA_two_species_global_C_global_F, state, tspan, p)")
+            
+          }
+          
+          sol = de$solve(prob, de$Tsit5(), saveat = t)
+          d = as.data.frame(t(sapply(sol$u, identity)))
+          
+          colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
+          
+          d2 = rbind(d2, d[nrow(d),] %>% add_column(S = S, Sp="Both"))
+          d3 = rbind(d3, d[nrow(d), ] %>% add_column(S = S,Sp="Both",alpha_0=alpha0))
+          
+        }
+        d2[d2 < 10^-4] = 0
+        d3[d3 < 10^-4] = 0
+        colnames(d2) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm", "S", "alpha_0")
+        d2$rho_plus = d2$rho_1 + d2$rho_2
+        
+        S_critic1_both = abs(diff(range(d2$S[which(d2$rho_1 !=0 )]))) 
+        S_critic2_both = abs(diff(range(d2$S[which(d2$rho_2 !=0 )]))) 
+        
+        
+        
+        
+        #Putting niche in the tibble
+        
+        d_niche=rbind(d_niche,tibble(
+          Facilitation = f, Local_disp = disp, H = 1, Scena = name_scena[scena_ID], alpha_0 =alpha0,
+          Delta_niche_1 = 100 * (S_critic1_both - S_critic1_alone) / S_critic1_alone,  #making it a percentage of initial niche
+          Delta_niche_2 = 100 * (S_critic2_both - S_critic2_alone) / S_critic2_alone)) #making it a percentage of initial niche
+        
+        
+        
+        d3$rho_plus = d3$rho_1 + d3$rho_2
+        
+        
+        d_compe=filter(d3,Sp=="Competitive")
+        d_stesstol=filter(d3,Sp=="Stress_tolerant")
+        d_both=filter(d3,Sp=="Both")
+        
+        d_RNE=rbind(d_RNE,tibble(S=d_both$S,alpha_0=d_both$alpha_0, Facilitation=f,H=1,Local_disp=disp,Scena=name_scena[scena_ID], 
+                                 RNE_stress_tol = (d_both$rho_1-d_stesstol$rho_1)/(d_both$rho_1+d_stesstol$rho_1),
+                                 RNE_competitive = (d_both$rho_2-d_compe$rho_2)/(d_both$rho_2+d_compe$rho_2)))
+        
+        
+        d_all_dyn=rbind(d3,d_all_dyn)
+        
+        
+      } #end competition loop
+      
+    } #end facilitation loop
     
   } #end dispersal loop
   
@@ -3741,8 +3737,8 @@ julia_library("DifferentialEquations")
 julia_assign("tspan", tspan)
 
 N_rep = 50
-S_seq = c(.6,.65,.7,.73,.77)
-alpha_seq = c(0,.2)
+S_seq = c(.73,.77)
+alpha_seq = c(.2)
 f_seq=.9
 delta_seq=seq(0,1,length.out=N_rep)
 cintra_seq=c(.3)
@@ -3813,7 +3809,8 @@ for (scena_ID in 1:2){ #for each scenario of species pairs
           
           d_clustering=rbind(d_clustering,tibble(
             Rho_1=d2$rho_1,Rho_2=d2$rho_2,Rho_12=d2$rho_12,
-            Rho_22=d2$rho_22,Rho_11=d2$rho_11,
+            Rho_22=d2$rho_22,Rho_11=d2$rho_11,Rho_10=d2$rho_1 - d2$rho_11 - d2$rho_12 - d2$rho_1m,
+            Rho_20=d2$rho_2 - d2$rho_22 - d2$rho_12 - d2$rho_2m,
             S   = d2$S,alpha_0 = d2$alpha_0,
             f=f,delta=disp,Scena=scena_ID,
             cintra=aii
@@ -4473,7 +4470,6 @@ ggsave("../Figures/N_species/MF/Global_cover_random_ini.pdf",ggarrange(pD,pR,nro
 
 ## 2) Species level : occurrence, size of tipping points  ----
 
-d=read.table('../Table/N_species/MF/Random_ini.csv',sep=";")
 treshold_sp=0.1
 d_ASS_sp=tibble()
 
@@ -4523,11 +4519,10 @@ for (i in c(5,10,15,20,25,30,35)){
   
 }
 
-d_ASS_sp=d_ASS_sp[-which(d_ASS_sp$Random_ini>100),]
 write.table(d_ASS_sp,"../Table/N_species/MF/d_ASS_sp.csv",sep=";")
 
 d_ASS_sp=read.table("../Table/N_species/MF/d_ASS_sp.csv",sep=";")
-N_replicate=100
+N_replicate=150
 
 
 #Species-specific tipping points size & frequency
@@ -4646,6 +4641,7 @@ d_tipping=d_tipping%>%
 write.table(d_tipping,"../Table/N_species/MF/Multistability_tipping.csv",sep=";")
 write.table(d_richness,"../Table/N_species/MF/Multistability_richness.csv",sep=";")
 write.table(d_richness2,"../Table/N_species/MF/Multistability_richness2.csv",sep=";")
+write.table(d_tot,"../Table/N_species/MF/Multistability_CSI.csv",sep=";")
 
 
 p1=ggplot(d_tipping%>%filter(., Branch=="Degradation"))+

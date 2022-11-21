@@ -1,5 +1,4 @@
-source('./N_species_Analysis_functions.R')
-source('./2_species_Analysis_functions.R')
+source('./Dryland_shift_functions.R')
 library(grid)
 
 
@@ -318,14 +317,15 @@ for (Psi_sp1 in psi1_seq){
     
     p1=ggplot(d_state%>%
                 mutate(all_state=recode_factor(all_state,
-                                               "Species 2/Coexistence"="Coexistence/Species 2",
-                                               "Desert/Species 2"="Species 2/Desert",
+                                               "Desert/Species 2"="Competitive/Desert",
                                                "Desert/Coexistence"="Coexistence/Desert",
-                                               "Desert/Stress_tolerant"="Species 1/Desert",
-                                               "Stress_tolerant"= "Species 1",
-                                               "Stress_tolerant/Coexistence"="Coexistence/Species 1",
-                                               "Stress_tolerant/Species 2"="Species 2/Species 1",
-                                               "Species 2/Coexistence"="Coexistence/Species 2"))) +
+                                               "Species 2"="Competitive",
+                                               "Desert/Stress_tolerant"="Stress-tolerant/Desert",
+                                               "Coexistence/Species 2"="Coexistence/Competitive",
+                                               "Stress_tolerant"= "Stress-tolerant",
+                                               "Stress_tolerant/Coexistence"="Coexistence/Stress-tolerant",
+                                               "Stress_tolerant/Species 2"="Competitive/Stress-tolerant",
+                                               "Species 2/Coexistence"="Coexistence/Competitive"))) +
       geom_tile_pattern(aes(x=Stress,y=as.numeric(Psi2),fill=all_state,pattern=Multistability),              
                         colour          = 'transparent',
                         pattern_spacing = 0.05, 
@@ -334,20 +334,17 @@ for (Psi_sp1 in psi1_seq){
                         pattern_colour  = alpha("black",.7))+
       theme_classic() +
       theme(legend.position = "bottom") +
-      labs(x = "Stress (S)", y = TeX(r'(Trait species 2, \ $\psi_2)'), fill = "") +
+      labs(x = "Stress (S)", y = TeX(r'(Trait competitive sp., \ $\psi_2)'), fill = "") +
       theme(legend.text = element_text(size = 11))+
       scale_fill_manual(values=c("Coexistence" = "#D8CC7B",
-                                 "Species 2" = "#ACD87B",
-                                 "Coexistence/Species 2" = "#DDEFCA",
-                                 "Species 1" = "#7BD8D3",
-                                 "Species 1/Desert" ="#0F8E87",
-                                 "Coexistence/Species 1"="#9BBBB9",
+                                 "Competitive" = "#ACD87B",
+                                 "Coexistence/Competitive" = "#DDEFCA",
+                                 "Stress-tolerant" = "#7BD8D3",
+                                 "Stress-tolerant/Desert" ="#0F8E87",
+                                 "Coexistence/Stress-tolerant"="#9BBBB9",
                                  "Coexistence/Desert"="#C19E5E",
                                  "Desert"=  "#696969",
-                                 "Species 2/Species 1" = "#C998CE"),
-                        labels=c("Coexistence","Species 2","Coexistence/Species 2","Species 1","Species 1/Desert",
-                                 "Coexistence/Species 1",
-                                 "Coexistence/Desert","Desert","Species 2/Species 1"))+
+                                 "Competitive/Stress-tolerant" = "#C998CE"))+
       facet_grid(.~alpha_0,labeller=label_bquote(cols = alpha[e] == .(alpha_0)))+
       the_theme+theme(legend.text = element_text(size=9),strip.text.x = element_text(size=13))+
       scale_y_continuous(sec.axis = sec_axis(trans = ~ (1-.x) ,
@@ -408,13 +405,13 @@ for (Psi_sp1 in psi1_seq){
     
     p2=ggplot(d_state%>%
                 mutate(all_state=recode_factor(all_state,
-                                               "Species 2/Coexistence"="Coexistence/Species 1",
-                                               "Desert/Species 2"="Species 1/Desert",
+                                               "Species 2/Coexistence"="Coexistence/Stress-tolerant",
+                                               "Desert/Species 2"="Stress-tolerant/Desert",
                                                "Desert/Coexistence"="Coexistence/Desert",
-                                               "Desert/Competitive"="Species 2/Desert",
-                                               "Competitive" = "Species 2",
-                                               "Species 2" = "Species 1",
-                                               "Coexistence/Competitive" = "Coexistence/Species 2"
+                                               "Desert/Competitive"="Competitive/Desert",
+                                               "Competitive" = "Competitive",
+                                               "Species 2" = "Stress-tolerant",
+                                               "Coexistence/Competitive" = "Coexistence/Competitive"
                 ),
                 Psi2=round(Psi2,5),
                 Stress=round(Stress,5))) +
@@ -426,16 +423,16 @@ for (Psi_sp1 in psi1_seq){
                         pattern_colour  = alpha("black",.7))+
       theme_classic() +
       theme(legend.position = "bottom") +
-      labs(x = "Stress (S)", y = TeX(r'(Trait species 1, \ $\psi_2)'), fill = "") +
+      labs(x = "Stress (S)", y = TeX(r'(Trait stress-tolerant sp., \ $\psi_2)'), fill = "") +
       theme(legend.text = element_text(size = 11))+
       scale_fill_manual(values=c("Coexistence" = "#D8CC7B",
-                                 "Species 1" = "#7BD8D3",
-                                 "Species 2" = "#ACD87B",
-                                 "Coexistence/Species 1" = "#9BBBB9",
-                                 "Species 1/Desert" ="#0F8E87",
+                                 "Stress-tolerant" = "#7BD8D3",
+                                 "Competitive" = "#ACD87B",
+                                 "Coexistence/Stress-tolerant" = "#9BBBB9",
+                                 "Stress-tolerant/Desert" ="#0F8E87",
                                  "Coexistence/Desert"="#C19E5E",
-                                 "Coexistence/Species 2" = "#DDEFCA",
-                                 "Coexistence/Species 1"="#9BBBB9",
+                                 "Coexistence/Competitive" = "#DDEFCA",
+                                 "Coexistence/Stress-tolerant"="#9BBBB9",
                                  "Desert"=  "#696969"))+
       facet_grid(.~alpha_0,labeller=label_bquote(cols = alpha[e] == .(alpha_0)))+
       the_theme+theme(legend.text = element_text(size=9),strip.text.x = element_text(size=13))+
@@ -532,7 +529,7 @@ for (Psi_sp1 in psi1_seq){
     p1=ggplot(d_tipping)+
       geom_smooth(aes(x=Psi2,y=Tipping_C,color=Branch,group=interaction(Competition,Branch)),se = F)+
       the_theme+facet_grid(.~Competition,labeller = label_bquote(cols=alpha[e]==.(Competition)))+
-      labs(x=TeX(r'(Trait species 2, \ $\psi_2)'),y="Tipping point",color="")+
+      labs(x=TeX(r'(Trait competitive sp., \ $\psi_2)'),y="Threshold stress",color="")+
       scale_color_manual(values=c("black","blue"))+
       scale_x_continuous(sec.axis = sec_axis(trans = ~ (1-.x) ,
                                              name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)'),
@@ -577,7 +574,7 @@ for (Psi_sp1 in psi1_seq){
     p2=ggplot(d_tipping)+
       geom_smooth(aes(x=Psi2,y=Tipping_ST,color=Branch,group=interaction(Competition,Branch)),se = F)+
       the_theme+facet_grid(.~Competition,labeller = label_bquote(cols=alpha[e]==.(Competition)))+
-      labs(x=TeX(r'(Trait species 1, \ $\psi_1)'),y="Tipping point",color="")+
+      labs(x=TeX(r'(Trait stress-tolerant sp., \ $\psi_1)'),y="Threshold stress",color="")+
       scale_color_manual(values=c("black","blue"))+
       scale_x_continuous(sec.axis = sec_axis(trans = ~ (.x) ,
                                              name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)'),
@@ -595,7 +592,7 @@ p_tot=ggarrange(p1+theme(legend.position = "none")+ggtitle(TeX("$\\psi_1 = 1$"))
 ggsave("../Figures/Final_figs/SI/Tipping_points_traits_MF.pdf",width = 7,height = 7)
 
 
-## Explanation traits with net-effects ----
+## Net-effects, balance competition-facilitation ----
 
 epsilon=10^(-6)
 d2=read.table("../Table/2_species/PA/Net_effect_varying_traits.csv",sep=";")
@@ -623,11 +620,11 @@ p11=ggplot(d_net%>%
   geom_hline(yintercept = 0,linetype=9)
 
 p12=ggplot(d_net%>%
-             filter(.,Psi1==1,alpha_0%in% c(.3),Species==1)%>% #see d2, species are inverted for \psi_1=1
+             filter(.,Psi1==1,alpha_0%in% c(.1),Species==2)%>% #see d2, species are inverted for \psi_1=1
              mutate(.,Species=recode_factor(Species,"1" ="Species 1","2" = "Species 2")))+
-  ggtitle(TeX("$\\psi_1=1, \\alpha_e=0.3$"))+
+  ggtitle(TeX("$\\psi_1=1, \\alpha_e=0.1$"))+
   geom_line(aes(x=S,y=value,color=Psi2,group=interaction(Psi1,Psi2,alpha_0,Species)))+
-  labs(x="Stress, S",y=TeX(r'($\frac{\partial \rho_{+_2}}{\partial \psi_2})'),
+  labs(x="Stress, S",y=TeX(r'($\frac{\partial \rho_{+_1}}{\partial \psi_2})'),
        color=TeX(r'($\ \psi_2 \ \ )'))+
   the_theme+
   scale_color_stepsn(colours=color_Nsp(6),breaks=seq(0,1,by=.2))+
@@ -658,12 +655,14 @@ p22=ggplot(d_net%>%
 
 
 p_tot=ggarrange(ggarrange(p11+theme(),
-                          p12+ylab(""),ncol=2,labels = c(letters[1:2]),common.legend = T,legend = "bottom"),
+                          p12,ncol=2,labels = c(letters[1:2]),common.legend = T,legend = "bottom"),
                 ggarrange(p21,
                           p22+ylab(""),ncol = 2,labels = c(letters[3:4]),common.legend = T,legend = "bottom"),
                 nrow=2)
 
 ggsave("../Figures/Final_figs/SI/Net_effects_varying_traits.pdf",p_tot,width = 7,height = 7)
+
+
 
 
 ## Clustering of species 1 along dispersal gradient ----
@@ -738,9 +737,20 @@ p=ggplot(d_clustering%>%
   geom_hline(yintercept = 1)
 
 
+p2=ggplot(d_clustering%>%
+           filter(., alpha_0==.3)%>%
+            melt(., measure.vars=c("Rho_10","Rho_20")))+
+  geom_point(aes(x=as.numeric(delta),y=value,color=variable),size=1.5,alpha=.7,shape=1)+
+  facet_grid(Scena~S,labeller=label_bquote(cols = Stress == .(S)),scales = "free")+
+  the_theme+labs(x=TeX("$\\delta$"),y=expression(paste("Stress-tolerant clustering (c"[11],")")))+
+  geom_hline(yintercept = 1)
+
 
 
 ggsave("../Figures/Final_figs/SI/Clustering_11_dispersal.pdf",p,width = 7,height = 4)
+
+
+
 
 
 ## NintA for MF model and PA model ----
@@ -1104,7 +1114,7 @@ p=ggplot(d2%>%melt(., measure.vars=c("Rho_plus","CSI"))%>%
 ggsave("../Figures/Final_figs/SI/Using_CSI.pdf",p,width = 6,height = 4)
 
 ## Competition experienced ----
-Nsp=45
+Nsp=15
 trait=rev(seq(0,1,length.out=Nsp))
 comp=comp2=c()
 for (i in 1:Nsp){
@@ -1120,9 +1130,41 @@ for (i in 1:Nsp){
 p1=ggplot(tibble(Com=comp,Trait=trait,Comp2=comp2))+
   geom_line(aes(x=Trait,y=Com))+
   geom_point(aes(x=Trait,y=Com,color=Trait),size=3)+
+  geom_text(data=tibble(x=c(0,trait[8],1),y=c(9.75,11.75,9.75),text=c("i","ii","iii")),aes(x=x,y=y,label=text),size=4)+
   the_theme+
   labs(x=TeX(r'(Trait species i, $\psi_i)'),y=TeX(r'(\ $\sum_j e^{-|\psi_i-\psi_j|})'),color="")+
-  scale_color_gradientn(colours = color_Nsp(Nsp))
+  scale_color_gradientn(colours = color_Nsp(Nsp))+
+  theme(legend.position = "none")
+
+trait_subplot=c(0,trait[8],1)
+for (i in 1:3){
+  
+  comp=sapply(1:Nsp,function(x){
+    exp(-abs(trait_subplot[i]-trait[x]))
+  })
+  
+  if (i != 3){
+    assign(paste0("p_",i),
+     ggplot(tibble(Com=comp,Trait=trait))+
+       geom_line(aes(x=Trait,y=Com))+
+       labs(x=TeX(r'(Trait species i, $\psi_i)'),y=TeX(r'(\ $e^{-|\psi_i-\psi_j|})'))+the_theme+
+       theme(axis.title.x = element_blank(),axis.text.x = element_blank(),axis.line.x = element_blank(),
+             axis.ticks.x = element_blank())+
+       scale_x_continuous(breaks = c(0,.5,1),labels = c("0","0.5","1"))
+    )
+  }else {
+    assign(paste0("p_",i),
+           ggplot(tibble(Com=comp,Trait=trait))+
+             geom_line(aes(x=Trait,y=Com))+
+             labs(x=TeX(r'(Trait species i, $\psi_i)'),y=TeX(r'(\ $e^{-|\psi_i-\psi_j|})'))+the_theme+
+             scale_x_continuous(breaks = c(0,.5,1),labels = c("0","0.5","1"))
+    )
+  }
+  
+}
+
+
+
 p2=ggplot(tibble(Com=comp,Trait=trait,Comp2=comp2))+
   geom_line(aes(x=Trait,y=Comp2))+
   geom_point(aes(x=Trait,y=Comp2,color=Trait),size=3)+
@@ -1131,19 +1173,20 @@ p2=ggplot(tibble(Com=comp,Trait=trait,Comp2=comp2))+
   scale_color_gradientn(colours = color_Nsp(15))
 
 ggsave("../Figures/Final_figs/SI/Competition_experienced.pdf",
-       ggarrange(p1,p2,ncol=2,common.legend = T,legend = "bottom",labels = letters[1:2]),
-       width = 9,height = 4)
+       ggarrange(
+         ggarrange(p1,
+                   ggarrange(p_1,p_2,p_3,nrow = 3,labels = c('i','ii','iii'),heights = c(1,1,1.4)),labels = c("a","","",""),widths = c(2,1)),
+         p2,ncol=2,common.legend = T,legend = "none",labels = c("",letters[2]),widths = c(1.5,1)),
+       width = 11,height = 4)
 
 
 
 # N-species ----
-
-
 ## Species specific tipping points ----
 
 
 d_ASS_sp=read.table("../Table/N_species/MF/d_ASS_sp.csv",sep=";")
-N_replicate=100
+N_replicate=150
 
 
 #Species-specific tipping points size & frequency
@@ -1306,3 +1349,98 @@ for (thresh in 1:length(threshold_seq)){
 p_tot=ggarrange(p_1,p_2,p_3,p_4,labels = letters[1:4],ncol = 2,nrow = 2,align = "hv")
 ggsave("../Figures/Final_figs/SI/Threshold_tipping.pdf",p_tot,width = 9,height = 10)
 
+
+## Figure N_species restoration ----
+
+
+d_tipping=read.table("../Table/N_species/MF/Multistability_tipping.csv",sep=";")
+d_richness2=read.table("../Table/N_species/MF/Multistability_richness2.csv",sep=";")
+d_richness=read.table("../Table/N_species/MF/Multistability_richness.csv",sep=";")
+
+
+p1=ggplot(d_richness%>%filter(., Branch=="Restoration"))+
+  geom_bar(aes(x=Nsp,fill=as.factor(Richness),y=Richness),
+           position = "fill",stat="identity",alpha=.75)+
+  labs(x="Community richness (N)",y="Fraction of random initial conditions",fill="Number of species")+
+  scale_x_continuous(breaks = seq(5,35,by=5))+
+  geom_point(data=d_richness2,aes(x=Nsp,y=Richness_D/Nsp),shape=1,size=3)+
+  geom_line(data=d_richness2,aes(x=Nsp,y=Richness_D/Nsp))+
+  scale_y_continuous(sec.axis=sec_axis(~., name="Fraction of species observed \n all across replicates"))+
+  the_theme
+
+
+
+d_tot=read.table("../Table/N_species/MF/Multistability_CSI.csv",sep=";")
+colnames(d_tot)[11]="Community richness (N)"
+
+p2=ggplot(d_tot%>%filter(.,Branch==2,`Community richness (N)` %in% c(5,35)))+
+  geom_point(aes(x=Stress,y=CSI,color=Psi_normalized,fill=Psi_normalized),size=.8,shape=21)+
+  facet_wrap(.~`Community richness (N)`,labeller = label_both)+
+  the_theme+labs(y="Community index",color="")+
+  scale_color_gradientn(colors = color_Nsp(100),na.value = "black")+
+  scale_fill_gradientn(colors = color_Nsp(100),na.value = "black")+
+  guides(fill="none")+
+  labs(x="Stress, S")+
+  scale_x_continuous(breaks = c(0,.5,1),labels = c("0","0.5","1"))+
+  theme(strip.text.x = element_text(size=10),strip.text.y = element_text(size=11),
+        panel.background = element_blank(),strip.background.x = element_blank())
+
+d_ASS_sp=read.table("../Table/N_species/MF/d_ASS_sp.csv",sep=";")
+N_replicate=150
+colnames(d_ASS_sp)[6]="Community richness (N)"
+
+#Species-specific tipping points size & frequency
+p3_1=ggplot(filter(d_ASS_sp, `Community richness (N)` %in% c(5),Branch=="Restoration"), 
+            aes(x=Trait,y=Tipping/N_replicate,fill=Trait)) + 
+  geom_bar( stat="identity",width = .1)+
+  facet_grid(.~`Community richness (N)`)+
+  the_theme+
+  labs(x=TeX("$\\psi$"),y="Frequency of abrupt shift",fill="")+
+  scale_fill_gradientn(colours = color_Nsp(100))+
+  scale_x_continuous(breaks = c(0,.5,1),labels = c("0","0.5","1"))+
+  theme(strip.text.x =element_blank(),strip.text.y = element_text(size=11),
+        panel.background = element_blank(),strip.background.x = element_blank())
+
+p3_2=ggplot(filter(d_ASS_sp, `Community richness (N)` %in% c(35),Branch=="Restoration"), 
+            aes(x=Trait,y=Tipping/N_replicate,fill=Trait)) + 
+  geom_bar( stat="identity",width = .025)+
+  facet_grid(.~`Community richness (N)`)+
+  the_theme+
+  labs(x=TeX("$\\psi$"),y="Frequency of abrupt shift",fill="")+
+  scale_fill_gradientn(colours = color_Nsp(100))+
+  scale_x_continuous(breaks = c(0,.5,1),labels = c("0","0.5","1"))+
+  theme(strip.text.x =element_blank(),strip.text.y = element_text(size=11),
+        panel.background = element_blank(),strip.background.x = element_blank(),
+        axis.line.y = element_blank(),axis.text.y = element_blank(),axis.ticks.y = element_blank(),
+        axis.title.y = element_blank())
+
+p3=ggarrange(p3_1,p3_2,ncol = 2,legend = "none",widths = c(1.2,1),labels = c(letters[3],""),hjust = -3,vjust = -2)
+
+Fig6SI=ggarrange(p1,ggarrange(p2,p3,nrow=2,labels = c(letters[2],""),hjust=-2.3,
+                            common.legend = T,legend = "bottom",heights = c(1.2,1)),
+               ncol=2,labels = c(letters[1],"",""),widths = c(1.3,1))
+
+ggsave("../Figures/Final_figs/SI/N_species_restoration.pdf",Fig6SI,width=10,height=5)
+
+
+## All CSI panel ----
+
+
+d_tot=read.table("../Table/N_species/MF/Multistability_CSI.csv",sep=";")
+colnames(d_tot)[11]="Community richness (N)"
+
+p=ggplot(d_tot%>%filter(.,Branch==1))+
+  geom_point(aes(x=Stress,y=CSI,color=Psi_normalized,fill=Psi_normalized),size=.5,shape=21)+
+  facet_wrap(.~`Community richness (N)`,labeller = label_both)+
+  the_theme+labs(y="Community index",color=expression(paste(bar(psi),"    ")))+
+  scale_color_gradientn(colors = color_Nsp(100),na.value = "black")+
+  scale_fill_gradientn(colors = color_Nsp(100),na.value = "black")+
+  guides(fill="none")+
+  labs(x="Stress, S")+
+  theme(strip.text.x = element_text(size=10),strip.text.y = element_text(size=11),
+        panel.background = element_blank(),strip.background.x = element_blank())
+
+
+
+
+ggsave("../Figures/Final_figs/SI/CSI_Nsp_all.pdf",p,width=7,height=5)
