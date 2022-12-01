@@ -169,8 +169,11 @@ p=ggplot(d_state) +
                              "Stress_tolerant/Desert" ="#0F8E87",
                              "Coexistence/Stress_tolerant"="#9BBBB9",
                              "Coexistence/Desert"="#C19E5E",
-                             "Desert"=  "#696969"
-  ),labels=c("Stress_tolerant"="Stress-tolerant","Stress_tolerant/Desert"="Stress-tolerant/Desert","Coexistence/Stress_tolerant"="Coexistence/Stress-tolerant"))+
+                             "Desert"=  "#696969",
+                             "Competitive/Stress_tolerant"="#C998CE"
+  ),labels=c("Stress_tolerant"="Stress-tolerant","Stress_tolerant/Desert"="Stress-tolerant/Desert",
+             "Coexistence/Stress_tolerant"="Coexistence/Stress-tolerant",
+             "Competitive/Stress_tolerant"="Competitive/Stress-tolerant"))+
   geom_hline(yintercept = round(unique(d2$alpha_0)[c(1,100)],4))+
   geom_text(data=tibble(x=c(1.025,1.025),y=c(0.01,.31),lab=c("c",'b')),aes(x=x,y=y,label=lab))+
   the_theme+theme(legend.text = element_text(size=10))+
@@ -665,7 +668,7 @@ ggsave("../Figures/Final_figs/SI/Net_effects_varying_traits.pdf",p_tot,width = 7
 
 
 
-## Clustering of species 1 along dispersal gradient ----
+## Clustering of species 1 along dispersal gradient & species/fertile sites pairs ----
 d_clustering = read.table("../Table/2_species/PA/Clustering_PA.csv",sep=";")
 
 
@@ -716,10 +719,9 @@ for (nr in 1:nrow(d_clustering)){
   d_clustering$c22[nr]=c22
   d_clustering$c11[nr]=c11
   d_clustering$Scena[nr]=name_scena[as.numeric(d_clustering$Scena[nr])]
-  
+
   
 }
-
 
 
 d_clustering=mutate(d_clustering, Scena=recode_factor(Scena,"global_C_global_F"="Global facilitation","global_C_local_F"="Local facilitation"))
@@ -727,27 +729,30 @@ d_clustering=mutate(d_clustering, Scena=recode_factor(Scena,"global_C_global_F"=
 
 
 p=ggplot(d_clustering%>%
-           filter(., alpha_0==.2)%>%
+           filter(., alpha_0==.2, S %in% c(.73, .77))%>%
            group_by(., cintra,alpha_0,S,delta,Scena)%>%
            summarise(.,.groups ="keep",c11=mean(c11) ))+
   geom_point(aes(x=as.numeric(delta),y=c11),size=1.5,alpha=.7,shape=1)+
   facet_grid(Scena~S,labeller=label_bquote(cols = Stress == .(S)),scales = "free")+
   the_theme+labs(x=TeX("$\\delta$"),y=expression(paste("Stress-tolerant clustering (c"[11],")")))+
   scale_color_manual(values=as.character(color_rho[c(2,4)]))+
-  geom_hline(yintercept = 1)
-
-
-p2=ggplot(d_clustering%>%
-           filter(., alpha_0==.3)%>%
-            melt(., measure.vars=c("Rho_10","Rho_20")))+
-  geom_point(aes(x=as.numeric(delta),y=value,color=variable),size=1.5,alpha=.7,shape=1)+
-  facet_grid(Scena~S,labeller=label_bquote(cols = Stress == .(S)),scales = "free")+
-  the_theme+labs(x=TeX("$\\delta$"),y=expression(paste("Stress-tolerant clustering (c"[11],")")))+
-  geom_hline(yintercept = 1)
-
-
-
+  geom_hline(yintercept = 1)+ylim(0,3)
 ggsave("../Figures/Final_figs/SI/Clustering_11_dispersal.pdf",p,width = 7,height = 4)
+
+p=ggplot(d_clustering%>%
+         filter(., alpha_0==.2, S %in% c(0))%>%
+         melt(., measure.vars=c("Rho_20","Rho_10"))%>%
+         mutate(.,variable=recode_factor(variable,"Rho_10"="Pair Stress-tolerant sp./Fertile",
+                                "Rho_20"="Pair Competitive sp./Fertile")))+
+  geom_point(aes(x=as.numeric(delta),y=value,color=variable),size=1.5)+
+  ggtitle("Stress (S) = 0")+
+  the_theme+labs(x=TeX("$\\delta$"),y=expression(paste("Cover")))+
+  facet_grid(Scena~.,scales = "free")+
+  
+  scale_color_manual(values=c("black","grey"))+
+  labs(color="")
+
+ggsave("../Figures/Final_figs/SI/Pair_10_20.pdf",p,width = 5,height = 4)
 
 
 
@@ -1181,6 +1186,115 @@ ggsave("../Figures/Final_figs/SI/Competition_experienced.pdf",
 
 
 
+## Comparing CA & PA ----
+
+#First layer = Simulations with PA (~Fig 2)
+
+d2=read.table(paste0("../Table/2_species/PA/Multistability_fixed_traits_PA.csv"),sep=";")%>%
+  filter(., Delta==.1)
+
+d2$state = sapply(1:nrow(d2), function(x) {
+  if (d2[x, 1] > 0 & d2[x, 2] > 0) {
+    return("Coexistence")
+  }
+  if (d2[x, 1] > 0 & d2[x, 2] == 0) {
+    return("Stress-tolerant")
+  }
+  if (d2[x, 1] == 0 & d2[x, 2] > 0) {
+    return("Competitive")
+  }
+  if (d2[x, 1] == 0 & d2[x, 2] == 0) {
+    return("Desert")
+  }
+})
+
+d2=d2[order(d2$alpha_0,d2$Scena,d2$Delta,d2$Stress),]
+
+all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
+  if (d2$state[x] != d2$state[x+1]){
+    return(paste0(d2$state[x],"/", d2$state[x+1]))
+  }
+  else {return(d2$state[x])}
+})
+
+d_state=d2%>%
+  filter(., Branches=="Degradation")%>%
+  select(.,-Branches)
+d_state$all_state=all_state
+
+
+scale="global"
+d2t=transform(d_state%>% 
+                filter(., Scena %in% c(paste0(scale,"_C_global_F"),paste0(scale,"_C_local_F")))%>%
+                mutate(., Stress=round(Stress,6),alpha_0=round(alpha_0,6)),
+              Scena=factor(Scena,levels=c(paste0(scale,"_C_global_F"),paste0(scale,"_C_local_F")),
+                           labels=c("Global facilitation","Local facilitation")))
+
+#Second layer : CA simulations
+
+list_f=list.files("../Table/2_species/CA/Justifying_use_PA/")
+d=tibble()
+for (i in list_f){
+  d2=read.table(paste0("../Table/2_species/CA/Justifying_use_PA/",i),sep=",")
+  mean_density=c(colMeans(d2[-c(1:1000),-1]),
+                 str_split(i,pattern = "_")[[1]][3],
+                 str_split(i,pattern = "_")[[1]][5],
+                 gsub(pattern = ".csv",replacement = "",x=str_split(i,pattern = "_")[[1]][7]))
+  d=rbind(d,mean_density)  
+}
+colnames(d)=c("Rho_1","Rho_2","Rho_0","Rho_d","Stress","Branches","alpha_0")
+d=as_tibble(d)%>%
+  mutate(., Rho_1=as.numeric(Rho_1),Rho_2=as.numeric(Rho_2),Rho_0=as.numeric(Rho_0),Rho_d=as.numeric(Rho_d),
+         alpha_0=as.numeric(alpha_0),Stress=as.numeric(Stress))
+
+d$state = sapply(1:nrow(d), function(x) {
+  if (d[x, 1] > 0 & d[x, 2] > 0) {
+    return("Coexistence")
+  }
+  if (d[x, 1] > 0 & d[x, 2] == 0) {
+    return("Stress-tolerant")
+  }
+  if (d[x, 1] == 0 & d[x, 2] > 0) {
+    return("Competitive")
+  }
+  if (d[x, 1] == 0 & d[x, 2] == 0) {
+    return("Desert")
+  }
+})
+
+d=d[order(d$alpha_0,d$Stress),]
+
+all_state =sapply(seq(1, nrow(d) , by = 2),function(x){
+  if (d$state[x] != d$state[x+1]){
+    return(paste0(d$state[x],"/", d$state[x+1]))
+  }
+  else {return(d$state[x])}
+})
+
+
+d_state=d%>%
+  filter(., Branches=="Degradation")%>%
+  select(.,-Branches)
+d_state$all_state=all_state
+
+p=ggplot(NULL) +
+  geom_tile(data=d2t,aes(x=Stress,y=alpha_0,fill=all_state))+
+  geom_point(data=d_state,aes(x=Stress,y=alpha_0,fill=all_state),size=5,shape=21)+
+  labs(x = TeX(r'(Stress, \ $S)'), y = TeX(r'(Strength of competition, \ $\alpha_e)'), fill = "") +
+  theme(legend.text = element_text(size = 11))+
+  scale_fill_manual(values=c("Coexistence" = "#D8CC7B", 
+                             "Competitive" = "#ACD87B", 
+                             "Coexistence/Competitive" = "#DDEFCA",
+                             "Stress-tolerant" = "#7BD8D3",
+                             "Stress-tolerant/Desert" ="#0F8E87",
+                             "Coexistence/Stress-tolerant"="#9BBBB9",
+                             "Coexistence/Desert"="#C19E5E",
+                             "Desert"=  "#696969"
+  ))+
+  the_theme+theme(strip.text.x = element_text(size=12),legend.text = element_text(size=9))
+ggsave("../Figures/Final_figs/SI/Comparizon_CA_PA.pdf",p,width = 7,height = 6)
+
+
 # N-species ----
 ## Species specific tipping points ----
 
@@ -1444,3 +1558,26 @@ p=ggplot(d_tot%>%filter(.,Branch==1))+
 
 
 ggsave("../Figures/Final_figs/SI/CSI_Nsp_all.pdf",p,width=7,height=5)
+
+## Test: nb ASS along stress gradient ----
+
+d_tot=read.table("../Table/N_species/MF/Multistability_CSI.csv",sep=";")
+
+d_ASS=tibble()
+for (branch in 1:2){
+  for (s in unique(d_tot$Stress)){
+    for (com in unique(d_tot$Nsp)){
+      
+      d_fil=filter(d_tot,Stress==s,Nsp==com,Branch==branch)
+      d_ASS=rbind(d_ASS,tibble(Nsp=com,Stress=s,Nb_ASS=length(unique(round(d_fil$CSI,2))),Branch=ifelse(branch==1,"Degradation","Restoration")))
+      
+    }
+  }
+}
+
+ggplot(d_ASS)+
+  geom_smooth(aes(x=Stress,y=Nb_ASS,color=as.factor(Nsp)),se = F)+
+  the_theme+
+  facet_grid(.~Branch)+
+  scale_color_manual(values = colorRampPalette(c("orange","black","green"))(7))
+
