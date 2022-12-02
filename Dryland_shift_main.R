@@ -4893,8 +4893,8 @@ julia_library("DifferentialEquations")
 julia_assign("tspan", tspan)
 
 
-N_sim=30
-S_seq =seq(0,1,length.out=N_sim)
+N_sim=50
+S_seq =seq(0,.82, length.out = 100)
 psi_seq=seq(0,1,length.out=N_sim)
 c_inter_seq=rev(c(0,.1, .2, .3,.4))
 psi1_seq=seq(0,1,length.out=N_sim)
@@ -4917,10 +4917,8 @@ for (facil in f_seq){
           
           if (branch =="Degradation"){ #doing the two branches of the bifurcation diagram
             state = Get_PA_initial_state(Get_MF_initial_state(c(.4,.4,.1)))
-            S_seq=seq(0,1, length.out = N_sim)
           }else {
             state = Get_PA_initial_state(Get_MF_initial_state(c(.005,.005,.49)))
-            S_seq=rev(seq(0,1, length.out = N_sim))
           }
           
           d2 = tibble()
@@ -4928,7 +4926,7 @@ for (facil in f_seq){
           
           for (psi2 in psi_seq){
             
-            for (psi1 in psi1_seq){
+            for (psi1 in psi1_seq[which(psi1_seq>psi2)]){
               
               julia_assign("state", state)
               param=Get_PA_parameters()
@@ -4971,189 +4969,6 @@ for (facil in f_seq){
   } #end loop dispersal
   
 }#end facilitation loop
-
-
-
-c_inter_seq=c(0,.1,.2,.3,.4)
-stress_seq=seq(0,1,length.out=30)
-
-
-d=tibble()  
-d_bistab=tibble()
-for (stress in stress_seq){
-  
-  for (cinter in c_inter_seq){
-    
-    
-    d2=rbind(read.table(paste0("../Table/2_species/PA/Multistability_PA/Frac_gradient/Test_interspe_comp_",
-                               cinter,"_branch_Degradation_stress_",stress,"_delta_",.1,"_facilitation_",.9,".csv"),sep=";"),
-             read.table(paste0("../Table/2_species/PA/Multistability_PA/Frac_gradient/Test_interspe_comp_",
-                               cinter,"_branch_Restoration_stress_",stress,"_delta_",.1,"_facilitation_",.9,".csv"),sep=";"))
-    d=rbind(d,d2)
-    
-    
-    
-  } # end loop interspecific competition
-} # end loop branch
-
-d2=d
-d2[,1:2][d2[,1:2] < 10^-4] = 0
-d2$state = sapply(1:nrow(d2), function(x) {
-  if (d2[x, 1] > 0 & d2[x, 2] > 0) {
-    return("Coexistence")
-  }
-  if (d2[x, 1] > 0 & d2[x, 2] == 0) {
-    return("Stress_tolerant")
-  }
-  if (d2[x, 1] == 0 & d2[x, 2] > 0) {
-    return("Species 2")
-  }
-  if (d2[x, 1] == 0 & d2[x, 2] == 0) {
-    return("Desert")
-  }
-})
-d2=d2[order(d2$Psi2,d2$Stress,d2$alpha_0,d2$Psi1),]
-
-all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
-  if (d2$state[x] != d2$state[x+1]){
-    return(paste0(d2$state[x],"/", d2$state[x+1]))
-  }
-  else {return(d2$state[x])}
-})
-
-d_state=d2%>%
-  filter(., Branches=="Degradation")%>%
-  select(.,-Branches)
-d_state$all_state=all_state
-
-d_state$multistab=sapply(1:nrow(d_state),function(x){
-  if (d_state$all_state[x] %in% c( "Species 2/Stress_tolerant","Species 2/Desert","Coexistence/Desert",
-                               "Stress_tolerant/Species 2","Stress_tolerant/Desert")){
-    return(1)
-  } else {return(0)}
-  
-})
-
-d_final=tibble()
-for (i in unique(d_state$Psi1)){
-  for (j in unique(d_state$Psi2)){
-    for (a0 in c(.3,.4)){#unique(d_state$alpha_0)){
-      d_fil=filter(d_state,Psi1==i,Psi2==j,alpha_0==a0)
-      d_final=rbind(d_final,tibble(Psi1=i,Psi2=j,alpha_0=a0,Frac_multi=sum(d_fil$multistab)/length(which(d_fil$state!="Desert"))))
-    }
-  }
-}
-
-multistability=d_state%>%
-  group_by(., Psi1,Psi2,alpha_0)%>%
-  summarise(., .groups = "keep",frac_multi=sum(multistab)/length(unique(d_state$Stress)))
-
-ggplot(multistability)+
-  geom_tile(aes(x=Psi1,y=Psi2,fill=frac_multi))+
-  facet_wrap(.~alpha_0)+
-  the_theme+
-  scale_fill_viridis_c()
-
-
-ggplot(d_final)+
-  geom_tile(aes(x=Psi1,y=Psi2,fill=Frac_multi))+
-  facet_wrap(.~alpha_0)+
-  the_theme+
-  scale_fill_viridis_c()
-
-
-color_plot=c("Coexistence" = "#D8CC7B",
-             "Species 2" = "#ACD87B",
-             "Coexistence/Species 2" = "#DDEFCA",
-             "Species 2/Coexistence" = "#DDEFCA",
-             "Stress_tolerant" = "#7BD8D3",
-             "Stress_tolerant/Desert" ="#0F8E87",
-             "Desert/Stress_tolerant" ="#0F8E87",
-             "Coexistence/Stress_tolerant"="#9BBBB9",
-             "Stress_tolerant/Coexistence"="#9BBBB9",
-             "Coexistence/Desert"="#C19E5E",
-             "Desert/Coexistence"="#C19E5E",
-             "Desert"=  "#696969",
-             "Stress_tolerant/Species 2" = "#C998CE",
-             "Species 2/Stress_tolerant" = "#C998CE")
-
-pdf("./All_plot.pdf",width = 7,height = 5)
-for (i in unique(d_state$Psi2)){
-  print(d_state%>%
-    filter(., Psi2==i)%>%
-    ggplot(.)+
-    geom_tile(aes(x=Stress,y=Psi1,fill=all_state))+
-    the_theme+
-    facet_wrap(.~alpha_0,labeller = label_bquote(cols = alpha[e]==.(alpha_0)))+
-    scale_fill_manual(values=color_plot)+
-    theme(legend.position = "none")+
-    ggtitle(paste(round(i,3))))
-  
-}
-dev.off()
-
-
-
-
-
-
-
-
-
-
-
-#testing hysteresis size
-
-
-c_inter_seq=c(0,.1,.2,.3,.4)
-stress_seq=seq(0,1,length.out=30)
-
-
-d=tibble()  
-d_bistab=tibble()
-for (stress in stress_seq){
-  
-  for (cinter in c_inter_seq){
-    
-    
-    d2=rbind(read.table(paste0("../Table/2_species/PA/Multistability_PA/Frac_gradient/Test_interspe_comp_",
-                               cinter,"_branch_Degradation_stress_",stress,"_delta_",.1,"_facilitation_",.9,".csv"),sep=";"),
-             read.table(paste0("../Table/2_species/PA/Multistability_PA/Frac_gradient/Test_interspe_comp_",
-                               cinter,"_branch_Restoration_stress_",stress,"_delta_",.1,"_facilitation_",.9,".csv"),sep=";"))
-    d=rbind(d,d2)
-    
-    
-    
-  } # end loop interspecific competition
-} # end loop branch
-d=d[order(d$Branches),]
-d[,1:2][d[,1:2] < 10^-2] = 0
-
-
-d_h=tibble()
-for (a0 in unique(d$alpha_0)){
-  for (p1 in unique(d$Psi1)){
-    for (p2 in unique(d$Psi2)){
-      
-      if (p1>p2){ #as there is a symmetry
-        d_fil=filter(d,Psi1==p1,Psi2==p2,alpha_0==a0)
-        
-        d_h=rbind(d_h,tibble(Psi1=p1,Psi2=p2,alpha_0=a0,
-                             hyst=d_fil$Stress[min(which(d_fil$Competitive[1:26]==0))-1]-
-                               d_fil$Stress[min(which(d_fil$Competitive[27:52]==0))]))
-        
-      }
-    }
-  }
-}
-
-ggplot(d_h)+
-  geom_tile(aes(x=Psi1,y=Psi2,fill=hyst))+
-  facet_wrap(.~alpha_0)+
-  the_theme+
-  scale_fill_viridis_c()
-
-
 
 
 

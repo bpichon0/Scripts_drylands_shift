@@ -17,7 +17,7 @@ color_rho = c("coexistence" = "#D8CC7B", "competitive" = "#ACD87B", "desert" = "
 
 color_rho = c("coexistence" = "#D8CC7B", "competitive" = "#ACD87B", "desert" = "#696969", "stress_tol" = "#7BD8D3")
 color_Nsp=colorRampPalette(c("#077D10",as.character(color_rho[2]),as.character(color_rho[4]),"#2A39EF"))
-
+color_hys=colorRampPalette(c("#C7B6C8", "#74B6BA" ,"#7783C4" ,"#B56D4E", "#F28E47", "#FCE269"))
 #creating folders
 dir.create("../",showWarnings = F)
 dir.create("../Table",showWarnings = F)

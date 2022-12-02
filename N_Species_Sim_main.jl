@@ -140,16 +140,16 @@ CSV.write("../Table/N_species/MF/Number_tipping.csv", Tables.table(d), writehead
 
 #region : testing PA N species 
 
-p = Get_classical_param(N_species=8, type_interaction="classic",
+p = Get_classical_param(N_species=12, type_interaction="classic",
     alpha_0=0.1, scenario_trait="spaced", cintra=0.3, h=1)
-state = Get_initial_state(Nsp=8, type="equal", branch="Degradation", PA=true)
+state = Get_initial_state(Nsp=12, type="equal", branch="Degradation", PA=true)
 p[9] = 0.1
 tspan = (0, 2000)
 prob = ODEProblem(PA_N_species, state, tspan, p)
 sol = solve(prob, Tsit5())
 
 d2 = Reorder_dynamics(sol)
-Plot_dynamics(d=d2, Nsp=8, PA=true)
+Plot_dynamics(d=d2, Nsp=12, PA=true)
 
 
 #endregion

@@ -151,9 +151,9 @@ function Get_initial_state(; Nsp, type, branch, PA=false)
     if PA
 
         with_rho_ii = vcat(vec(frac), vec(frac .* frac))
-        with_rho_i0 = vcat(vec(with_rho_ii), vec(frac[1:Nsp] .* frac[3]))
-        with_rho_0m = vcat(vec(with_rho_i0), frac[4] * frac[3])
-        with_rho_mi = vcat(vec(with_rho_0m), vec(frac[1:Nsp] .* frac[4]))
+        with_rho_i0 = vcat(vec(with_rho_ii), vec(frac[1:Nsp] .* frac[Nsp+1]))
+        with_rho_0m = vcat(vec(with_rho_i0), frac[Nsp+1] * frac[Nsp+2])
+        with_rho_mi = vcat(vec(with_rho_0m), vec(frac[1:Nsp] .* frac[Nsp+2]))
 
         ini_rho_ij = zeros(Nsp, Nsp)
         for i in 1:(Nsp-1)
@@ -222,6 +222,7 @@ function Reorder_dynamics(sol)
 end
 
 function PA_N_species(du, u, p, t)
+
     Nsp = p[1]
     r = p[2]
     d = p[3]
@@ -243,6 +244,7 @@ function PA_N_species(du, u, p, t)
     rho_i0 = u[(2*Nsp+5):(3*Nsp+5)] #The last one being rho_i0
     rho_im = u[(3*Nsp+6):(4*Nsp+5)]
     rho_ij = u[(4*Nsp+6):Int(((Nsp^2 + 7 * Nsp) / 2) + 5)]
+
 
     #rho_i -> OK
     for i in 1:Nsp
@@ -327,13 +329,19 @@ function PA_N_species(du, u, p, t)
         for i in 1:(Nsp-1)
             for j in (i+1):Nsp
 
+                if i == 1
+                    line = 0
+                else
+                    line = sum([Nsp - k for k in 1:(i-1)])
+                end
+
                 species_pairs[i, j] = rho_i0[i] * (delta * rho_i[j] + (1 - delta) * ((z - 1) / z) * (rho_i0[j] / rho_0)) *
                                       (beta * (1 - S * (1 - trait[j] * e)) -
                                        (sum([rho_i[k] * alpha[j, k] for k in 1:(Nsp)]))) + #recruitment j next to i
                                       rho_i0[j] * (delta * rho_i[i] + (1 - delta) * ((z - 1) / z) * (rho_i0[i] / rho_0)) *
                                       (beta * (1 - S * (1 - trait[i] * e)) -
                                        (sum([rho_i[k] * alpha[i, k] for k in 1:(Nsp)]))) - #recruitment j
-                                      2 * m * rho_ij[sum([Nsp - k for k in 1:(i-1)])+abs(j - i)] #mortality. We need to get the index that coresponds to the proper rho_ij in the vector rho_ij
+                                      2 * m * rho_ij[line+abs(j - i)] #mortality. We need to get the index that coresponds to the proper rho_ij in the vector rho_ij
 
             end
         end
@@ -363,146 +371,6 @@ function PA_N_species(du, u, p, t)
     for i in (2*Nsp+5):(3*Nsp+4)
         du[i] = du[i-(2*Nsp+5)+1] - du[(i+Nsp+1)] - du[(i-(Nsp+3)+1)] - sum(species_pairs[i-(2*Nsp+5)+1, :])
     end
-
-
-end
-
-
-function PA_N_species_dict(du, u, p, t)
-
-
-
-
-
-
-    rho_i = u[1:(p["Nsp"])]
-    rho_0 = u[p["Nsp"]+1]
-    rho_m = u[p["Nsp"]+2]
-    rho_ii = u[(p["Nsp"]+3):(2*p["Nsp"]+4)]
-    rho_i0 = u[(2*p["Nsp"]+5):(3*p["Nsp"]+5)] #The last one being rho_i0
-    rho_im = u[(3*p["Nsp"]+6):(4*p["Nsp"]+5)]
-    rho_ij = u[(4*p["Nsp"]+6):Int(((p["Nsp"]^2 + 7 * p["Nsp"]) / 2) + 5)]
-
-    #rho_i -> OK
-    for i in 1:p["Nsp"]
-        du[i] = rho_0 * (p["delta"] * rho_i[i] + (1 - p["delta"]) * (rho_i0[i] / rho_0)) *
-                (p["beta"] * (1 - p["S"] * (1 - p["trait"][i] * p["e"])) -
-                 (sum([rho_i[k] * p["alpha"][i, k] for k in 1:(p["Nsp"])]))) -  #recruitment of plant i
-                rho_i[i] * p["m"] #mortality
-
-    end
-
-    #rho_0 -> OK
-    du[p["Nsp"]+1] = rho_m * (p["r"] + p["f"] * (sum([p["trait"][k] * (rho_im[k] / rho_m) for k in 1:p["Nsp"]]))) - #restoration
-                     p["d"] * rho_0 - #degradation
-                     sum([du[k] for k in 1:p["Nsp"]]) #sum of plant recruitment
-
-    #rho_m -> OK
-    du[p["Nsp"]+2] = p["d"] * rho_0 - #degradation
-                     rho_m * (p["r"] + p["f"] * (sum([p["trait"][k] * (rho_im[k] / rho_m) for k in 1:p["Nsp"]]))) #restoration
-
-
-    #rho_ii -> OK
-    for i in (p["Nsp"]+3):(2*p["Nsp"]+2)
-        du[i] = 2 * rho_i0[i-(p["Nsp"]+2)] * (p["delta"] * rho_i[i-(p["Nsp"]+2)] + ((1 - p["delta"]) / p["z"]) + (1 - p["delta"]) * ((p["z"] - 1) / p["z"]) * (rho_i0[i-(p["Nsp"]+2)] / rho_0)) *
-                (p["beta"] * (1 - p["S"] * (1 - p["trait"][i-(p["Nsp"]+2)] * p["e"])) -
-                 (sum([rho_i[k] * p["alpha"][i-(p["Nsp"]+2), k] for k in 1:(p["Nsp"])]))) - #recruitment
-                2 * p["m"] * rho_ii[i-(p["Nsp"]+2)] #mortality
-    end
-
-    #rho_00 -> OK
-    du[2*p["Nsp"]+3] = 2 * sum([rho_i0[k] * p["m"] for k in 1:p["Nsp"]]) + #plant mortality
-                       2 * rho_i0[p["Nsp"]+1] * (p["r"] + ((p["z"] - 1) / p["z"]) * p["f"] * (sum([p["trait"][k] * (rho_im[k] / rho_m) for k in 1:p["Nsp"]]))) - #restoration from rho_0m
-                       2 * rho_ii[p["Nsp"]+1] * p["d"] - #degradation
-                       2 * sum([rho_ii[p["Nsp"]+1] * ((p["delta"] * rho_i[k] + (1 - p["delta"]) * ((p["z"] - 1) / p["z"]) * (rho_i0[k] / rho_0)) *
-                                                      (p["beta"] * (1 - p["S"] * (1 - p["trait"][k] * p["e"])) -
-                                                       (sum([rho_i[x] * p["alpha"][k, x] for x in 1:(p["Nsp"])])))) for k in 1:p["Nsp"]]) #recruitment, we sum over all species recruitment possibilities
-
-
-    #rho_mm -> OK
-    du[2*p["Nsp"]+4] = 2 * rho_i0[p["Nsp"]+1] * p["d"] -
-                       2 * rho_ii[p["Nsp"]+2] * (p["r"] + ((p["z"] - 1) / p["z"]) * p["f"] * (sum([p["trait"][k] * (rho_im[k] / rho_m) for k in 1:p["Nsp"]])))
-
-
-    # OLD for rho_i0
-    # 2 * rho_ii[p["Nsp"]+1] * ((p["delta"] * rho_i[(i-(2*p["Nsp"]+4))] + (1 - p["delta"]) * ((p["z"] - 1) / p["z"]) * (rho_i0[(i-(2*p["Nsp"]+4))] / rho_0)) *
-    #                                      (p["beta"] * (1 - p["S"] * (1 - p["trait"][(i-(2*p["Nsp"]+4))] * p["e"])) -
-    #                                       (sum([rho_i[x] * p["alpha"][(i-(2*p["Nsp"]+4)), x] for x in 1:(p["Nsp"])])))) + #00 creating i0
-    #            rho_im[i-(2*p["Nsp"]+4)] * (p["r"] + (p["f"] * p["trait"][(i-(2*p["Nsp"]+4))] / p["z"]) + ((p["z"] - 1) / p["z"]) * p["f"] * (sum([p["trait"][k] * (rho_im[k] / rho_m) for k in 1:p["Nsp"]]))) +  # im creating i0
-    #            2 * rho_ii[i-(2*p["Nsp"]+4)] * p["m"] - #ii creating i0
-    #            rho_i0[i-(2*p["Nsp"]+4)] * p["m"] - #i0 creating 00
-    #            rho_i0[i-(2*p["Nsp"]+4)] * p["d"] - #i0 creating im
-    #            rho_i0[i-(2*p["Nsp"]+4)] * ((p["delta"] * rho_i[(i-(2*p["Nsp"]+4))] + ((1 - p["delta"]) / p["z"]) + (1 - p["delta"]) * ((p["z"] - 1) / p["z"]) * (rho_i0[(i-(2*p["Nsp"]+4))] / rho_0)) *
-    #                                        (p["beta"] * (1 - p["S"] * (1 - p["trait"][(i-(2*p["Nsp"]+4))] * p["e"])) -
-    #                                         (sum([rho_i[x] * p["alpha"][(i-(2*p["Nsp"]+4)), x] for x in 1:(p["Nsp"])])))) #i0 creating ii
-
-
-    #rho_m0 -> need rho_mi so the value is fixed after
-    du[3*p["Nsp"]+5] = 1
-
-
-    #rho_mi -> OK
-    for i in (3*p["Nsp"]+6):(4*p["Nsp"]+5)
-
-        du[i] = rho_i0[i-(3*p["Nsp"]+5)] * p["d"] + #degradation
-                rho_i0[p["Nsp"]+1] * (p["delta"] * rho_i[i-(3*p["Nsp"]+5)] + (1 - p["delta"]) * ((p["z"] - 1) / p["z"]) * (rho_i0[i-(3*p["Nsp"]+5)] / rho_0)) *
-                (p["beta"] * (1 - p["S"] * (1 - p["trait"][i-(3*p["Nsp"]+5)] * p["e"])) -
-                 (sum([rho_i[k] * p["alpha"][(i-(3*p["Nsp"]+5)), k] for k in 1:(p["Nsp"])]))) - #recruitment
-                rho_im[i-(3*p["Nsp"]+5)] * p["m"] - #mortality
-                rho_im[i-(3*p["Nsp"]+5)] * (p["r"] + (p["f"] * p["trait"][(i-(3*p["Nsp"]+5))] / p["z"]) + ((p["z"] - 1) / p["z"]) * p["f"] * (sum([p["trait"][k] * (rho_im[k] / rho_m) for k in 1:p["Nsp"]]))) #restoration
-    end
-
-    #now we fix rho_m0
-    du[3*p["Nsp"]+5] = du[p["Nsp"]+2] - sum(du[(3*p["Nsp"]+6):(4*p["Nsp"]+5)]) - du[2*p["Nsp"]+4]#rho_m0 = rho_m - sum_j rho_mj (j species) - rho_mm
-
-
-
-
-
-    #rho_ij species pairs --> OK
-    #We complete the triangular sup of a matrix before turning that into a vector
-    species_pairs = zeros(p["Nsp"], p["Nsp"])
-    if (p["Nsp"] > 2)
-        for i in 1:(p["Nsp"]-1)
-            for j in (i+1):p["Nsp"]
-
-                species_pairs[i, j] = rho_i0[i] * (p["delta"] * rho_i[j] + (1 - p["delta"]) * ((p["z"] - 1) / p["z"]) * (rho_i0[j] / rho_0)) *
-                                      (p["beta"] * (1 - p["S"] * (1 - p["trait"][j] * p["e"])) -
-                                       (sum([rho_i[k] * p["alpha"][j, k] for k in 1:(p["Nsp"])]))) + #recruitment j next to i
-                                      rho_i0[j] * (p["delta"] * rho_i[i] + (1 - p["delta"]) * ((p["z"] - 1) / p["z"]) * (rho_i0[i] / rho_0)) *
-                                      (p["beta"] * (1 - p["S"] * (1 - p["trait"][i] * p["e"])) -
-                                       (sum([rho_i[k] * p["alpha"][i, k] for k in 1:(p["Nsp"])]))) - #recruitment j
-                                      2 * p["m"] * rho_ij[sum([p["Nsp"] - k for k in 1:(i-1)])+abs(j - i)] #mortality. We need to get the index that coresponds to the proper rho_ij in the vector rho_ij
-
-            end
-        end
-
-    else
-        for i in 1:(p["Nsp"]-1)
-            for j in (i+1):p["Nsp"]
-
-                species_pairs[i, j] = rho_i0[i] * (p["delta"] * rho_i[j] + (1 - p["delta"]) * ((p["z"] - 1) / p["z"]) * (rho_i0[j] / rho_0)) *
-                                      (p["beta"] * (1 - p["S"] * (1 - p["trait"][j] * p["e"])) -
-                                       (sum([rho_i[k] * p["alpha"][j, k] for k in 1:(p["Nsp"])]))) + #recruitment j next to i
-                                      rho_i0[j] * (p["delta"] * rho_i[i] + (1 - p["delta"]) * ((p["z"] - 1) / p["z"]) * (rho_i0[i] / rho_0)) *
-                                      (p["beta"] * (1 - p["S"] * (1 - p["trait"][i] * p["e"])) -
-                                       (sum([rho_i[k] * p["alpha"][i, k] for k in 1:(p["Nsp"])]))) - #recruitment i next to i
-                                      2 * rho_ij[1] * p["m"] #mortality. We need to get the index that coresponds to the proper rho_ij in the vector rho_ij
-
-            end
-        end
-    end
-
-    species_pairs += transpose(species_pairs)
-
-    du[(4*p["Nsp"]+6):Int(((p["Nsp"]^2 + 7 * p["Nsp"]) / 2) + 5)] = transpose(species_pairs)[tril!(trues(size(species_pairs)), -1)] #to get triangular sup matrix
-
-
-    #rho_i0 = rho_i - rho_mi - rho_ii
-    for i in (2*p["Nsp"]+5):(3*p["Nsp"]+4)
-        du[i] = du[i-(2*p["Nsp"]+5)+1] - du[(i+p["Nsp"]+1)] - du[(i-(p["Nsp"]+3)+1)] - sum(species_pairs[i-(2*p["Nsp"]+5)+1, :])
-    end
-
 
 end
 

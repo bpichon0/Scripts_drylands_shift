@@ -1294,6 +1294,236 @@ p=ggplot(NULL) +
   the_theme+theme(strip.text.x = element_text(size=12),legend.text = element_text(size=9))
 ggsave("../Figures/Final_figs/SI/Comparizon_CA_PA.pdf",p,width = 7,height = 6)
 
+## Threshold for invasion ----
+
+tspan = c(0, 2000) #to avoid long transient
+t = seq(0, 2000, by = 1)
+julia_library("DifferentialEquations")
+julia_assign("tspan", tspan)
+N_rep = 100
+S_seq = seq(0,1,length.out=1000)
+alpha_seq = c(.2)
+f_seq=.9
+delta_seq=seq(0,1,length.out=10)
+cintra_seq=c(.3)
+
+
+name_scena=c("global_C_global_F","global_C_local_F")
+
+d_invade=tibble() #initializing the tibble
+
+for (scena_ID in 1:2){ #for each scenario of species pairs
+  
+  for (disp in delta_seq){ #varying dispersal scale
+    
+    for (aii in cintra_seq){ #varying intraspecific competition strength
+      
+      for (f in f_seq){ #varying facilitation strength
+        
+        for (alpha0 in alpha_seq) { #varying competition
+          
+          
+          #Setting the parameters
+          param=Get_PA_parameters()
+          param["cintra"]=aii
+          param["f"]=f
+          param["delta"]=disp
+          param["alpha_0"]=alpha0
+          
+          
+          state=Get_PA_initial_state(ini =c(.05,.05,.49))
+          julia_assign("state", state)
+          
+          #varying the global interspecific competition
+          
+          d2 = tibble()
+          
+          for (S in S_seq) { #varying the stress 
+            
+            param["S"] = S
+            param["alpha_0"] = alpha0
+            julia_assign("p", param)
+            
+            if (scena_ID==1){  #global C, global F
+              
+              julia_assign("p", param)
+              prob = julia_eval("ODEProblem(PA_two_species_global_C_global_F, state, tspan, p)")
+              
+            }else if (scena_ID==2){ #global C, local F
+              
+              julia_assign("p", param)
+              prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F, state, tspan, p)")
+              
+            }
+            
+            sol = de$solve(prob, de$Tsit5(), saveat = t)
+            d = as.data.frame(t(sapply(sol$u, identity)))
+            
+            colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
+            
+            d2 = rbind(d2, d[nrow(d),] %>% add_column(S = S, alpha_0=alpha0))
+            
+          }
+          d2[d2 < 10^-4] = 0
+          colnames(d2) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm", "S", "alpha_0")
+          d2$rho_plus = d2$rho_1 + d2$rho_2
+          
+          
+          
+          d_invade=rbind(d_invade,tibble(
+            Thresh_invasion=max(d2$S[which((d2$rho_1)>0)]),
+            alpha_0 = alpha0,
+            f=f,delta=disp,Scena=scena_ID,
+            cintra=aii
+          ))
+          
+          
+        } #end competition loop
+        
+      } #end facilitation loop
+      
+    } #end h loop
+    
+  } #end dispersal loop
+  
+} #end scenario loop
+
+p=ggplot(d_invade%>%
+           mutate(., Scena=recode_factor(Scena,'1'="Global facilitation",'2'="Local facilitation")))+
+  geom_point(aes(x=delta,y=Thresh_invasion,shape=Scena),size=3)+
+  geom_line(aes(x=delta,y=Thresh_invasion,group=Scena))+
+  labs(x=TeX("$\\delta$"),y="Threshold of stress for invasion \n of a desert state",shape="")+
+  scale_shape_manual(values = c(0,8))+the_theme+
+  theme(legend.text = element_text(size=12))
+
+ggsave("../Figures/Final_figs/SI/Threshold_invasion.pdf",width = 7,height = 4)
+
+
+
+
+## Restoration trajectory trait----
+
+c_inter_seq=c(0,.1, .2, .3)
+psi1_seq=c(1,0)
+
+f=.9;disp=.1
+for (Psi_sp1 in psi1_seq){
+  d=tibble()  
+  
+  for (branch in c("Restoration","Degradation")){
+    for (cinter in c_inter_seq){
+      
+      d2=read.table(paste0("../Table/2_species/PA/Multistability_PA/Varying_traits/Multistability_varying_trait_interspe_comp_",
+                           cinter,"_branch_",branch,
+                           "_Psi1_",Psi_sp1,"_delta_",disp,"_facilitation_",f,".csv"),sep=";")
+      d=rbind(d,d2)
+      
+    } # end loop interspecific competition
+  } # end loop branch
+  
+  
+  d[,1:2][d[,1:2] < 10^-4] = 0
+  #COmputing CSI index
+  set.seed(123)
+  u=runif(2)
+  d$CSI = sapply(1:nrow(d),function(x){
+    return(u[1]*d$Stress_tolerant[x]+u[2]*d$Competitive[x])
+  })
+  
+  if (Psi_sp1 ==1) {
+    
+    d2=filter(d,Psi1==Psi_sp1)
+    
+    
+    #Restoration and degradation points
+    d_tipping=tibble()
+    for (a0 in unique(d2$alpha_0)){
+      for (psi in unique(d2$Psi2)){
+        for (direction in "Restoration"){
+          
+          d_a0=filter(d2,alpha_0==a0,Psi2==psi,Branches==direction)
+          
+          if (direction=="Restoration") d_a0=d_a0[order(d_a0$Stress,decreasing = T),]
+          
+          density_C=d_a0$Competitive
+          stress_C=stress_ST=d_a0$Stress
+          
+          if (direction=="Restoration"){ #initially absent
+            
+            stress_C=stress_C[-c(1:min(which(abs(diff(density_C))>0)))]
+            density_C=density_C[-c(1:min(which(abs(diff(density_C))>0)))]
+            Tipping_C = stress_C[1]
+            
+          } else{
+            
+            Tipping_C = stress_C[min(which(density_C==0))-1]
+            
+          }
+          
+          d_tipping=rbind(d_tipping,tibble(Competition=a0,Psi2=psi,Branch=direction,
+                                           Tipping = Tipping_C,Psi1=1))
+          
+        }
+      }
+    }
+    
+
+  } 
+  if (Psi_sp1==0){
+    
+    
+    d2=filter(d,Psi1==Psi_sp1)
+    
+    
+    
+    #Restoration and degradation points
+    for (a0 in unique(d2$alpha_0)){
+      for (psi in unique(d2$Psi2)){
+        for (direction in "Restoration"){
+          
+          d_a0=filter(d2,alpha_0==a0,Psi2==psi,Branches==direction)
+          
+          if (direction=="Restoration") d_a0=d_a0[order(d_a0$Stress,decreasing = T),]
+          
+          density_ST=d_a0$Stress_tolerant
+          stress_ST=stress_ST=d_a0$Stress
+          
+          if (direction=="Restoration"){ #initially absent
+            
+            stress_ST=stress_ST[-c(1:min(which(abs(diff(density_ST))>0)))]
+            density_ST=density_ST[-c(1:min(which(abs(diff(density_ST))>0)))]
+            Tipping_ST = stress_ST[1]
+            
+          } else{
+            
+            Tipping_ST = stress_ST[min(which(density_ST==0))-1]
+            
+          }
+          
+          d_tipping=rbind(d_tipping,tibble(Competition=a0,Psi2=psi,Branch=direction,
+                                           Tipping = Tipping_ST,Psi1=0))
+          
+        }
+      }
+    }
+    
+  }
+}
+
+
+p2=ggplot(d_tipping %>%filter(., Competition==.3))+
+  geom_smooth(aes(x=Psi2,y=Tipping,color=as.factor(Psi1),group=interaction(Competition,Branch,Psi1)),se = F)+
+  the_theme+
+  labs(x=TeX(r'($\psi_2)'),y="Threshold stress",color=TeX(r'($\psi_1)'))+
+  scale_color_manual(values=c("black","blue"))
+
+
+p_tot=ggarrange(p1+theme(legend.position = "none",strip.text.x = element_text(size=13))+ggtitle(TeX("$\\psi_1 = 1$")),
+                p2+ggtitle(TeX("$\\psi_2 = 0$"))+theme(strip.background.x = element_blank(),
+                                                       strip.text.x = element_blank()),nrow=2,labels = letters[1:2])
+
+ggsave("../Figures/Final_figs/Figure_4.pdf",p_tot,width = 7,height = 7)
+
 
 # N-species ----
 ## Species specific tipping points ----
