@@ -230,903 +230,17 @@ p_bottom=ggarrange(ggplot()+theme_void(), p2_1+ylab("Cover")+guides(color="none"
                    p2_3+ylab("Cover")+guides(color="none",fill="none"),ggplot()+theme_void(),
                    common.legend = T,legend = "bottom",ncol = 4,align="hv",labels=c("",letters[2],letters[3],""),widths = c(.3,1,1,.3))
 
-Fig_2=ggarrange(p1,p_bottom,nrow=2,heights = c(3,1),labels = c(letters[1],""))
+Fig_2=ggarrange(p1,p_bottom,nrow=2,heights = c(3,1.3),labels = c(letters[1],""))
 
-ggsave("../Figures/Final_figs/Figure_2.pdf",Fig_2,width = 9,height = 9)
-
-
-Fig_2=ggarrange(p1_pattern+guides(pattern=F),p_bottom,nrow=2,heights = c(3,1),labels = c(letters[1],""))
-
-ggsave("../Figures/Final_figs/Figure_2_pattern.pdf",Fig_2,width = 9,height = 9)
+ggsave("../Figures/Final_figs/Figure_2.pdf",Fig_2,width = 9,height = 10)
 
 
-# Figure 3: Trait variation and multistability ----
+Fig_2=ggarrange(p1_pattern+guides(pattern=F),p_bottom,nrow=2,heights = c(3,1.3),labels = c(letters[1],""))
 
-c_inter_seq=c(.1,.2, .3)
-psi1_seq=c(1,0)
-disp=.1
-f=0.9
-
-d=tibble()  
-for (Psi_sp1 in c(0,1)){
-  for (branch in c("Restoration","Degradation")){
-    for (cinter in c_inter_seq){
-      
-      d2=read.table(paste0("../Table/2_species/PA/Multistability_PA/Varying_traits/Multistability_varying_trait_interspe_comp_",
-                           cinter,"_branch_",branch,
-                           "_Psi1_",Psi_sp1,"_delta_",disp,"_facilitation_",f,".csv"),sep=";")
-      
-      d=rbind(d,d2)
-      
-    } # end loop interspecific competition
-  } # end loop branch
-}
+ggsave("../Figures/Final_figs/Figure_2_pattern.pdf",Fig_2,width = 9,height = 10)
 
 
-
-d[,1:2][d[,1:2] < 10^-3] = 0
-
-
-#COmputing CSI index
-set.seed(123)
-u=runif(2)
-d$CSI = sapply(1:nrow(d),function(x){
-  return(u[1]*d$Stress_tolerant[x]+u[2]*d$Competitive[x])
-})
-
-
-for (Psi_sp1 in c(0,1)){
-
-  if (Psi_sp1 ==1) {
-    
-    d2=filter(d,Psi1==1)
-    
-    
-    d2$state = sapply(1:nrow(d2), function(x) {
-      if (d2[x, 1] > 0 & d2[x, 2] > 0) {
-        return("Coexistence")
-      }
-      if (d2[x, 1] > 0 & d2[x, 2] == 0) {
-        return("Stress_tolerant")
-      }
-      if (d2[x, 1] == 0 & d2[x, 2] > 0) {
-        return("Species 2")
-      }
-      if (d2[x, 1] == 0 & d2[x, 2] == 0) {
-        return("Desert")
-      }
-    })
-    
-    d2=d2[order(d2$Psi2,d2$Stress,d2$alpha_0,d2$Psi1),]
-    
-    all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
-      if (d2$state[x] != d2$state[x+1]){
-        return(paste0(d2$state[x],"/", d2$state[x+1]))
-      }
-      else {return(d2$state[x])}
-    })
-    
-    d_state=d2%>%
-      filter(., Branches=="Degradation")%>%
-      select(.,-Branches)
-    d_state$all_state=all_state
-    
-    
-    color_rho = c("Coexistence" = "#D8CC7B", "Competitive" = "#ACD87B", "Desert" = "#696969", "Stress_tolerant" = "#7BD8D3")
-    
-    appender <- function(string) {
-      TeX(paste("$\\alpha_e = $", string))}
-    
-    
-    d_state$Multistability=sapply(1:nrow(d_state),function(x){
-      if (d_state$all_state[x] %in% c("Species 2","Coexistence","Desert","Stress_tolerant")){
-        return("no_multi")
-      } else{
-        return("multi")
-      }
-    })
-    
-    d_state=d_state%>%
-      mutate(all_state=recode_factor(all_state,
-                                     "Species 2/Coexistence"="Coexistence/Competitive",
-                                     "Desert/Species 2"="Competitive/Desert",
-                                     "Desert/Coexistence"="Coexistence/Desert",
-                                     "Stress_tolerant"="Stress-tolerant",
-                                     "Desert/Stress_tolerant"="Stress-tolerant/Desert",
-                                     "Stress_tolerant/Coexistence"="Coexistence/Stress-tolerant",
-                                     "Stress_tolerant/Species 2"="Competitive/Stress-tolerant",
-                                     "Species 2/Coexistence"="Coexistence/Competitive",
-                                     "Coexistence/Species 2"="Coexistence/Competitive",
-                                     "Species 2" = "Competitive"))
-      
-    color_multistability=c("Coexistence" = "#D8CC7B",
-                           "Competitive" = "#ACD87B",
-                           "Coexistence/Competitive" = "#DDEFCA",
-                           "Stress-tolerant" = "#7BD8D3",
-                           "Stress-tolerant/Desert" ="#0F8E87",
-                           "Coexistence/Stress-tolerant"="#9BBBB9",
-                           "Coexistence/Desert"="#C19E5E",
-                           "Desert"=  "#696969",
-                           "Competitive/Stress-tolerant" = "#C998CE")
-    #State multistability
-    p1=ggplot(d_state) +
-      geom_tile(aes(x=Stress,y=as.numeric(Psi2),fill=all_state))+
-      theme_classic() +
-      theme(legend.position = "bottom") +
-      labs(x = TeX(r'(Stress, \ $S)'), y = TeX(r'(Trait competitive sp., \ $\psi_2)'), fill = "") +
-      theme(legend.text = element_text(size = 11))+
-      scale_fill_manual(values=color_multistability)+
-      facet_grid(.~alpha_0,labeller=label_bquote(cols = alpha[e] == .(alpha_0)))+
-      the_theme+theme(legend.text = element_text(size=9),strip.text.x = element_text(size=13))+
-      geom_hline(data=tibble(alpha_0=.2,y=c(.75)),aes(yintercept=y))+
-      geom_text(data= tibble(alpha_0=.2,y=c(.8),x=1.05,labels=c("c")), 
-                aes(x=x, y=y,label=labels), alpha=1, colour="black")
-      
-    
-    #State multistability same but with patterns
-    
-    p1_pattern=ggplot(d_state) +
-      geom_tile_pattern(aes(x=Stress,y=as.numeric(Psi2),fill=all_state,pattern=Multistability),
-                        colour          = 'transparent',
-                        pattern_spacing = 0.05, 
-                        pattern_density = 0.01, 
-                        pattern_fill    = "gray20",
-                        pattern_colour  = "gray20")+
-      theme_classic() +
-      theme(legend.position = "bottom") +
-      labs(x = TeX(r'(Stress, \ $S)'), y = TeX(r'(Trait competitive sp., \ $\psi_2)'), fill = "") +
-      theme(legend.text = element_text(size = 11))+
-      scale_fill_manual(values=color_multistability)+
-      facet_grid(.~alpha_0,labeller=label_bquote(cols = alpha[e] == .(alpha_0)))+
-      the_theme+theme(legend.text = element_text(size=9),strip.text.x = element_text(size=13))+
-      geom_hline(data=tibble(alpha_0=.2,y=c(.8)),aes(yintercept=y))+
-      geom_text(data= tibble(alpha_0=.2,y=c(.85),x=1.05,labels=c("c")), 
-                aes(x=x, y=y,label=labels), alpha=1, colour="black")+
-      scale_pattern_manual(values=rev(c("none" ,"stripe")))
-
-    
-    #Bifurcation diagram
-    
-    p2_1=ggplot(d2%>%melt(., measure.vars=c("Stress_tolerant","Competitive"))%>%
-               filter(., Psi2 %in% unique(d_state$Psi2)[c(80)])%>%
-               mutate(Psi2=round(abs(Psi2),2))%>%
-               filter(., alpha_0==.2))+
-      geom_line(aes(x = Stress, y = value, color = variable,linetype=Branches),lwd=.8) +
-      labs(x = TeX(r'(Stress, \ $S)'), y = "Cover", color = "",linetype="") +
-      the_theme +
-      scale_color_manual(values = color_rho[c(2, 4)],labels=c("Species 2","Stress-tolerant")) +
-      scale_linetype_manual(values=c(1,9))+guides(color=F)+
-      theme(axis.text.x = element_text(size = 9),axis.text.y = element_text(size = 9),strip.text.y = element_text(size=9))+
-      new_scale_color() +
-      geom_point(data=d_state%>%
-                   filter(., Psi2==unique(d_state$Psi2)[c(80)],alpha_0==.2)%>%
-                   mutate(., y=.83),
-                 aes(x=Stress,y=y,fill=all_state,color=all_state),alpha=.5,shape=22,size=3)+
-      scale_fill_manual(values=color_multistability)+
-      scale_color_manual(values=color_multistability)
-    
-    
-    
-    #Community index
-    p2_2=ggplot(d2%>%
-                 filter(., Psi2 %in% unique(d_state$Psi2)[c(80)])%>%
-                 mutate(Psi2=round(abs(Psi2),2))%>%
-                 filter(., alpha_0==.2))+
-      geom_line(aes(x = Stress, y = CSI,linetype=Branches)) +
-      labs(x = TeX(r'(Stress, \ $S)'), y = "Community index", color = "",linetype="") +
-      the_theme +
-      theme(axis.text.x = element_text(size = 9),
-            axis.text.y = element_text(size = 9),
-            strip.text.y = element_text(size=9))+
-      new_scale_color() +
-      geom_point(data=d_state%>%
-                   filter(., Psi2==unique(d_state$Psi2)[c(80)],alpha_0==.2)%>%
-                   mutate(., y=.65),
-                 aes(x=Stress,y=y,fill=all_state,color=all_state),alpha=.5,shape=22,size=3)+
-      scale_fill_manual(values=color_multistability)+
-      scale_color_manual(values=color_multistability)
-    
-    
-  
-    
-    
-    
-    
-    
-  } 
-  if (Psi_sp1==0){
-    
-    d2=filter(d,Psi1==0)
-    
-    
-    d2$state = sapply(1:nrow(d2), function(x) {
-      if (d2[x, 1] > 0 & d2[x, 2] > 0) {
-        return("Coexistence")
-      }
-      if (d2[x, 1] > 0 & d2[x, 2] == 0) {
-        return("Competitive")
-      }
-      if (d2[x, 1] == 0 & d2[x, 2] > 0) {
-        return("Species 2")
-      }
-      if (d2[x, 1] == 0 & d2[x, 2] == 0) {
-        return("Desert")
-      }
-    })
-    
-    d2=d2[order(d2$Psi2,d2$Stress,d2$alpha_0,d2$Psi1),]
-    
-    all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
-      if (d2$state[x] != d2$state[x+1]){
-        return(paste0(d2$state[x],"/", d2$state[x+1]))
-      }
-      else {return(d2$state[x])}
-    })
-    
-    d_state=d2%>%
-      filter(., Branches=="Degradation")%>%
-      select(.,-Branches)
-    d_state$all_state=all_state
-    
-    
-    color_rho = c("Coexistence" = "#D8CC7B", "Competitive" = "#ACD87B", "Desert" = "#696969", "Stress_tolerant" = "#7BD8D3")
-    
-    appender <- function(string) {
-      TeX(paste("$\\alpha_e = $", string))}
-    
-    
-    d_state$Multistability=sapply(1:nrow(d_state),function(x){
-      if (d_state$all_state[x] %in% c("Species 2","Coexistence","Desert","Competitive")){
-        return("no_multi")
-      } else{
-        return("multi")
-      }
-    })
-    
-    d_state=d_state%>%
-      mutate(all_state=recode_factor(all_state,
-                                     "Species 2/Coexistence"="Coexistence/Stress-tolerant",
-                                     "Desert/Species 2"="Stress-tolerant/Desert",
-                                     "Desert/Coexistence"="Coexistence/Desert",
-                                     "Desert/Competitive"="Competitive/Desert",
-                                     "Species 2" = "Stress-tolerant",
-                                     "Competitive/Coexistence" = "Coexistence/Competitive"))
-                                     
-    
-    color_multistability=c("Coexistence" = "#D8CC7B",
-                           "Stress-tolerant" = "#7BD8D3",
-                           "Coexistence/Stress-tolerant" = "#9BBBB9",
-                           "Stress-tolerant/Desert" ="#0F8E87",
-                           "Coexistence/Desert"="#C19E5E",
-                           "Desert"=  "#696969")
-    p2=ggplot(d_state%>%
-                mutate(.,Psi2=round(Psi2,5),
-                Stress=round(Stress,5))) +
-      geom_tile(aes(x=Stress,y=abs(as.numeric(Psi2)),fill=all_state))+
-      theme_classic() +
-      theme(legend.position = "bottom") +
-      labs(x = TeX(r'(Stress, \ $S)'), y = TeX(r'(Trait stress-tolerant sp., \ $\psi_1)'), fill = "") +
-      theme(legend.text = element_text(size = 11))+
-      scale_fill_manual(values=color_multistability)+
-      facet_grid(.~alpha_0,labeller=label_bquote(cols = alpha[e] == .(alpha_0)))+
-      the_theme+theme(legend.text = element_text(size=9),strip.text.x = element_text(size=13))+
-      geom_hline(data=tibble(alpha_0=.3,y=c(.5)),aes(yintercept=y))+
-      geom_text(data= tibble(alpha_0=.3,y=c(0.55),x=1.05,labels=c("d")), 
-                aes(x=x, y=y,label=labels), alpha=1, colour="black")
-    
-    
-    p2_pattern=ggplot(d_state%>%
-                mutate(Psi2=round(Psi2,5),Stress=round(Stress,5))) +
-      geom_tile_pattern(aes(x=Stress,y=as.numeric(Psi2),fill=all_state,pattern=Multistability),
-                        colour          = 'transparent',
-                        pattern_spacing = 0.05, 
-                        pattern_density = 0.01, 
-                        pattern_fill    = "gray20",
-                        pattern_colour  = "gray20")+
-      theme_classic() +
-      theme(legend.position = "bottom") +
-      labs(x = TeX(r'(Stress, \ $S)'), y = TeX(r'(Trait stress-tolerant sp., \ $\psi_1)'), fill = "") +
-      theme(legend.text = element_text(size = 11))+
-      scale_fill_manual(values=color_multistability)+
-      facet_grid(.~alpha_0,labeller=label_bquote(cols = alpha[e] == .(alpha_0)))+
-      the_theme+theme(legend.text = element_text(size=9),strip.text.x = element_text(size=13))+
-      geom_hline(data=tibble(alpha_0=.3,y=c(.5)),aes(yintercept=y))+
-      geom_text(data= tibble(alpha_0=.3,y=c(0.55),x=1.05,labels=c("d")), 
-                aes(x=x, y=y,label=labels), alpha=1, colour="black")+
-      scale_pattern_manual(values=rev(c("none" ,"stripe")))
-
-    
-    
-    
-    #Bifurcation diagrams
-    d2t=transform(d2,
-                  alpha_0 = factor(alpha_0, levels=c(0.1,.2,.3), labels=c("alpha[e] : 0", "alpha[e] : 0.1",
-                                                                          "alpha[e] == 0.5")),
-                  Psi2=factor(Psi2,levels=unique(d_state$Psi2)[c(1,75,100)],
-                              labels=c("|psi[1] - psi[2]|","Stress-tolerant","Competitive")))
-    
-    
-    p2_3=ggplot(d2%>%melt(., measure.vars=c("Stress_tolerant","Competitive"))%>%
-               filter(., Psi2 %in% unique(d_state$Psi2)[c(50)])%>%
-               mutate(Psi2=round(abs(Psi1-Psi2),2))%>%
-               filter(., alpha_0==.3))+
-      geom_line(aes(x = Stress, y = value, color = variable,linetype=Branches),lwd=.8) +
-      labs(x = TeX(r'(Stress, \ $S)'), y = "Cover", color = "",linetype="") +
-      the_theme +
-      scale_color_manual(values = (as.character(color_rho[c(2, 4)])),labels=c("Competitive","Species 2")) +
-      scale_linetype_manual(values=c(1,9))+guides(color=F)+
-      theme(axis.text.x = element_text(size = 9),axis.text.y = element_text(size = 9),strip.text.y = element_text(size=9))+
-      new_scale_color() +
-      geom_point(data=d_state%>%
-                   filter(., Psi2==unique(d_state$Psi2)[c(50)],alpha_0==.3)%>%
-                   mutate(., y=.80),
-                 aes(x=Stress,y=y,fill=all_state,color=all_state),alpha=.5,shape=22,size=3)+
-      scale_fill_manual(values=color_multistability)+
-      scale_color_manual(values=color_multistability)
-    
-    
-    
-    
-    
-    
-    #COmmunity index
-    p2_4=ggplot(d2%>%
-               filter(., Psi2 %in% unique(d2$Psi2)[c(50)])%>%
-               mutate(Psi2=round(abs(Psi1-Psi2),2))%>%
-               filter(., alpha_0==.3))+
-      geom_line(aes(x = Stress, y = CSI,linetype=Branches)) +
-      labs(x = TeX(r'(Stress, \ $S)'), y = "Community index", color = "",linetype="") +
-      the_theme +
-      theme(axis.text.x = element_text(size = 9),axis.text.y = element_text(size = 9),strip.text.y = element_text(size=9))+
-      new_scale_color() +
-      geom_point(data=d_state%>%
-                   filter(., Psi2==unique(d_state$Psi2)[c(50)],alpha_0==.3)%>%
-                   mutate(., y=.62),
-                 aes(x=Stress,y=y,fill=all_state,color=all_state),alpha=.5,shape=22,size=3)+
-      scale_fill_manual(values=color_multistability)+
-      scale_color_manual(values=color_multistability)
-    
-    
-    
-  }
-}
-
-Figure_3_top=ggarrange(p1+theme(axis.text.x = element_blank(),axis.title.x = element_blank(),
-                            axis.line.x = element_blank(),
-                            axis.ticks.x = element_blank(),axis.title.y.right = element_text(size = 11))+
-            scale_y_continuous(sec.axis = sec_axis(trans = ~ (1-.x) ,
-                                                   name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)') ))+
-              ggtitle(TeX(r'(Stress-tolerant sp., $\psi_1 = 1$)')),
-          p2+theme(strip.background.x = element_blank(),strip.text.x = element_blank(),axis.title.y.right = element_text(size = 11))+
-            scale_y_continuous(sec.axis = sec_axis(trans = ~ .x ,
-                                                   name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)') ))+
-            ggtitle(TeX(r'(Competitive sp., $\psi_2 = 0$)')),
-          common.legend = T,legend = "bottom",nrow=2,labels = letters[1:2])
-
-Figure_3_bottom=ggarrange(p2_1+guides(color="none",fill="none")+theme(legend.position = "none"),
-                          p2_2+guides(color="none",fill="none"),
-                          p2_3+guides(color="none",fill="none")+theme(legend.position = "none"),
-                          p2_4+guides(color="none",fill="none"),
-                          ncol=4,labels = c(letters[3],"",letters[4],""),common.legend = T,legend = "bottom")
-
-Figure_3_tot=ggarrange(Figure_3_top,Figure_3_bottom,nrow=2,heights = c(3,1))
-
-ggsave("../Figures/Final_figs/Figure_3.pdf",Figure_3_tot,width = 9,height = 9)
-
-
-#same but with patterns
-Figure_3_top=ggarrange(p1_pattern+guides(pattern=F)+theme(axis.text.x = element_blank(),axis.title.x = element_blank(),
-                                axis.line.x = element_blank(),
-                                axis.ticks.x = element_blank(),axis.title.y.right = element_text(size = 11))+
-                         scale_y_continuous(sec.axis = sec_axis(trans = ~ (1-.x) ,
-                                                                name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)') ))+
-                         ggtitle(TeX(r'(Stress-tolerant sp., $\psi_1 = 1$)')),
-                       p2_pattern+guides(pattern=F)+theme(strip.background.x = element_blank(),strip.text.x = element_blank(),axis.title.y.right = element_text(size = 11))+
-                         scale_y_continuous(sec.axis = sec_axis(trans = ~ .x ,
-                                                                name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)') ))+
-                         ggtitle(TeX(r'(Competitive sp., $\psi_2 = 0$)')),
-                       common.legend = T,legend = "bottom",nrow=2,labels = letters[1:2])
-
-Figure_3_tot=ggarrange(Figure_3_top,Figure_3_bottom,nrow=2,heights = c(3,1))
-
-ggsave("../Figures/Final_figs/Figure_3_pattern.pdf",Figure_3_tot,width = 9,height = 9)
-
-
-# Figure 4: Position of tipping points ----
-
-c_inter_seq=c(0,.1, .2, .3)
-psi1_seq=c(1,0)
-
-f=.9;disp=.1
-for (Psi_sp1 in psi1_seq){
-  d=tibble()  
-  
-  for (branch in c("Restoration","Degradation")){
-    for (cinter in c_inter_seq){
-      
-      d2=read.table(paste0("../Table/2_species/PA/Multistability_PA/Varying_traits/Multistability_varying_trait_interspe_comp_",
-                           cinter,"_branch_",branch,
-                           "_Psi1_",Psi_sp1,"_delta_",disp,"_facilitation_",f,".csv"),sep=";")
-      d=rbind(d,d2)
-      
-    } # end loop interspecific competition
-  } # end loop branch
-  
-
-  d[,1:2][d[,1:2] < 10^-4] = 0
-  #COmputing CSI index
-  set.seed(123)
-  u=runif(2)
-  d$CSI = sapply(1:nrow(d),function(x){
-    return(u[1]*d$Stress_tolerant[x]+u[2]*d$Competitive[x])
-  })
-
-  if (Psi_sp1 ==1) {
-    
-    d2=filter(d,Psi1==Psi_sp1)
-    
-    
-    #Restoration and degradation points
-    d_tipping=tibble()
-    for (a0 in unique(d2$alpha_0)){
-      for (psi in unique(d2$Psi2)){
-        for (direction in unique(d2$Branches)){
-          
-          d_a0=filter(d2,alpha_0==a0,Psi2==psi,Branches==direction)
-          
-          if (direction=="Restoration") d_a0=d_a0[order(d_a0$Stress,decreasing = T),]
-          
-          density_C=d_a0$Competitive
-          stress_C=stress_ST=d_a0$Stress
-          
-          if (direction=="Restoration"){ #initially absent
-            
-            stress_C=stress_C[-c(1:min(which(abs(diff(density_C))>0)))]
-            density_C=density_C[-c(1:min(which(abs(diff(density_C))>0)))]
-            Tipping_C = stress_C[1]
-            
-          } else{
-            
-            Tipping_C = stress_C[min(which(density_C==0))-1]
-            
-          }
-          
-          d_tipping=rbind(d_tipping,tibble(Competition=a0,Psi2=psi,Branch=direction,
-                                           Tipping_C = Tipping_C))
-          
-        }
-      }
-    }
-    
-    p1=ggplot(d_tipping)+
-      geom_smooth(aes(x=Psi2,y=Tipping_C,color=Branch,group=interaction(Competition,Branch)),se = F)+
-      the_theme+facet_grid(.~Competition,labeller = label_bquote(cols=alpha[e]==.(Competition)))+
-      labs(x=TeX(r'(Trait competitive sp., \ $\psi_2)'),y="Threshold stress",color="")+
-      scale_color_manual(values=c("black","blue"))+
-      scale_x_continuous(sec.axis = sec_axis(trans = ~ (1-.x) ,
-                                             name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)'),
-                                             breaks = c(0,.25,.5,.75,1),labels = c("0","0.25","0.5","0.75","1")),
-                         breaks = c(0,.25,.5,.75,1),labels = c("0","0.25","0.5","0.75","1"))
-
-  } 
-  if (Psi_sp1==0){
-    
-    
-    d2=filter(d,Psi1==Psi_sp1)
-    
-    
-    
-    #Restoration and degradation points
-    d_tipping=tibble()
-    for (a0 in unique(d2$alpha_0)){
-      for (psi in unique(d2$Psi2)){
-        for (direction in unique(d2$Branches)){
-          
-          d_a0=filter(d2,alpha_0==a0,Psi2==psi,Branches==direction)
-          
-          if (direction=="Restoration") d_a0=d_a0[order(d_a0$Stress,decreasing = T),]
-          
-          density_ST=d_a0$Stress_tolerant
-          stress_ST=stress_ST=d_a0$Stress
-          
-          if (direction=="Restoration"){ #initially absent
-            
-            stress_ST=stress_ST[-c(1:min(which(abs(diff(density_ST))>0)))]
-            density_ST=density_ST[-c(1:min(which(abs(diff(density_ST))>0)))]
-            Tipping_ST = stress_ST[1]
-            
-          } else{
-            
-            Tipping_ST = stress_ST[min(which(density_ST==0))-1]
-            
-          }
-          
-          d_tipping=rbind(d_tipping,tibble(Competition=a0,Psi2=psi,Branch=direction,
-                                           Tipping_ST = Tipping_ST))
-          
-        }
-      }
-    }
-    
-    p2=ggplot(d_tipping)+
-      geom_smooth(aes(x=Psi2,y=Tipping_ST,color=Branch,group=interaction(Competition,Branch)),se = F)+
-      the_theme+facet_grid(.~Competition,labeller = label_bquote(cols=alpha[e]==.(Competition)))+
-      labs(x=TeX(r'(Trait stress-tolerant sp., \ $\psi_1)'),y="Threshold stress",color="")+
-      scale_color_manual(values=c("black","blue"))+
-      scale_x_continuous(sec.axis = sec_axis(trans = ~ (.x) ,
-                                             name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)'),
-                                             breaks = c(0,.25,.5,.75,1),labels = c("0","0.25","0.5","0.75","1")),
-                         breaks = c(0,.25,.5,.75,1),labels = c("0","0.25","0.5","0.75","1"))
-  }
-}
-
-p_tot=ggarrange(p1+theme(legend.position = "none",strip.text.x = element_text(size=13))+ggtitle(TeX("$\\psi_1 = 1$")),
-                p2+ggtitle(TeX("$\\psi_2 = 0$"))+theme(strip.background.x = element_blank(),
-                                                       strip.text.x = element_blank()),nrow=2,labels = letters[1:2])
-
-ggsave("../Figures/Final_figs/Figure_4.pdf",p_tot,width = 7,height = 7)
-
-# Figure 3& 4 bis proposition ----
-c_inter_seq=c(.1,.2, .3)
-psi1_seq=c(1,0)
-disp=.1
-f=0.9
-
-d=tibble()  
-for (Psi_sp1 in c(0,1)){
-  for (branch in c("Restoration","Degradation")){
-    for (cinter in c_inter_seq){
-      
-      d2=read.table(paste0("../Table/2_species/PA/Multistability_PA/Varying_traits/Multistability_varying_trait_interspe_comp_",
-                           cinter,"_branch_",branch,
-                           "_Psi1_",Psi_sp1,"_delta_",disp,"_facilitation_",f,".csv"),sep=";")
-      
-      d=rbind(d,d2)
-      
-    } # end loop interspecific competition
-  } # end loop branch
-}
-
-
-
-d[,1:2][d[,1:2] < 10^-3] = 0
-
-
-#COmputing CSI index
-set.seed(123)
-u=runif(2)
-d$CSI = sapply(1:nrow(d),function(x){
-  return(u[1]*d$Stress_tolerant[x]+u[2]*d$Competitive[x])
-})
-
-
-for (Psi_sp1 in c(0,1)){
-  
-  if (Psi_sp1 ==1) {
-    
-    d2=filter(d,Psi1==1)
-    
-    
-    d2$state = sapply(1:nrow(d2), function(x) {
-      if (d2[x, 1] > 0 & d2[x, 2] > 0) {
-        return("Coexistence")
-      }
-      if (d2[x, 1] > 0 & d2[x, 2] == 0) {
-        return("Stress_tolerant")
-      }
-      if (d2[x, 1] == 0 & d2[x, 2] > 0) {
-        return("Species 2")
-      }
-      if (d2[x, 1] == 0 & d2[x, 2] == 0) {
-        return("Desert")
-      }
-    })
-    
-    d2=d2[order(d2$Psi2,d2$Stress,d2$alpha_0,d2$Psi1),]
-    
-    all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
-      if (d2$state[x] != d2$state[x+1]){
-        return(paste0(d2$state[x],"/", d2$state[x+1]))
-      }
-      else {return(d2$state[x])}
-    })
-    
-    d_state=d2%>%
-      filter(., Branches=="Degradation")%>%
-      select(.,-Branches)
-    d_state$all_state=all_state
-    
-    
-    color_rho = c("Coexistence" = "#D8CC7B", "Competitive" = "#ACD87B", "Desert" = "#696969", "Stress_tolerant" = "#7BD8D3")
-    
-    appender <- function(string) {
-      TeX(paste("$\\alpha_e = $", string))}
-    
-    
-    d_state$Multistability=sapply(1:nrow(d_state),function(x){
-      if (d_state$all_state[x] %in% c("Species 2","Coexistence","Desert","Stress_tolerant")){
-        return("no_multi")
-      } else{
-        return("multi")
-      }
-    })
-    
-    d_state=d_state%>%
-      mutate(all_state=recode_factor(all_state,
-                                     "Species 2/Coexistence"="Coexistence/Species 2",
-                                     "Desert/Species 2"="Species 2/Desert",
-                                     "Desert/Coexistence"="Coexistence/Desert",
-                                     "Stress_tolerant"="Stress-tolerant",
-                                     "Desert/Stress_tolerant"="Stress-tolerant/Desert",
-                                     "Stress_tolerant/Coexistence"="Coexistence/Stress-tolerant",
-                                     "Stress_tolerant/Species 2"="Species 2/Stress-tolerant",
-                                     "Species 2/Coexistence"="Coexistence/Species 2",
-                                     "Coexistence/Species 2"="Coexistence/Species 2",
-                                     "Species 2" = "Species 2"))
-    
-    color_multistability=c("Coexistence" = "#D8CC7B",
-                           "Species 2" = "#ACD87B",
-                           "Coexistence/Species 2" = "#DDEFCA",
-                           "Stress-tolerant" = "#7BD8D3",
-                           "Stress-tolerant/Desert" ="#0F8E87",
-                           "Coexistence/Stress-tolerant"="#9BBBB9",
-                           "Coexistence/Desert"="#C19E5E",
-                           "Desert"=  "#696969",
-                           "Species 2/Stress-tolerant" = "#C998CE")
-    #State multistability
-
-    p1=ggplot(d_state) +
-      geom_tile_pattern(aes(x=Stress,y=as.numeric(Psi2),fill=all_state,pattern=Multistability),
-                        colour          = 'transparent',
-                        pattern_spacing = 0.05, 
-                        pattern_density = 0.01, 
-                        pattern_fill    = "gray20",
-                        pattern_colour  = "gray20")+
-      theme_classic() +
-      theme(legend.position = "bottom") +
-      labs(x = TeX(r'(Stress, \ $S)'), y = TeX(r'(Trait species 2, \ $\psi_2)'), fill = "") +
-      theme(legend.text = element_text(size = 11))+
-      scale_fill_manual(values=color_multistability)+
-      facet_grid(.~alpha_0,labeller=label_bquote(cols = alpha[e] == .(alpha_0)))+
-      the_theme+theme(legend.text = element_text(size=9),strip.text.x = element_text(size=13))+
-      scale_pattern_manual(values=rev(c("none" ,"stripe")))+
-      guides(pattern=F)
-    
-    
-    
-  } 
-  if (Psi_sp1==0){
-    
-    d2=filter(d,Psi1==0)
-    
-    
-    d2$state = sapply(1:nrow(d2), function(x) {
-      if (d2[x, 1] > 0 & d2[x, 2] > 0) {
-        return("Coexistence")
-      }
-      if (d2[x, 1] > 0 & d2[x, 2] == 0) {
-        return("Competitive")
-      }
-      if (d2[x, 1] == 0 & d2[x, 2] > 0) {
-        return("Species 2")
-      }
-      if (d2[x, 1] == 0 & d2[x, 2] == 0) {
-        return("Desert")
-      }
-    })
-    
-    d2=d2[order(d2$Psi2,d2$Stress,d2$alpha_0,d2$Psi1),]
-    
-    all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
-      if (d2$state[x] != d2$state[x+1]){
-        return(paste0(d2$state[x],"/", d2$state[x+1]))
-      }
-      else {return(d2$state[x])}
-    })
-    
-    d_state=d2%>%
-      filter(., Branches=="Degradation")%>%
-      select(.,-Branches)
-    d_state$all_state=all_state
-    
-    
-    color_rho = c("Coexistence" = "#D8CC7B", "Competitive" = "#ACD87B", "Desert" = "#696969", "Stress_tolerant" = "#7BD8D3")
-    
-    appender <- function(string) {
-      TeX(paste("$\\alpha_e = $", string))}
-    
-    
-    d_state$Multistability=sapply(1:nrow(d_state),function(x){
-      if (d_state$all_state[x] %in% c("Species 2","Coexistence","Desert","Competitive")){
-        return("no_multi")
-      } else{
-        return("multi")
-      }
-    })
-    
-    d_state=d_state%>%
-      mutate(all_state=recode_factor(all_state,
-                                     "Species 2/Coexistence"="Coexistence/Species 2",
-                                     "Desert/Species 2"="Species 2/Desert",
-                                     "Desert/Coexistence"="Coexistence/Desert",
-                                     "Desert/Competitive"="Competitive/Desert",
-                                     "Competitive/Coexistence" = "Coexistence/Competitive"))
-    
-    
-    color_multistability=c("Coexistence" = "#D8CC7B",
-                           "Species 2" = "#7BD8D3",
-                           "Coexistence/Species 2" = "#9BBBB9",
-                           "Species 2/Desert" ="#0F8E87",
-                           "Coexistence/Desert"="#C19E5E",
-                           "Desert"=  "#696969")
-
-    p2=ggplot(d_state%>%
-                        mutate(Psi2=round(Psi2,5),Stress=round(Stress,5))) +
-      geom_tile_pattern(aes(x=Stress,y=as.numeric(Psi2),fill=all_state,pattern=Multistability),
-                        colour          = 'transparent',
-                        pattern_spacing = 0.05, 
-                        pattern_density = 0.01, 
-                        pattern_fill    = "gray20",
-                        pattern_colour  = "gray20")+
-      theme_classic() +
-      theme(legend.position = "bottom") +
-      labs(x = TeX(r'(Stress, \ $S)'), y = TeX(r'(Trait species 2, \ $\psi_2)'), fill = "") +
-      theme(legend.text = element_text(size = 11))+
-      scale_fill_manual(values=color_multistability)+
-      facet_grid(.~alpha_0,labeller=label_bquote(cols = alpha[e] == .(alpha_0)))+
-      the_theme+theme(legend.text = element_text(size=9),strip.text.x = element_text(size=13))+
-      scale_pattern_manual(values=rev(c("none" ,"stripe")))+
-      guides(pattern=F)
-    
-    
-    
-  }
-}
-
-
-c_inter_seq=c(.1, .2, .3)
-psi1_seq=c(1,0)
-
-f=.9;disp=.1
-for (Psi_sp1 in psi1_seq){
-  d=tibble()  
-  
-  for (branch in c("Restoration","Degradation")){
-    for (cinter in c_inter_seq){
-      
-      d2=read.table(paste0("../Table/2_species/PA/Multistability_PA/Varying_traits/Multistability_varying_trait_interspe_comp_",
-                           cinter,"_branch_",branch,
-                           "_Psi1_",Psi_sp1,"_delta_",disp,"_facilitation_",f,".csv"),sep=";")
-      d=rbind(d,d2)
-      
-    } # end loop interspecific competition
-  } # end loop branch
-  
-  
-  d[,1:2][d[,1:2] < 10^-4] = 0
-  #COmputing CSI index
-  set.seed(123)
-  u=runif(2)
-  d$CSI = sapply(1:nrow(d),function(x){
-    return(u[1]*d$Stress_tolerant[x]+u[2]*d$Competitive[x])
-  })
-  
-  if (Psi_sp1 ==1) {
-    
-    d2=filter(d,Psi1==Psi_sp1)
-    
-    
-    #Restoration and degradation points
-    d_tipping=tibble()
-    for (a0 in unique(d2$alpha_0)){
-      for (psi in unique(d2$Psi2)){
-        for (direction in unique(d2$Branches)){
-          
-          d_a0=filter(d2,alpha_0==a0,Psi2==psi,Branches==direction)
-          
-          if (direction=="Restoration") d_a0=d_a0[order(d_a0$Stress,decreasing = T),]
-          
-          density_C=d_a0$Competitive
-          stress_C=stress_ST=d_a0$Stress
-          
-          if (direction=="Restoration"){ #initially absent
-            
-            stress_C=stress_C[-c(1:min(which(abs(diff(density_C))>0)))]
-            density_C=density_C[-c(1:min(which(abs(diff(density_C))>0)))]
-            Tipping_C = stress_C[1]
-            
-          } else{
-            
-            Tipping_C = stress_C[min(which(density_C==0))-1]
-            
-          }
-          
-          d_tipping=rbind(d_tipping,tibble(Competition=a0,Psi2=psi,Branch=direction,
-                                           Tipping_C = Tipping_C))
-          
-        }
-      }
-    }
-    
-    p3=ggplot(d_tipping%>%filter(., Psi2 != 1))+
-      geom_smooth(aes(x=Psi2,y=Tipping_C,color=Branch,group=interaction(Competition,Branch)),se = F)+
-      the_theme+facet_grid(.~Competition,labeller = label_bquote(cols=alpha[e]==.(Competition)))+
-      labs(x=TeX(r'(Trait species 2, \ $\psi_2)'),y="Threshold stress",color="")+
-      scale_color_manual(values=c("black","blue"))
-    
-  } 
-  if (Psi_sp1==0){
-    
-    
-    d2=filter(d,Psi1==Psi_sp1)
-    
-    
-    
-    #Restoration and degradation points
-    d_tipping=tibble()
-    for (a0 in unique(d2$alpha_0)){
-      for (psi in unique(d2$Psi2)){
-        for (direction in unique(d2$Branches)){
-          
-          d_a0=filter(d2,alpha_0==a0,Psi2==psi,Branches==direction)
-          
-          if (direction=="Restoration") d_a0=d_a0[order(d_a0$Stress,decreasing = T),]
-          
-          density_ST=d_a0$Stress_tolerant
-          stress_ST=stress_ST=d_a0$Stress
-          
-          if (direction=="Restoration"){ #initially absent
-            
-            stress_ST=stress_ST[-c(1:min(which(abs(diff(density_ST))>0)))]
-            density_ST=density_ST[-c(1:min(which(abs(diff(density_ST))>0)))]
-            Tipping_ST = stress_ST[1]
-            
-          } else{
-            
-            Tipping_ST = stress_ST[min(which(density_ST==0))-1]
-            
-          }
-          
-          d_tipping=rbind(d_tipping,tibble(Competition=a0,Psi2=psi,Branch=direction,
-                                           Tipping_ST = Tipping_ST))
-          
-        }
-      }
-    }
-    
-    p4=ggplot(d_tipping)+
-      geom_smooth(aes(x=Psi2,y=Tipping_ST,color=Branch,group=interaction(Competition,Branch)),se = F)+
-      the_theme+facet_grid(.~Competition,labeller = label_bquote(cols=alpha[e]==.(Competition)))+
-      labs(x=TeX(r'(Trait species 2, \ $\psi_2)'),y="Threshold stress",color="")+
-      scale_color_manual(values=c("black","blue"))
-  }
-}
-
-
-p_fig3=ggarrange(p1+scale_y_continuous(sec.axis = sec_axis(trans = ~ (1-.x) ,
-                                                    name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)') ))+
-            ggtitle(TeX(r'(Stress-tolerant sp., $\psi_1 = 1$)'))+theme(legend.text = element_text(size=11)),
-            ggarrange(p3+theme(strip.background.x = element_blank(),
-                               strip.text.x = element_blank(),legend.text = element_text(size=12)),
-                      ggplot()+theme_void(),widths = c(17,1)), nrow = 2,heights = c(1.5,1),
-            labels = letters[1:2],align = 'hv')
-
-
-p_fig4=ggarrange(p2+scale_y_continuous(sec.axis = sec_axis(trans = ~ .x ,
-                                                    name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)') ))+
-            ggtitle(TeX(r'(Competitive sp., $\psi_1 = 0$)'))+theme(legend.text = element_text(size=11)),
-          ggarrange(p4+theme(strip.background.x = element_blank(),
-                   strip.text.x = element_blank(),legend.text = element_text(size=12)),
-                   ggplot()+theme_void(),widths = c(17,1)), nrow = 2,heights = c(1.5,1),
-          labels = letters[1:2],align = 'hv')
-
-
-ggsave("../Figures/Final_figs/Fig3_alter.pdf",p_fig3,width = 10,height = 8)
-ggsave("../Figures/Final_figs/Fig4_alter.pdf",p_fig4,width = 10,height = 8)
-
-
-
-# Hysteresis and fraction multistability ----
+# Figure 3: Mulitstability trait ----
 
 
 stress_seq=seq(0,.82, length.out = 100)
@@ -1200,6 +314,8 @@ for (i in unique(d_state$Psi1)){
         d_final=rbind(d_final,tibble(Psi1=i,Psi2=j,alpha_0=a0,
                                      Frac_multi=sum(d_fil$multistab)/length(which(d_fil$state!="Desert")),
                                      Frac_multi_raw=sum(d_fil$multistab),
+                                     Frac_bistab_env=length(which(d_fil$all_state %in% c("Stress_tolerant/Desert")))/length(which(d_fil$state!="Desert")),
+                                     Frac_bistab_env_raw=length(which(d_fil$all_state %in% c("Stress_tolerant/Desert"))),
                                      Deg=d_fil$Stress[min(which(d_fil$Competitive==0))-1],
                                      Rest=d_fil$Stress[min(which(d_fil$Competitive_reg==0))]))
       }
@@ -1209,7 +325,6 @@ for (i in unique(d_state$Psi1)){
 
 trait1_for_bifu=c(unique(d2$Psi1)[15],unique(d2$Psi1)[49],unique(d2$Psi1)[49])
 trait2_for_bifu=c(unique(d2$Psi2)[13],unique(d2$Psi2)[1],unique(d2$Psi2)[49])
-
 
 p1=ggplot(d_final)+
   geom_tile(aes(x=Psi1,y=Psi2,fill=Frac_multi))+
@@ -1221,13 +336,11 @@ p1=ggplot(d_final)+
                         txt=c("(i)","(ii)","(iii)")),aes(x=x,y=y,label=txt),size=4.5)+
   guides(shape=F)
 
-
 p2=ggplot(d_final)+
   geom_tile(aes(x=Psi1,y=Psi2,fill=Deg-Rest))+
   the_theme+labs(x=TeX(r'(Species 1 trait, $\psi_1$)'),y=TeX(r'(Species 2 trait, $\psi_2$)'),fill="Species 2 hysteresis size")+
   scale_fill_gradientn(colors=colorRampPalette(c("#FFFFFF","#E2BFE2","#D48ACF","#650328"))(100))+
   guides(shape=F)
-
 
 p3=ggplot(d_final)+
   geom_tile(aes(x=Psi1,y=Psi2,fill=Deg))+
@@ -1326,7 +439,7 @@ pbifu=ggarrange(ggplot()+theme_void(),p3_1,p3_2,
 p_tot=ggarrange(ggarrange(p1,p2,p3,p4,ncol = 2,nrow=2,labels = letters[1:4]),ggplot()+theme_void(),
                 pbifu,ncol=3,widths = c(2,.05,.8))
 
-ggsave("../Figures/Final_figs/Trait_multistability.pdf",p_tot,width = 13,height = 9)
+ggsave("../Figures/Final_figs/Figure_3",p_tot,width = 13,height = 9)
 
 
 
@@ -1516,5 +629,898 @@ Figure_5 = ggarrange(ggarrange(ggarrange(p1,ggplot()+theme_void(),heights = c(1,
 
 
 ggsave("../Figures/Final_figs/Figure_5.pdf",Figure_5,width = 8,height = 7)
+
+# Figure 3: Trait variation and multistability 
+
+c_inter_seq=c(.1,.2, .3)
+psi1_seq=c(1,0)
+disp=.1
+f=0.9
+
+d=tibble()  
+for (Psi_sp1 in c(0,1)){
+  for (branch in c("Restoration","Degradation")){
+    for (cinter in c_inter_seq){
+      
+      d2=read.table(paste0("../Table/2_species/PA/Multistability_PA/Varying_traits/Multistability_varying_trait_interspe_comp_",
+                           cinter,"_branch_",branch,
+                           "_Psi1_",Psi_sp1,"_delta_",disp,"_facilitation_",f,".csv"),sep=";")
+      
+      d=rbind(d,d2)
+      
+    } # end loop interspecific competition
+  } # end loop branch
+}
+
+
+
+d[,1:2][d[,1:2] < 10^-3] = 0
+
+
+#COmputing CSI index
+set.seed(123)
+u=runif(2)
+d$CSI = sapply(1:nrow(d),function(x){
+  return(u[1]*d$Stress_tolerant[x]+u[2]*d$Competitive[x])
+})
+
+
+for (Psi_sp1 in c(0,1)){
+  
+  if (Psi_sp1 ==1) {
+    
+    d2=filter(d,Psi1==1)
+    
+    
+    d2$state = sapply(1:nrow(d2), function(x) {
+      if (d2[x, 1] > 0 & d2[x, 2] > 0) {
+        return("Coexistence")
+      }
+      if (d2[x, 1] > 0 & d2[x, 2] == 0) {
+        return("Stress_tolerant")
+      }
+      if (d2[x, 1] == 0 & d2[x, 2] > 0) {
+        return("Species 2")
+      }
+      if (d2[x, 1] == 0 & d2[x, 2] == 0) {
+        return("Desert")
+      }
+    })
+    
+    d2=d2[order(d2$Psi2,d2$Stress,d2$alpha_0,d2$Psi1),]
+    
+    all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
+      if (d2$state[x] != d2$state[x+1]){
+        return(paste0(d2$state[x],"/", d2$state[x+1]))
+      }
+      else {return(d2$state[x])}
+    })
+    
+    d_state=d2%>%
+      filter(., Branches=="Degradation")%>%
+      select(.,-Branches)
+    d_state$all_state=all_state
+    
+    
+    color_rho = c("Coexistence" = "#D8CC7B", "Competitive" = "#ACD87B", "Desert" = "#696969", "Stress_tolerant" = "#7BD8D3")
+    
+    appender <- function(string) {
+      TeX(paste("$\\alpha_e = $", string))}
+    
+    
+    d_state$Multistability=sapply(1:nrow(d_state),function(x){
+      if (d_state$all_state[x] %in% c("Species 2","Coexistence","Desert","Stress_tolerant")){
+        return("no_multi")
+      } else{
+        return("multi")
+      }
+    })
+    
+    d_state=d_state%>%
+      mutate(all_state=recode_factor(all_state,
+                                     "Species 2/Coexistence"="Coexistence/Competitive",
+                                     "Desert/Species 2"="Competitive/Desert",
+                                     "Desert/Coexistence"="Coexistence/Desert",
+                                     "Stress_tolerant"="Stress-tolerant",
+                                     "Desert/Stress_tolerant"="Stress-tolerant/Desert",
+                                     "Stress_tolerant/Coexistence"="Coexistence/Stress-tolerant",
+                                     "Stress_tolerant/Species 2"="Competitive/Stress-tolerant",
+                                     "Species 2/Coexistence"="Coexistence/Competitive",
+                                     "Coexistence/Species 2"="Coexistence/Competitive",
+                                     "Species 2" = "Competitive"))
+    
+    color_multistability=c("Coexistence" = "#D8CC7B",
+                           "Competitive" = "#ACD87B",
+                           "Coexistence/Competitive" = "#DDEFCA",
+                           "Stress-tolerant" = "#7BD8D3",
+                           "Stress-tolerant/Desert" ="#0F8E87",
+                           "Coexistence/Stress-tolerant"="#9BBBB9",
+                           "Coexistence/Desert"="#C19E5E",
+                           "Desert"=  "#696969",
+                           "Competitive/Stress-tolerant" = "#C998CE")
+    #State multistability
+    p1=ggplot(d_state) +
+      geom_tile(aes(x=Stress,y=as.numeric(Psi2),fill=all_state))+
+      theme_classic() +
+      theme(legend.position = "bottom") +
+      labs(x = TeX(r'(Stress, \ $S)'), y = TeX(r'(Trait competitive sp., \ $\psi_2)'), fill = "") +
+      theme(legend.text = element_text(size = 11))+
+      scale_fill_manual(values=color_multistability)+
+      facet_grid(.~alpha_0,labeller=label_bquote(cols = alpha[e] == .(alpha_0)))+
+      the_theme+theme(legend.text = element_text(size=9),strip.text.x = element_text(size=13))+
+      geom_hline(data=tibble(alpha_0=.2,y=c(.75)),aes(yintercept=y))+
+      geom_text(data= tibble(alpha_0=.2,y=c(.8),x=1.05,labels=c("c")), 
+                aes(x=x, y=y,label=labels), alpha=1, colour="black")
+    
+    
+    #State multistability same but with patterns
+    
+    p1_pattern=ggplot(d_state) +
+      geom_tile_pattern(aes(x=Stress,y=as.numeric(Psi2),fill=all_state,pattern=Multistability),
+                        colour          = 'transparent',
+                        pattern_spacing = 0.05, 
+                        pattern_density = 0.01, 
+                        pattern_fill    = "gray20",
+                        pattern_colour  = "gray20")+
+      theme_classic() +
+      theme(legend.position = "bottom") +
+      labs(x = TeX(r'(Stress, \ $S)'), y = TeX(r'(Trait competitive sp., \ $\psi_2)'), fill = "") +
+      theme(legend.text = element_text(size = 11))+
+      scale_fill_manual(values=color_multistability)+
+      facet_grid(.~alpha_0,labeller=label_bquote(cols = alpha[e] == .(alpha_0)))+
+      the_theme+theme(legend.text = element_text(size=9),strip.text.x = element_text(size=13))+
+      geom_hline(data=tibble(alpha_0=.2,y=c(.8)),aes(yintercept=y))+
+      geom_text(data= tibble(alpha_0=.2,y=c(.85),x=1.05,labels=c("c")), 
+                aes(x=x, y=y,label=labels), alpha=1, colour="black")+
+      scale_pattern_manual(values=rev(c("none" ,"stripe")))
+    
+    
+    #Bifurcation diagram
+    
+    p2_1=ggplot(d2%>%melt(., measure.vars=c("Stress_tolerant","Competitive"))%>%
+                  filter(., Psi2 %in% unique(d_state$Psi2)[c(80)])%>%
+                  mutate(Psi2=round(abs(Psi2),2))%>%
+                  filter(., alpha_0==.2))+
+      geom_line(aes(x = Stress, y = value, color = variable,linetype=Branches),lwd=.8) +
+      labs(x = TeX(r'(Stress, \ $S)'), y = "Cover", color = "",linetype="") +
+      the_theme +
+      scale_color_manual(values = color_rho[c(2, 4)],labels=c("Species 2","Stress-tolerant")) +
+      scale_linetype_manual(values=c(1,9))+guides(color=F)+
+      theme(axis.text.x = element_text(size = 9),axis.text.y = element_text(size = 9),strip.text.y = element_text(size=9))+
+      new_scale_color() +
+      geom_point(data=d_state%>%
+                   filter(., Psi2==unique(d_state$Psi2)[c(80)],alpha_0==.2)%>%
+                   mutate(., y=.83),
+                 aes(x=Stress,y=y,fill=all_state,color=all_state),alpha=.5,shape=22,size=3)+
+      scale_fill_manual(values=color_multistability)+
+      scale_color_manual(values=color_multistability)
+    
+    
+    
+    #Community index
+    p2_2=ggplot(d2%>%
+                  filter(., Psi2 %in% unique(d_state$Psi2)[c(80)])%>%
+                  mutate(Psi2=round(abs(Psi2),2))%>%
+                  filter(., alpha_0==.2))+
+      geom_line(aes(x = Stress, y = CSI,linetype=Branches)) +
+      labs(x = TeX(r'(Stress, \ $S)'), y = "Community index", color = "",linetype="") +
+      the_theme +
+      theme(axis.text.x = element_text(size = 9),
+            axis.text.y = element_text(size = 9),
+            strip.text.y = element_text(size=9))+
+      new_scale_color() +
+      geom_point(data=d_state%>%
+                   filter(., Psi2==unique(d_state$Psi2)[c(80)],alpha_0==.2)%>%
+                   mutate(., y=.65),
+                 aes(x=Stress,y=y,fill=all_state,color=all_state),alpha=.5,shape=22,size=3)+
+      scale_fill_manual(values=color_multistability)+
+      scale_color_manual(values=color_multistability)
+    
+    
+    
+    
+    
+    
+    
+    
+  } 
+  if (Psi_sp1==0){
+    
+    d2=filter(d,Psi1==0)
+    
+    
+    d2$state = sapply(1:nrow(d2), function(x) {
+      if (d2[x, 1] > 0 & d2[x, 2] > 0) {
+        return("Coexistence")
+      }
+      if (d2[x, 1] > 0 & d2[x, 2] == 0) {
+        return("Competitive")
+      }
+      if (d2[x, 1] == 0 & d2[x, 2] > 0) {
+        return("Species 2")
+      }
+      if (d2[x, 1] == 0 & d2[x, 2] == 0) {
+        return("Desert")
+      }
+    })
+    
+    d2=d2[order(d2$Psi2,d2$Stress,d2$alpha_0,d2$Psi1),]
+    
+    all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
+      if (d2$state[x] != d2$state[x+1]){
+        return(paste0(d2$state[x],"/", d2$state[x+1]))
+      }
+      else {return(d2$state[x])}
+    })
+    
+    d_state=d2%>%
+      filter(., Branches=="Degradation")%>%
+      select(.,-Branches)
+    d_state$all_state=all_state
+    
+    
+    color_rho = c("Coexistence" = "#D8CC7B", "Competitive" = "#ACD87B", "Desert" = "#696969", "Stress_tolerant" = "#7BD8D3")
+    
+    appender <- function(string) {
+      TeX(paste("$\\alpha_e = $", string))}
+    
+    
+    d_state$Multistability=sapply(1:nrow(d_state),function(x){
+      if (d_state$all_state[x] %in% c("Species 2","Coexistence","Desert","Competitive")){
+        return("no_multi")
+      } else{
+        return("multi")
+      }
+    })
+    
+    d_state=d_state%>%
+      mutate(all_state=recode_factor(all_state,
+                                     "Species 2/Coexistence"="Coexistence/Stress-tolerant",
+                                     "Desert/Species 2"="Stress-tolerant/Desert",
+                                     "Desert/Coexistence"="Coexistence/Desert",
+                                     "Desert/Competitive"="Competitive/Desert",
+                                     "Species 2" = "Stress-tolerant",
+                                     "Competitive/Coexistence" = "Coexistence/Competitive"))
+    
+    
+    color_multistability=c("Coexistence" = "#D8CC7B",
+                           "Stress-tolerant" = "#7BD8D3",
+                           "Coexistence/Stress-tolerant" = "#9BBBB9",
+                           "Stress-tolerant/Desert" ="#0F8E87",
+                           "Coexistence/Desert"="#C19E5E",
+                           "Desert"=  "#696969")
+    p2=ggplot(d_state%>%
+                mutate(.,Psi2=round(Psi2,5),
+                       Stress=round(Stress,5))) +
+      geom_tile(aes(x=Stress,y=abs(as.numeric(Psi2)),fill=all_state))+
+      theme_classic() +
+      theme(legend.position = "bottom") +
+      labs(x = TeX(r'(Stress, \ $S)'), y = TeX(r'(Trait stress-tolerant sp., \ $\psi_1)'), fill = "") +
+      theme(legend.text = element_text(size = 11))+
+      scale_fill_manual(values=color_multistability)+
+      facet_grid(.~alpha_0,labeller=label_bquote(cols = alpha[e] == .(alpha_0)))+
+      the_theme+theme(legend.text = element_text(size=9),strip.text.x = element_text(size=13))+
+      geom_hline(data=tibble(alpha_0=.3,y=c(.5)),aes(yintercept=y))+
+      geom_text(data= tibble(alpha_0=.3,y=c(0.55),x=1.05,labels=c("d")), 
+                aes(x=x, y=y,label=labels), alpha=1, colour="black")
+    
+    
+    p2_pattern=ggplot(d_state%>%
+                        mutate(Psi2=round(Psi2,5),Stress=round(Stress,5))) +
+      geom_tile_pattern(aes(x=Stress,y=as.numeric(Psi2),fill=all_state,pattern=Multistability),
+                        colour          = 'transparent',
+                        pattern_spacing = 0.05, 
+                        pattern_density = 0.01, 
+                        pattern_fill    = "gray20",
+                        pattern_colour  = "gray20")+
+      theme_classic() +
+      theme(legend.position = "bottom") +
+      labs(x = TeX(r'(Stress, \ $S)'), y = TeX(r'(Trait stress-tolerant sp., \ $\psi_1)'), fill = "") +
+      theme(legend.text = element_text(size = 11))+
+      scale_fill_manual(values=color_multistability)+
+      facet_grid(.~alpha_0,labeller=label_bquote(cols = alpha[e] == .(alpha_0)))+
+      the_theme+theme(legend.text = element_text(size=9),strip.text.x = element_text(size=13))+
+      geom_hline(data=tibble(alpha_0=.3,y=c(.5)),aes(yintercept=y))+
+      geom_text(data= tibble(alpha_0=.3,y=c(0.55),x=1.05,labels=c("d")), 
+                aes(x=x, y=y,label=labels), alpha=1, colour="black")+
+      scale_pattern_manual(values=rev(c("none" ,"stripe")))
+    
+    
+    
+    
+    #Bifurcation diagrams
+    d2t=transform(d2,
+                  alpha_0 = factor(alpha_0, levels=c(0.1,.2,.3), labels=c("alpha[e] : 0", "alpha[e] : 0.1",
+                                                                          "alpha[e] == 0.5")),
+                  Psi2=factor(Psi2,levels=unique(d_state$Psi2)[c(1,75,100)],
+                              labels=c("|psi[1] - psi[2]|","Stress-tolerant","Competitive")))
+    
+    
+    p2_3=ggplot(d2%>%melt(., measure.vars=c("Stress_tolerant","Competitive"))%>%
+                  filter(., Psi2 %in% unique(d_state$Psi2)[c(50)])%>%
+                  mutate(Psi2=round(abs(Psi1-Psi2),2))%>%
+                  filter(., alpha_0==.3))+
+      geom_line(aes(x = Stress, y = value, color = variable,linetype=Branches),lwd=.8) +
+      labs(x = TeX(r'(Stress, \ $S)'), y = "Cover", color = "",linetype="") +
+      the_theme +
+      scale_color_manual(values = (as.character(color_rho[c(2, 4)])),labels=c("Competitive","Species 2")) +
+      scale_linetype_manual(values=c(1,9))+guides(color=F)+
+      theme(axis.text.x = element_text(size = 9),axis.text.y = element_text(size = 9),strip.text.y = element_text(size=9))+
+      new_scale_color() +
+      geom_point(data=d_state%>%
+                   filter(., Psi2==unique(d_state$Psi2)[c(50)],alpha_0==.3)%>%
+                   mutate(., y=.80),
+                 aes(x=Stress,y=y,fill=all_state,color=all_state),alpha=.5,shape=22,size=3)+
+      scale_fill_manual(values=color_multistability)+
+      scale_color_manual(values=color_multistability)
+    
+    
+    
+    
+    
+    
+    #COmmunity index
+    p2_4=ggplot(d2%>%
+                  filter(., Psi2 %in% unique(d2$Psi2)[c(50)])%>%
+                  mutate(Psi2=round(abs(Psi1-Psi2),2))%>%
+                  filter(., alpha_0==.3))+
+      geom_line(aes(x = Stress, y = CSI,linetype=Branches)) +
+      labs(x = TeX(r'(Stress, \ $S)'), y = "Community index", color = "",linetype="") +
+      the_theme +
+      theme(axis.text.x = element_text(size = 9),axis.text.y = element_text(size = 9),strip.text.y = element_text(size=9))+
+      new_scale_color() +
+      geom_point(data=d_state%>%
+                   filter(., Psi2==unique(d_state$Psi2)[c(50)],alpha_0==.3)%>%
+                   mutate(., y=.62),
+                 aes(x=Stress,y=y,fill=all_state,color=all_state),alpha=.5,shape=22,size=3)+
+      scale_fill_manual(values=color_multistability)+
+      scale_color_manual(values=color_multistability)
+    
+    
+    
+  }
+}
+
+Figure_3_top=ggarrange(p1+theme(axis.text.x = element_blank(),axis.title.x = element_blank(),
+                                axis.line.x = element_blank(),
+                                axis.ticks.x = element_blank(),axis.title.y.right = element_text(size = 11))+
+                         scale_y_continuous(sec.axis = sec_axis(trans = ~ (1-.x) ,
+                                                                name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)') ))+
+                         ggtitle(TeX(r'(Stress-tolerant sp., $\psi_1 = 1$)')),
+                       p2+theme(strip.background.x = element_blank(),strip.text.x = element_blank(),axis.title.y.right = element_text(size = 11))+
+                         scale_y_continuous(sec.axis = sec_axis(trans = ~ .x ,
+                                                                name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)') ))+
+                         ggtitle(TeX(r'(Competitive sp., $\psi_2 = 0$)')),
+                       common.legend = T,legend = "bottom",nrow=2,labels = letters[1:2])
+
+Figure_3_bottom=ggarrange(p2_1+guides(color="none",fill="none")+theme(legend.position = "none"),
+                          p2_2+guides(color="none",fill="none"),
+                          p2_3+guides(color="none",fill="none")+theme(legend.position = "none"),
+                          p2_4+guides(color="none",fill="none"),
+                          ncol=4,labels = c(letters[3],"",letters[4],""),common.legend = T,legend = "bottom")
+
+Figure_3_tot=ggarrange(Figure_3_top,Figure_3_bottom,nrow=2,heights = c(3,1))
+
+ggsave("../Figures/Final_figs/Figure_3.pdf",Figure_3_tot,width = 9,height = 9)
+
+
+#same but with patterns
+Figure_3_top=ggarrange(p1_pattern+guides(pattern=F)+theme(axis.text.x = element_blank(),axis.title.x = element_blank(),
+                                                          axis.line.x = element_blank(),
+                                                          axis.ticks.x = element_blank(),axis.title.y.right = element_text(size = 11))+
+                         scale_y_continuous(sec.axis = sec_axis(trans = ~ (1-.x) ,
+                                                                name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)') ))+
+                         ggtitle(TeX(r'(Stress-tolerant sp., $\psi_1 = 1$)')),
+                       p2_pattern+guides(pattern=F)+theme(strip.background.x = element_blank(),strip.text.x = element_blank(),axis.title.y.right = element_text(size = 11))+
+                         scale_y_continuous(sec.axis = sec_axis(trans = ~ .x ,
+                                                                name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)') ))+
+                         ggtitle(TeX(r'(Competitive sp., $\psi_2 = 0$)')),
+                       common.legend = T,legend = "bottom",nrow=2,labels = letters[1:2])
+
+Figure_3_tot=ggarrange(Figure_3_top,Figure_3_bottom,nrow=2,heights = c(3,1))
+
+ggsave("../Figures/Final_figs/Figure_3_pattern.pdf",Figure_3_tot,width = 9,height = 9)
+
+
+# Figure 4: Position of tipping points 
+
+c_inter_seq=c(0,.1, .2, .3)
+psi1_seq=c(1,0)
+
+f=.9;disp=.1
+for (Psi_sp1 in psi1_seq){
+  d=tibble()  
+  
+  for (branch in c("Restoration","Degradation")){
+    for (cinter in c_inter_seq){
+      
+      d2=read.table(paste0("../Table/2_species/PA/Multistability_PA/Varying_traits/Multistability_varying_trait_interspe_comp_",
+                           cinter,"_branch_",branch,
+                           "_Psi1_",Psi_sp1,"_delta_",disp,"_facilitation_",f,".csv"),sep=";")
+      d=rbind(d,d2)
+      
+    } # end loop interspecific competition
+  } # end loop branch
+  
+  
+  d[,1:2][d[,1:2] < 10^-4] = 0
+  #COmputing CSI index
+  set.seed(123)
+  u=runif(2)
+  d$CSI = sapply(1:nrow(d),function(x){
+    return(u[1]*d$Stress_tolerant[x]+u[2]*d$Competitive[x])
+  })
+  
+  if (Psi_sp1 ==1) {
+    
+    d2=filter(d,Psi1==Psi_sp1)
+    
+    
+    #Restoration and degradation points
+    d_tipping=tibble()
+    for (a0 in unique(d2$alpha_0)){
+      for (psi in unique(d2$Psi2)){
+        for (direction in unique(d2$Branches)){
+          
+          d_a0=filter(d2,alpha_0==a0,Psi2==psi,Branches==direction)
+          
+          if (direction=="Restoration") d_a0=d_a0[order(d_a0$Stress,decreasing = T),]
+          
+          density_C=d_a0$Competitive
+          stress_C=stress_ST=d_a0$Stress
+          
+          if (direction=="Restoration"){ #initially absent
+            
+            stress_C=stress_C[-c(1:min(which(abs(diff(density_C))>0)))]
+            density_C=density_C[-c(1:min(which(abs(diff(density_C))>0)))]
+            Tipping_C = stress_C[1]
+            
+          } else{
+            
+            Tipping_C = stress_C[min(which(density_C==0))-1]
+            
+          }
+          
+          d_tipping=rbind(d_tipping,tibble(Competition=a0,Psi2=psi,Branch=direction,
+                                           Tipping_C = Tipping_C))
+          
+        }
+      }
+    }
+    
+    p1=ggplot(d_tipping)+
+      geom_smooth(aes(x=Psi2,y=Tipping_C,color=Branch,group=interaction(Competition,Branch)),se = F)+
+      the_theme+facet_grid(.~Competition,labeller = label_bquote(cols=alpha[e]==.(Competition)))+
+      labs(x=TeX(r'(Trait competitive sp., \ $\psi_2)'),y="Threshold stress",color="")+
+      scale_color_manual(values=c("black","blue"))+
+      scale_x_continuous(sec.axis = sec_axis(trans = ~ (1-.x) ,
+                                             name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)'),
+                                             breaks = c(0,.25,.5,.75,1),labels = c("0","0.25","0.5","0.75","1")),
+                         breaks = c(0,.25,.5,.75,1),labels = c("0","0.25","0.5","0.75","1"))
+    
+  } 
+  if (Psi_sp1==0){
+    
+    
+    d2=filter(d,Psi1==Psi_sp1)
+    
+    
+    
+    #Restoration and degradation points
+    d_tipping=tibble()
+    for (a0 in unique(d2$alpha_0)){
+      for (psi in unique(d2$Psi2)){
+        for (direction in unique(d2$Branches)){
+          
+          d_a0=filter(d2,alpha_0==a0,Psi2==psi,Branches==direction)
+          
+          if (direction=="Restoration") d_a0=d_a0[order(d_a0$Stress,decreasing = T),]
+          
+          density_ST=d_a0$Stress_tolerant
+          stress_ST=stress_ST=d_a0$Stress
+          
+          if (direction=="Restoration"){ #initially absent
+            
+            stress_ST=stress_ST[-c(1:min(which(abs(diff(density_ST))>0)))]
+            density_ST=density_ST[-c(1:min(which(abs(diff(density_ST))>0)))]
+            Tipping_ST = stress_ST[1]
+            
+          } else{
+            
+            Tipping_ST = stress_ST[min(which(density_ST==0))-1]
+            
+          }
+          
+          d_tipping=rbind(d_tipping,tibble(Competition=a0,Psi2=psi,Branch=direction,
+                                           Tipping_ST = Tipping_ST))
+          
+        }
+      }
+    }
+    
+    p2=ggplot(d_tipping)+
+      geom_smooth(aes(x=Psi2,y=Tipping_ST,color=Branch,group=interaction(Competition,Branch)),se = F)+
+      the_theme+facet_grid(.~Competition,labeller = label_bquote(cols=alpha[e]==.(Competition)))+
+      labs(x=TeX(r'(Trait stress-tolerant sp., \ $\psi_1)'),y="Threshold stress",color="")+
+      scale_color_manual(values=c("black","blue"))+
+      scale_x_continuous(sec.axis = sec_axis(trans = ~ (.x) ,
+                                             name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)'),
+                                             breaks = c(0,.25,.5,.75,1),labels = c("0","0.25","0.5","0.75","1")),
+                         breaks = c(0,.25,.5,.75,1),labels = c("0","0.25","0.5","0.75","1"))
+  }
+}
+
+p_tot=ggarrange(p1+theme(legend.position = "none",strip.text.x = element_text(size=13))+ggtitle(TeX("$\\psi_1 = 1$")),
+                p2+ggtitle(TeX("$\\psi_2 = 0$"))+theme(strip.background.x = element_blank(),
+                                                       strip.text.x = element_blank()),nrow=2,labels = letters[1:2])
+
+ggsave("../Figures/Final_figs/Figure_4.pdf",p_tot,width = 7,height = 7)
+
+
+
+
+
+
+
+# Figure 3& 4 bis proposition 
+
+c_inter_seq=c(.1,.2, .3)
+psi1_seq=c(1,0)
+disp=.1
+f=0.9
+
+d=tibble()  
+for (Psi_sp1 in c(0,1)){
+  for (branch in c("Restoration","Degradation")){
+    for (cinter in c_inter_seq){
+      
+      d2=read.table(paste0("../Table/2_species/PA/Multistability_PA/Varying_traits/Multistability_varying_trait_interspe_comp_",
+                           cinter,"_branch_",branch,
+                           "_Psi1_",Psi_sp1,"_delta_",disp,"_facilitation_",f,".csv"),sep=";")
+      
+      d=rbind(d,d2)
+      
+    } # end loop interspecific competition
+  } # end loop branch
+}
+
+
+
+d[,1:2][d[,1:2] < 10^-3] = 0
+
+
+#COmputing CSI index
+set.seed(123)
+u=runif(2)
+d$CSI = sapply(1:nrow(d),function(x){
+  return(u[1]*d$Stress_tolerant[x]+u[2]*d$Competitive[x])
+})
+
+
+for (Psi_sp1 in c(0,1)){
+  
+  if (Psi_sp1 ==1) {
+    
+    d2=filter(d,Psi1==1)
+    
+    
+    d2$state = sapply(1:nrow(d2), function(x) {
+      if (d2[x, 1] > 0 & d2[x, 2] > 0) {
+        return("Coexistence")
+      }
+      if (d2[x, 1] > 0 & d2[x, 2] == 0) {
+        return("Stress_tolerant")
+      }
+      if (d2[x, 1] == 0 & d2[x, 2] > 0) {
+        return("Species 2")
+      }
+      if (d2[x, 1] == 0 & d2[x, 2] == 0) {
+        return("Desert")
+      }
+    })
+    
+    d2=d2[order(d2$Psi2,d2$Stress,d2$alpha_0,d2$Psi1),]
+    
+    all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
+      if (d2$state[x] != d2$state[x+1]){
+        return(paste0(d2$state[x],"/", d2$state[x+1]))
+      }
+      else {return(d2$state[x])}
+    })
+    
+    d_state=d2%>%
+      filter(., Branches=="Degradation")%>%
+      select(.,-Branches)
+    d_state$all_state=all_state
+    
+    
+    color_rho = c("Coexistence" = "#D8CC7B", "Competitive" = "#ACD87B", "Desert" = "#696969", "Stress_tolerant" = "#7BD8D3")
+    
+    appender <- function(string) {
+      TeX(paste("$\\alpha_e = $", string))}
+    
+    
+    d_state$Multistability=sapply(1:nrow(d_state),function(x){
+      if (d_state$all_state[x] %in% c("Species 2","Coexistence","Desert","Stress_tolerant")){
+        return("no_multi")
+      } else{
+        return("multi")
+      }
+    })
+    
+    d_state=d_state%>%
+      mutate(all_state=recode_factor(all_state,
+                                     "Species 2/Coexistence"="Coexistence/Species 2",
+                                     "Desert/Species 2"="Species 2/Desert",
+                                     "Desert/Coexistence"="Coexistence/Desert",
+                                     "Stress_tolerant"="Stress-tolerant",
+                                     "Desert/Stress_tolerant"="Stress-tolerant/Desert",
+                                     "Stress_tolerant/Coexistence"="Coexistence/Stress-tolerant",
+                                     "Stress_tolerant/Species 2"="Species 2/Stress-tolerant",
+                                     "Species 2/Coexistence"="Coexistence/Species 2",
+                                     "Coexistence/Species 2"="Coexistence/Species 2",
+                                     "Species 2" = "Species 2"))
+    
+    color_multistability=c("Coexistence" = "#D8CC7B",
+                           "Species 2" = "#ACD87B",
+                           "Coexistence/Species 2" = "#DDEFCA",
+                           "Stress-tolerant" = "#7BD8D3",
+                           "Stress-tolerant/Desert" ="#0F8E87",
+                           "Coexistence/Stress-tolerant"="#9BBBB9",
+                           "Coexistence/Desert"="#C19E5E",
+                           "Desert"=  "#696969",
+                           "Species 2/Stress-tolerant" = "#C998CE")
+    #State multistability
+    
+    p1=ggplot(d_state) +
+      geom_tile_pattern(aes(x=Stress,y=as.numeric(Psi2),fill=all_state,pattern=Multistability),
+                        colour          = 'transparent',
+                        pattern_spacing = 0.05, 
+                        pattern_density = 0.01, 
+                        pattern_fill    = "gray20",
+                        pattern_colour  = "gray20")+
+      theme_classic() +
+      theme(legend.position = "bottom") +
+      labs(x = TeX(r'(Stress, \ $S)'), y = TeX(r'(Trait species 2, \ $\psi_2)'), fill = "") +
+      theme(legend.text = element_text(size = 11))+
+      scale_fill_manual(values=color_multistability)+
+      facet_grid(.~alpha_0,labeller=label_bquote(cols = alpha[e] == .(alpha_0)))+
+      the_theme+theme(legend.text = element_text(size=9),strip.text.x = element_text(size=13))+
+      scale_pattern_manual(values=rev(c("none" ,"stripe")))+
+      guides(pattern=F)
+    
+    
+    
+  } 
+  if (Psi_sp1==0){
+    
+    d2=filter(d,Psi1==0)
+    
+    
+    d2$state = sapply(1:nrow(d2), function(x) {
+      if (d2[x, 1] > 0 & d2[x, 2] > 0) {
+        return("Coexistence")
+      }
+      if (d2[x, 1] > 0 & d2[x, 2] == 0) {
+        return("Competitive")
+      }
+      if (d2[x, 1] == 0 & d2[x, 2] > 0) {
+        return("Species 2")
+      }
+      if (d2[x, 1] == 0 & d2[x, 2] == 0) {
+        return("Desert")
+      }
+    })
+    
+    d2=d2[order(d2$Psi2,d2$Stress,d2$alpha_0,d2$Psi1),]
+    
+    all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
+      if (d2$state[x] != d2$state[x+1]){
+        return(paste0(d2$state[x],"/", d2$state[x+1]))
+      }
+      else {return(d2$state[x])}
+    })
+    
+    d_state=d2%>%
+      filter(., Branches=="Degradation")%>%
+      select(.,-Branches)
+    d_state$all_state=all_state
+    
+    
+    color_rho = c("Coexistence" = "#D8CC7B", "Competitive" = "#ACD87B", "Desert" = "#696969", "Stress_tolerant" = "#7BD8D3")
+    
+    appender <- function(string) {
+      TeX(paste("$\\alpha_e = $", string))}
+    
+    
+    d_state$Multistability=sapply(1:nrow(d_state),function(x){
+      if (d_state$all_state[x] %in% c("Species 2","Coexistence","Desert","Competitive")){
+        return("no_multi")
+      } else{
+        return("multi")
+      }
+    })
+    
+    d_state=d_state%>%
+      mutate(all_state=recode_factor(all_state,
+                                     "Species 2/Coexistence"="Coexistence/Species 2",
+                                     "Desert/Species 2"="Species 2/Desert",
+                                     "Desert/Coexistence"="Coexistence/Desert",
+                                     "Desert/Competitive"="Competitive/Desert",
+                                     "Competitive/Coexistence" = "Coexistence/Competitive"))
+    
+    
+    color_multistability=c("Coexistence" = "#D8CC7B",
+                           "Species 2" = "#7BD8D3",
+                           "Coexistence/Species 2" = "#9BBBB9",
+                           "Species 2/Desert" ="#0F8E87",
+                           "Coexistence/Desert"="#C19E5E",
+                           "Desert"=  "#696969")
+    
+    p2=ggplot(d_state%>%
+                mutate(Psi2=round(Psi2,5),Stress=round(Stress,5))) +
+      geom_tile_pattern(aes(x=Stress,y=as.numeric(Psi2),fill=all_state,pattern=Multistability),
+                        colour          = 'transparent',
+                        pattern_spacing = 0.05, 
+                        pattern_density = 0.01, 
+                        pattern_fill    = "gray20",
+                        pattern_colour  = "gray20")+
+      theme_classic() +
+      theme(legend.position = "bottom") +
+      labs(x = TeX(r'(Stress, \ $S)'), y = TeX(r'(Trait species 2, \ $\psi_2)'), fill = "") +
+      theme(legend.text = element_text(size = 11))+
+      scale_fill_manual(values=color_multistability)+
+      facet_grid(.~alpha_0,labeller=label_bquote(cols = alpha[e] == .(alpha_0)))+
+      the_theme+theme(legend.text = element_text(size=9),strip.text.x = element_text(size=13))+
+      scale_pattern_manual(values=rev(c("none" ,"stripe")))+
+      guides(pattern=F)
+    
+    
+    
+  }
+}
+
+
+c_inter_seq=c(.1, .2, .3)
+psi1_seq=c(1,0)
+
+f=.9;disp=.1
+for (Psi_sp1 in psi1_seq){
+  d=tibble()  
+  
+  for (branch in c("Restoration","Degradation")){
+    for (cinter in c_inter_seq){
+      
+      d2=read.table(paste0("../Table/2_species/PA/Multistability_PA/Varying_traits/Multistability_varying_trait_interspe_comp_",
+                           cinter,"_branch_",branch,
+                           "_Psi1_",Psi_sp1,"_delta_",disp,"_facilitation_",f,".csv"),sep=";")
+      d=rbind(d,d2)
+      
+    } # end loop interspecific competition
+  } # end loop branch
+  
+  
+  d[,1:2][d[,1:2] < 10^-4] = 0
+  #COmputing CSI index
+  set.seed(123)
+  u=runif(2)
+  d$CSI = sapply(1:nrow(d),function(x){
+    return(u[1]*d$Stress_tolerant[x]+u[2]*d$Competitive[x])
+  })
+  
+  if (Psi_sp1 ==1) {
+    
+    d2=filter(d,Psi1==Psi_sp1)
+    
+    
+    #Restoration and degradation points
+    d_tipping=tibble()
+    for (a0 in unique(d2$alpha_0)){
+      for (psi in unique(d2$Psi2)){
+        for (direction in unique(d2$Branches)){
+          
+          d_a0=filter(d2,alpha_0==a0,Psi2==psi,Branches==direction)
+          
+          if (direction=="Restoration") d_a0=d_a0[order(d_a0$Stress,decreasing = T),]
+          
+          density_C=d_a0$Competitive
+          stress_C=stress_ST=d_a0$Stress
+          
+          if (direction=="Restoration"){ #initially absent
+            
+            stress_C=stress_C[-c(1:min(which(abs(diff(density_C))>0)))]
+            density_C=density_C[-c(1:min(which(abs(diff(density_C))>0)))]
+            Tipping_C = stress_C[1]
+            
+          } else{
+            
+            Tipping_C = stress_C[min(which(density_C==0))-1]
+            
+          }
+          
+          d_tipping=rbind(d_tipping,tibble(Competition=a0,Psi2=psi,Branch=direction,
+                                           Tipping_C = Tipping_C))
+          
+        }
+      }
+    }
+    
+    p3=ggplot(d_tipping%>%filter(., Psi2 != 1))+
+      geom_smooth(aes(x=Psi2,y=Tipping_C,color=Branch,group=interaction(Competition,Branch)),se = F)+
+      the_theme+facet_grid(.~Competition,labeller = label_bquote(cols=alpha[e]==.(Competition)))+
+      labs(x=TeX(r'(Trait species 2, \ $\psi_2)'),y="Threshold stress",color="")+
+      scale_color_manual(values=c("black","blue"))
+    
+  } 
+  if (Psi_sp1==0){
+    
+    
+    d2=filter(d,Psi1==Psi_sp1)
+    
+    
+    
+    #Restoration and degradation points
+    d_tipping=tibble()
+    for (a0 in unique(d2$alpha_0)){
+      for (psi in unique(d2$Psi2)){
+        for (direction in unique(d2$Branches)){
+          
+          d_a0=filter(d2,alpha_0==a0,Psi2==psi,Branches==direction)
+          
+          if (direction=="Restoration") d_a0=d_a0[order(d_a0$Stress,decreasing = T),]
+          
+          density_ST=d_a0$Stress_tolerant
+          stress_ST=stress_ST=d_a0$Stress
+          
+          if (direction=="Restoration"){ #initially absent
+            
+            stress_ST=stress_ST[-c(1:min(which(abs(diff(density_ST))>0)))]
+            density_ST=density_ST[-c(1:min(which(abs(diff(density_ST))>0)))]
+            Tipping_ST = stress_ST[1]
+            
+          } else{
+            
+            Tipping_ST = stress_ST[min(which(density_ST==0))-1]
+            
+          }
+          
+          d_tipping=rbind(d_tipping,tibble(Competition=a0,Psi2=psi,Branch=direction,
+                                           Tipping_ST = Tipping_ST))
+          
+        }
+      }
+    }
+    
+    p4=ggplot(d_tipping)+
+      geom_smooth(aes(x=Psi2,y=Tipping_ST,color=Branch,group=interaction(Competition,Branch)),se = F)+
+      the_theme+facet_grid(.~Competition,labeller = label_bquote(cols=alpha[e]==.(Competition)))+
+      labs(x=TeX(r'(Trait species 2, \ $\psi_2)'),y="Threshold stress",color="")+
+      scale_color_manual(values=c("black","blue"))
+  }
+}
+
+
+p_fig3=ggarrange(p1+scale_y_continuous(sec.axis = sec_axis(trans = ~ (1-.x) ,
+                                                           name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)') ))+
+                   ggtitle(TeX(r'(Stress-tolerant sp., $\psi_1 = 1$)'))+theme(legend.text = element_text(size=11)),
+                 ggarrange(p3+theme(strip.background.x = element_blank(),
+                                    strip.text.x = element_blank(),legend.text = element_text(size=12)),
+                           ggplot()+theme_void(),widths = c(17,1)), nrow = 2,heights = c(1.5,1),
+                 labels = letters[1:2],align = 'hv')
+
+
+p_fig4=ggarrange(p2+scale_y_continuous(sec.axis = sec_axis(trans = ~ .x ,
+                                                           name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)') ))+
+                   ggtitle(TeX(r'(Competitive sp., $\psi_1 = 0$)'))+theme(legend.text = element_text(size=11)),
+                 ggarrange(p4+theme(strip.background.x = element_blank(),
+                                    strip.text.x = element_blank(),legend.text = element_text(size=12)),
+                           ggplot()+theme_void(),widths = c(17,1)), nrow = 2,heights = c(1.5,1),
+                 labels = letters[1:2],align = 'hv')
+
+
+ggsave("../Figures/Final_figs/Fig3_alter.pdf",p_fig3,width = 10,height = 8)
+ggsave("../Figures/Final_figs/Fig4_alter.pdf",p_fig4,width = 10,height = 8)
+
+
 
 

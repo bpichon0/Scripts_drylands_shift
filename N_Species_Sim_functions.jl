@@ -4,7 +4,7 @@ using StatsBase, RCall, Plots, StatsPlots, Random, DifferentialEquations, LaTeXS
 
 #Parameters functions 
 
-function Get_classical_param(; N_species=4, type_interaction="classic", alpha_0=0.1, cintra=0.2, scenario_trait="spaced", h=1)
+function Get_classical_param(; N_species=4, type_interaction="classic", alpha_0=0.1, cintra=0.2, scenario_trait="spaced", h=1, trade_off=1)
 
     r = 0.01
     d = 0.025
@@ -19,10 +19,11 @@ function Get_classical_param(; N_species=4, type_interaction="classic", alpha_0=
     tau_leap = 0.05
     trait = Get_species_traits(Nsp=N_species, scena=scenario_trait)
     h = h
+    trade_off = trade_off
 
-    Interaction_mat = Get_interaction_matrix(Nsp=N_species, type=type_interaction, alpha_0=alpha_0, cintra=cintra, trait_sp=trait, h=h)
+    Interaction_mat = Get_interaction_matrix(Nsp=N_species, type=type_interaction, alpha_0=alpha_0, cintra=cintra, trait_sp=trait, h=h, trade_off=1)
 
-    return [N_species, r, d, f, beta, m, e, cg, S, delta, z, tau_leap, trait, Interaction_mat, h]
+    return [N_species, r, d, f, beta, m, e, cg, S, delta, z, tau_leap, trait, Interaction_mat, h, trade_off]
 
 end
 
@@ -67,7 +68,7 @@ function Get_classical_param_dict(; N_species=4, type_interaction="classic", alp
         "h" => h
     )
 end
-function Get_interaction_matrix(; Nsp, type, trait_sp, cintra=0.5, alpha_0, h=1)
+function Get_interaction_matrix(; Nsp, type, trait_sp, cintra=0.5, alpha_0, h=1, trade_off=1)
 
     if (type == "random")
         Interaction_mat = rand(Nsp * Nsp) / (Nsp + 3)
@@ -83,8 +84,8 @@ function Get_interaction_matrix(; Nsp, type, trait_sp, cintra=0.5, alpha_0, h=1)
         for i in 1:(Nsp-1)
             for j in (i+1):Nsp
                 if i != j
-                    Interaction_mat[i, j] = alpha_0 * (1 + h * exp(-abs(trait_sp[i] - trait_sp[j])) * trait_sp[i]) #j on i
-                    Interaction_mat[j, i] = alpha_0 * (1 + h * exp(-abs(trait_sp[i] - trait_sp[j])) * trait_sp[j]) #i on j
+                    Interaction_mat[i, j] = alpha_0 * (1 + h * exp(-abs(trait_sp[i] - trait_sp[j])) * trait_sp[i]^trade_off) #j on i
+                    Interaction_mat[j, i] = alpha_0 * (1 + h * exp(-abs(trait_sp[i] - trait_sp[j])) * trait_sp[j]^trade_off) #i on j
                 end
             end
         end
@@ -116,7 +117,7 @@ end
 
 function Get_initial_lattice(; param, branch="Degradation", size_mat=25, type_ini="equal")
 
-    frac = Get_initial_state(param=param, type=type_ini, branch=branch)
+    frac = Get_initial_state(Nsp=param["Nsp"], type=type_ini, branch=branch)
     species_vec = [k for k in 1:param["Nsp"]]
     push!(species_vec, 0)
     push!(species_vec, -1)
@@ -198,20 +199,21 @@ function MF_N_species(du, u, p, t)
     S = p[9]
     trait = p[13]
     alpha = p[14]
+    trade_off = p[16]
 
     rho_0 = u[Nsp+1]
     rho_d = u[Nsp+2]
 
     for k in 1:Nsp
-        du[k] = rho_0 * (u[k] * (beta * (1 - S * (1 - trait[k] * e)) - (sum([alpha[k, i] * u[i] for i in 1:Nsp])))) - u[k] * m
+        du[k] = rho_0 * (u[k] * (beta * (1 - S * (1 - trait[k]^trade_off * e)) - (sum([alpha[k, i] * u[i] for i in 1:Nsp])))) - u[k] * m
     end
-    du[Nsp+1] = -d * rho_0 + rho_d * (r + f * (sum([trait[i] * u[i] for i in 1:Nsp])))
+    du[Nsp+1] = -d * rho_0 + rho_d * (r + f * (sum([trait[i]^trade_off * u[i] for i in 1:Nsp])))
 
     for k in 1:Nsp
-        du[Nsp+1] = du[Nsp+1] - rho_0 * (u[k] * (beta * (1 - S * (1 - trait[k] * e)) - (sum([alpha[k, i] * u[i] for i in 1:Nsp])))) + u[k] * m
+        du[Nsp+1] = du[Nsp+1] - rho_0 * (u[k] * (beta * (1 - S * (1 - trait[k]^trade_off * e)) - (sum([alpha[k, i] * u[i] for i in 1:Nsp])))) + u[k] * m
     end
 
-    du[Nsp+2] = d * rho_0 - rho_d * (r + f * (sum([trait[i] * u[i] for i in 1:Nsp])))
+    du[Nsp+2] = d * rho_0 - rho_d * (r + f * (sum([trait[i]^trade_off * u[i] for i in 1:Nsp])))
 
 end
 
@@ -287,17 +289,6 @@ function PA_N_species(du, u, p, t)
                   2 * rho_ii[Nsp+2] * (r + ((z - 1) / z) * f * (sum([trait[k] * (rho_im[k] / rho_m) for k in 1:Nsp])))
 
 
-    # OLD for rho_i0
-    # 2 * rho_ii[Nsp+1] * ((delta * rho_i[(i-(2*Nsp+4))] + (1 - delta) * ((z - 1) / z) * (rho_i0[(i-(2*Nsp+4))] / rho_0)) *
-    #                                      (beta * (1 - S * (1 - trait[(i-(2*Nsp+4))] * e)) -
-    #                                       (sum([rho_i[x] * alpha[(i-(2*Nsp+4)), x] for x in 1:(Nsp)])))) + #00 creating i0
-    #            rho_im[i-(2*Nsp+4)] * (r + (f * trait[(i-(2*Nsp+4))] / z) + ((z - 1) / z) * f * (sum([trait[k] * (rho_im[k] / rho_m) for k in 1:Nsp]))) +  # im creating i0
-    #            2 * rho_ii[i-(2*Nsp+4)] * m - #ii creating i0
-    #            rho_i0[i-(2*Nsp+4)] * m - #i0 creating 00
-    #            rho_i0[i-(2*Nsp+4)] * d - #i0 creating im
-    #            rho_i0[i-(2*Nsp+4)] * ((delta * rho_i[(i-(2*Nsp+4))] + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_i0[(i-(2*Nsp+4))] / rho_0)) *
-    #                                        (beta * (1 - S * (1 - trait[(i-(2*Nsp+4))] * e)) -
-    #                                         (sum([rho_i[x] * alpha[(i-(2*Nsp+4)), x] for x in 1:(Nsp)])))) #i0 creating ii
 
 
     #rho_m0 -> need rho_mi so the value is fixed after
@@ -393,7 +384,6 @@ function Gillespie_CA_N_species(; param, landscape, tmax, type_competition)
     beta = param["beta"]
     m = param["m"]
     e = param["e"]
-    emax = param["emax"]
     Nsp = param["Nsp"]
     delta = param["delta"]
     S = param["S"]
@@ -423,9 +413,9 @@ function Gillespie_CA_N_species(; param, landscape, tmax, type_competition)
 
             for sp in 1:Nsp
                 Rate_landscape[:, :, sp] .= beta .* (delta * rho[sp] .+ (1 - delta) * neigh_matrix[:, :, sp] / z) .* #dispersal
-                                            (emax * (1 - S * (1 - trait_sp[sp] * e)) .- #recruitment
+                                            ((1 - S * (1 - trait_sp[sp] * e)) .- #recruitment
                                              ((sum([interaction_mat[sp, k] * #global competition
-                                                    rho[k] for k in 1:Nsp]) / z))) .* (landscape .== 0) #local competition
+                                                    rho[k] for k in 1:Nsp])))) .* (landscape .== 0) #local competition
 
                 Rate_landscape[:, :, Nsp+sp] .= m .* (landscape .== sp) #to have mortality only in species cells
 
@@ -472,7 +462,7 @@ function Gillespie_CA_N_species(; param, landscape, tmax, type_competition)
 
             for sp in 1:Nsp
                 Rate_landscape[:, :, sp] .= beta .* (delta * rho[sp] .+ (1 - delta) * neigh_matrix[:, :, sp] / z) .* #dispersal
-                                            (emax * (1 - S * (1 - trait_sp[sp] * e)) .- #recruitment
+                                            ((1 - S * (1 - trait_sp[sp] * e)) .- #recruitment
                                              ((sum([interaction_mat[sp, k] *
                                                     neigh_matrix[:, :, k] for k in 1:Nsp]) / z))) .* (landscape .== 0)
 

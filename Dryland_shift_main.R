@@ -4667,220 +4667,8 @@ p_tot=ggarrange(p1,p2,labels = letters[1:2],nrow = 2)
 
 ggsave("../Figures/2_species/PA/Varying_trade_off_shape.pdf",p_tot,width = 10,height = 8)
 
-## 13) Which invades ----
 
-rm(list = ls())
-source("./Dryland_shift_functions.R")
-julia_setup()
-de = diffeq_setup()
-
-tspan = c(0, 2000) #to avoid long transient
-t = seq(0, 2000, by = 1)
-julia_library("DifferentialEquations")
-julia_assign("tspan", tspan)
-
-
-N_sim=100
-S_seq = c(0,.3,.75)
-psi_seq=seq(0,1,length.out=N_sim)
-c_inter_seq=c(0,.1, .2, .3,.4)[c(3,4,5)][2]
-psi1_seq=seq(0,1,length.out=N_sim)
-f_seq=c(.9)
-dispersal_scale=c(.1)
-branches=c("Degradation","Restoration")
-
-for (facil in f_seq){
-  
-  for (disp in dispersal_scale){
-    
-    for (S in S_seq) { 
-      
-      
-      for (cinter in c_inter_seq){
-        
-        
-        
-        for (branch in branches){
-          
-          if (branch =="Degradation"){ #doing the two branches of the bifurcation diagram
-            state = Get_PA_initial_state(Get_MF_initial_state(c(.4,.4,.1)))
-            S_seq=seq(0,1, length.out = N_sim)
-          }else {
-            state = Get_PA_initial_state(Get_MF_initial_state(c(.005,.005,.49)))
-            S_seq=rev(seq(0,1, length.out = N_sim))
-          }
-          
-          d2 = tibble()
-          
-          
-          for (psi2 in psi_seq){
-            
-            for (psi1 in psi1_seq){
-              
-              julia_assign("state", state)
-              param=Get_PA_parameters()
-              param["delta"]=disp
-              param["cintra"]=.3
-              param["alpha_0"]=cinter
-              param["S"] = S
-              param["psi_1"]=psi1
-              param["psi_2"]=psi2
-              param["f"]=facil
-              julia_assign("p", param)
-              
-              prob = julia_eval("ODEProblem(PA_two_species_varying_trait, state, tspan, p)")
-              
-              
-              sol = de$solve(prob, de$Tsit5(), saveat = t)
-              d = as.data.frame(t(sapply(sol$u, identity)))
-              colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
-              
-              d2 = rbind(d2, d[nrow(d), ] %>% add_column(Stress = S, Psi2 = psi2, Psi1 = psi1,alpha_0=cinter,
-                                                         Branch=branch))
-              
-            }
-          } # end trait value 2nd species
-          
-          d2[d2 < 10^-4] = 0
-          d2$rho_plus = d2$rho_1 + d2$rho_2
-          d2=d2[,c(1,2,10:15)]
-          colnames(d2) = c("Stress_tolerant", "Competitive", "Stress", "Psi2","Psi1","alpha_0","Branches","Rho_plus")
-          write.table(d2,paste0("../Table/2_species/PA/Multistability_PA/Invasion/Test_interspe_comp_",
-                                cinter,"_branch_",branch,
-                                "_stress_",S,"_delta_",disp,"_facilitation_",facil,".csv"),sep=";")
-          
-        } # end loop interspecific competition
-        
-      } # end loop branch
-      
-    } # end loop first species trait
-    
-  } #end loop dispersal
-  
-}#end facilitation loop
-
-
-
-
-
-c_inter_seq=c(.2,.3,.4)
-stress_seq=c(0,.3,.75)
-
-
-d=tibble()  
-for (stress in stress_seq){
-  
-  for (cinter in c_inter_seq){
-    for (branch in c("Restoration","Degradation")){
-      
-      d2=read.table(paste0("../Table/2_species/PA/Multistability_PA/Invasion/Test_interspe_comp_",
-                           cinter,"_branch_",branch,
-                           "_stress_",stress,"_delta_",.1,"_facilitation_",.9,".csv"),sep=";")
-      d=rbind(d,d2)
-      
-    }
-    
-  } # end loop interspecific competition
-} # end loop branch
-
-
-
-
-d[,1:2][d[,1:2] < 10^-4] = 0
-
-
-#COmputing CSI index
-set.seed(123)
-u=runif(2)
-d$CSI = sapply(1:nrow(d),function(x){
-  return(u[1]*d$Stress_tolerant[x]+u[2]*d$Competitive[x])
-})
-
-d2=d
-d2$state = sapply(1:nrow(d2), function(x) {
-  if (d2[x, 1] > 0 & d2[x, 2] > 0) {
-    return("Coexistence")
-  }
-  if (d2[x, 1] > 0 & d2[x, 2] == 0) {
-    return("Stress_tolerant")
-  }
-  if (d2[x, 1] == 0 & d2[x, 2] > 0) {
-    return("Species 2")
-  }
-  if (d2[x, 1] == 0 & d2[x, 2] == 0) {
-    return("Desert")
-  }
-})
-
-d2=d2[order(d2$Psi2,d2$Stress,d2$alpha_0,d2$Psi1),]
-
-all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
-  if (d2$state[x] != d2$state[x+1]){
-    return(paste0(d2$state[x],"/", d2$state[x+1]))
-  }
-  else {return(d2$state[x])}
-})
-
-d_state=d2%>%
-  filter(., Branches=="Degradation")%>%
-  select(.,-Branches)
-d_state$all_state=all_state
-
-
-color_rho = c("Coexistence" = "#D8CC7B", "Competitive" = "#ACD87B", "Desert" = "#696969", "Stress_tolerant" = "#7BD8D3")
-
-appender <- function(string) {
-  TeX(paste("$\\alpha_e = $", string))}
-
-d_state=d_state%>%
-  mutate(all_state=recode_factor(all_state,
-                                 "Desert/Species 2"="Sp2/Desert",
-                                 "Desert/Coexistence"="Coexistence/Desert",
-                                 "Stress_tolerant"="Sp1",
-                                 "Coexistence/Stress_tolerant"="Coexistence/Sp1",
-                                 "Desert/Stress_tolerant"="Sp1/Desert",
-                                 "Stress_tolerant/Coexistence"="Coexistence/Sp1",
-                                 "Stress_tolerant/Species 2"="Sp1/Sp2",
-                                 "Species 2/Stress_tolerant"="Sp1/Sp2",
-                                 "Species 2/Coexistence"="Coexistence/Sp2",
-                                 "Coexistence/Species 2"="Coexistence/Sp2",
-                                 "Species 2" = "Sp2"))
-
-d_state$all_state2=d_state$all_state
-
-for (nr in 1:nrow(d_state)){
-  if (d_state$Psi2[nr]>d_state$Psi1[nr]){
-    d_state$all_state[nr]=NA
-  }
-}
-
-color_multistability=c("Coexistence" = "#D8CC7B",
-                       "Sp2" = "#ACD87B",
-                       "Coexistence/Sp2" = "#DDEFCA",
-                       "Sp1" = "#7BD8D3",
-                       "Sp1/Desert" ="#0F8E87",
-                       "Coexistence/Sp1"="#9BBBB9",
-                       "Coexistence/Desert"="#C19E5E",
-                       "Desert"=  "#696969",
-                       "Sp1/Sp2" = "#C998CE")
-
-p=ggplot(d_state%>%filter(., Stress !=.75)) +
-  geom_tile(aes(x=Psi1,y=as.numeric(Psi2),fill=all_state2))+
-  theme_classic() +
-  theme(legend.position = "bottom") +
-  theme(legend.text = element_text(size = 11))+
-  the_theme+theme(legend.text = element_text(size=9),strip.text.x = element_text(size=13))+
-  facet_grid(Stress~alpha_0,labeller = label_bquote(cols= alpha[e]==.(alpha_0),rows = Stress==.(Stress) ))+
-  scale_fill_manual(values=color_multistability,na.value = "white")+
-  labs(x=TeX("$\\psi_1$"),y=TeX("$\\psi_2$"),fill="")
-ggsave("../Figures/2_species/PA/Testing_relative_strategies_twofaces.pdf",width = 8,height = 7)
-
-
-
-
-
-
-## 14) Fraction gradient with bistability ----
+## 13) Fraction gradient with bistability ----
 
 rm(list = ls())
 source("./Dryland_shift_functions.R")
@@ -4969,6 +4757,9 @@ for (facil in f_seq){
   } #end loop dispersal
   
 }#end facilitation loop
+
+
+
 
 
 
@@ -5237,3 +5028,79 @@ p2=ggplot(d_richness%>%filter(., Branch=="Degradation"))+
 
 
 ggsave("../Figures/N_species/MF/Nb_shift_diversity.pdf",ggarrange(p1,p2,ncol = 2,labels = letters[1:2],align = "hv"),width=10,height=5)
+
+## 4) PA ----
+
+
+pdf("./test.pdf",width = 6,height = 4)
+for (i in list.files("../Table/N_species/PA/Tradeoff/",pattern = "Nsp")){
+  d=read.table(paste0("../Table/N_species/PA/Tradeoff/",i),sep=",")
+  colnames(d)[c(ncol(d)-1,ncol(d))]=c("Branches","Stress")
+
+  if (as.numeric(strsplit(i,"_")[[1]][5])>.23){
+  
+    if (length(grep(pattern = "Nsp",i))==1){
+      print(ggplot(d%>%melt(., measure.vars=c(paste0("V",1:5)))%>%
+                     filter(., Branches==2))+geom_line(aes(x=Stress,y=value,color=variable))+theme_classic()+
+              ggtitle(paste0("5 species ,aij = ",as.numeric(strsplit(i,"_")[[1]][5]),
+                             " and tradeoff = ",as.numeric(strsplit(i,"_")[[1]][7]),
+                             " Nrandom = ",as.numeric(strsplit(i,"_")[[1]][3])))+
+        theme(plot.title = element_text(size=9),legend.position = "bottom"))
+      
+    }  else {
+      print(ggplot(d%>%melt(., measure.vars=c(paste0("V",1:15)))%>%
+                     filter(., Branches==2))+geom_line(aes(x=Stress,y=value,color=variable))+theme_classic()+
+              ggtitle(paste0("15 species ,aij = ",as.numeric(strsplit(i,"_")[[1]][5]),
+                             " and tradeoff = ",as.numeric(strsplit(i,"_")[[1]][7]),
+                             " Nrandom = ",as.numeric(strsplit(i,"_")[[1]][3])))+
+        theme(plot.title = element_text(size=9),legend.position = "bottom"))
+      
+    }
+  }
+  
+}
+dev.off()
+
+
+## 5) Minimal level of competition ----
+
+pdf("./test2.pdf",width = 6,height = 4)
+for (i in list.files("../Table/N_species/PA/Minimal_comp/",pattern = "Nsp")){
+  d=read.table(paste0("../Table/N_species/PA/Minimal_comp/",i),sep=",")
+  colnames(d)[c(ncol(d)-1,ncol(d))]=c("Branches","Stress")
+  
+    
+  print(ggplot(d%>%melt(., measure.vars=c(paste0("V",1:as.numeric(strsplit(i,"_")[[1]][9]))))%>%
+                 filter(., Branches==2))+geom_line(aes(x=Stress,y=value,color=variable))+theme_classic()+
+          ggtitle(paste0("aij = ",as.numeric(strsplit(i,"_")[[1]][5]),
+                         " and tradeoff = ",as.numeric(strsplit(i,"_")[[1]][7]),
+                         " Nspecies = ",as.numeric(strsplit(i,"_")[[1]][9])))+
+          theme(plot.title = element_text(size=9),legend.position = "bottom"))
+  # 
+  # pairs=Extract_pairs_trait(d,as.numeric(strsplit(i,"_")[[1]][9]),clustering = T)
+  # ggplot(pairs)+
+  #   geom_tile(aes(x=Trait1,y=Trait2,fill=Pair_value))+
+  #   facet_wrap(.~Stress)
+  # 
+  # 
+  # pairs$type=as.numeric(as.factor(pairs$Stress))
+  # 
+  # 
+  # plot_func <- function(df,name) {
+  #   ggplot(data=df)+
+  #     geom_tile(aes(x=Trait1,y=Trait2,fill=Pair_value))+
+  #     scale_fill_viridis_c()
+  # }
+  # 
+  # nested_tmp <- pairs %>% filter(., round(Stress,5)==round(unique(pairs$Stress),
+  #                                                          5)[seq(1,length(unique(pairs$Stress)),length.out=7)])%>%
+  #   group_by(.,Stress,type) %>% 
+  #   nest(.) %>% 
+  #   mutate(.,plots = map2(data,type,plot_func)) 
+  # 
+  # gridExtra::grid.arrange(grobs = nested_tmp$plots)
+  # 
+  
+}
+dev.off()
+

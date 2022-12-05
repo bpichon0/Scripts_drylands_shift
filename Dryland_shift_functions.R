@@ -964,3 +964,56 @@ end
 
 
 ")
+
+## C) N species ----
+
+Extract_pairs_trait=function(d,Nsp,self=F,clustering=T){
+  
+  pairs=d[,(4*Nsp+6):(((Nsp^2 + 7 * Nsp) / 2) + 5)]
+  
+  if (self){pairs=d[,(Nsp+3):(2*Nsp+2)]}
+  
+  trait_sp=seq(1,0,length.out=Nsp)
+  
+  list_pair_name=c()
+  for (i in 1:(Nsp-1)){
+    for (j in (i+1):(Nsp)){
+      list_pair_name=c(list_pair_name,paste0(i,"_",j))
+    }
+  }
+  
+  
+  d_pair=tibble()
+  
+  if (clustering){
+    for (i in 1:(Nsp-1)){
+      for (j in (i+1):(Nsp)){
+        
+        d_pair=rbind(d_pair,tibble(Trait1=trait_sp[i],Trait2=trait_sp[j],
+                                   Delta_trait=abs(trait_sp[i]-trait_sp[j]),
+                                   Pair_value=pairs[,which(list_pair_name==paste0(i,"_",j))]/(d[,i]*d[,j]),
+                                   Stress=d[,ncol(d)]
+        ))
+        
+        
+      }
+    }
+  } else{
+    for (i in 1:(Nsp-1)){
+      for (j in (i+1):(Nsp)){
+        
+        d_pair=rbind(d_pair,tibble(Trait1=trait_sp[i],Trait2=trait_sp[j],
+                                   Delta_trait=abs(trait_sp[i]-trait_sp[j]),
+                                   Pair_value=pairs[,which(list_pair_name==paste0(i,"_",j))],
+                                   Stress=d[,ncol(d)]
+        ))
+        
+        
+      }
+    }
+    
+  }  
+  return(d_pair)
+  
+  
+}
