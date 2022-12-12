@@ -22,17 +22,10 @@ color_hys=colorRampPalette(c("#C7B6C8", "#74B6BA" ,"#7783C4" ,"#B56D4E", "#F28E4
 dir.create("../",showWarnings = F)
 dir.create("../Table",showWarnings = F)
 dir.create("../Table/2_species",showWarnings = F)
-dir.create("../Figures",showWarnings = F)
-dir.create("../Figures/2_species",showWarnings = F)
-dir.create("../Figures/2_species/CA",showWarnings = F)
-dir.create("../Figures/2_species/PA",showWarnings = F)
-dir.create("../Figures/2_species/MF",showWarnings = F)
-dir.create("../Table/2_species/CA/PL_summary",showWarnings = F)
-dir.create("../Table/2_species/CA/EWS_spatial",showWarnings = F)
 
 
 
-# A) Mean field analysis ----
+# 1) Mean field analysis ----
 
 Get_MF_parameters = function() {
     return(c(
@@ -235,28 +228,6 @@ Compute_hysteresis = function(d, n_species = 2) {
 
 
 
-plot_dynamics = function(d) {
-    color_rho2 = c("fertile" = "#D8CC7B", "competitive" = "#ACD87B", "desert" = "#696969", "stress_tol" = "#7BD8D3")
-    colnames(d) = c("rho_1", "rho_2", "rho_0", "rho_d")
-    if ("time" %in% colnames(d) | "Time" %in% colnames(d)) {
-        return(ggplot(d %>% melt(., id.vars = colnames(d)[ncol(d)]) %>%
-            mutate(., variable = recode_factor(variable, "rho_1" = "stress_tol", "rho_2" = "competitive", "rho_0" = "fertile", "rho_d" = "desert"))) +
-            geom_line(aes(x = time, y = value, color = variable), lwd = 1) +
-            theme_classic() +
-            scale_color_manual(values = color_rho2) +
-            labs(x = "Time", y = "Densities", color = "") +
-            theme(legend.text = element_text(size = 11), legend.position = "bottom"))
-    } else {
-        d$time = 1:nrow(d)
-        return(ggplot(d %>% melt(., id.vars = colnames(d)[ncol(d)]) %>%
-            mutate(., variable = recode_factor(variable, "rho_1" = "stress_tol", "rho_2" = "competitive", "rho_0" = "fertile", "rho_d" = "desert"))) +
-            geom_line(aes(x = time, y = value, color = variable), lwd = 1) +
-            the_theme +
-            scale_color_manual(values = color_rho2) +
-            labs(x = "Time", y = "Densities", color = "") +
-            theme(legend.text = element_text(size = 11), legend.position = "bottom"))
-    }
-}
 
 
 # Recruitment rate
@@ -272,7 +243,7 @@ Get_recruitment_rates = function(eq, param) {
 }
 
 
-# B) Pair approximation analysis ----
+# 2) Pair approximation analysis ----
 
 Get_PA_parameters = function() {
   param=c(
@@ -965,7 +936,7 @@ end
 
 ")
 
-## C) N species ----
+## 3) N species ----
 
 Extract_pairs_trait=function(d,Nsp,self=F,clustering=T){
   
@@ -1015,5 +986,66 @@ Extract_pairs_trait=function(d,Nsp,self=F,clustering=T){
   }  
   return(d_pair)
   
+  
+}
+
+
+Plot_landscape = function(landscape,Nsp=15){
+  color_CA = c("white","white",rev(color_Nsp(Nsp)))
+  if (Nsp==2){
+    color_CA = c("white","white",as.character(color_rho[c(4,2)]))
+  }
+  
+  state=melt(landscape)
+  state$Var2=paste0("V",1:100)
+  colnames(state)[1:2]=c("Var1","value")
+  ggplot(state) +
+    geom_tile(aes(x = Var1, y = Var2, fill = value)) +
+    theme_transparent() +
+    scale_fill_gradientn(colours = color_CA,breaks=c(1:5)) +
+    theme(panel.border = element_blank()) +
+    theme(legend.position = "bottom") +
+    labs(fill = "")
+}
+
+
+plot_dynamics = function(d) {
+  color_rho2 = c("Fertile" = "#D8CC7B", "Competitive" = "#ACD87B", "Desert" = "#696969", "Stress-tolerant" = "#7BD8D3")
+  
+  if (colnames(d)<7){
+    
+    if ("time" %in% colnames(d) | "Time" %in% colnames(d)) {
+      colnames(d) = c("Stress-tolerant", "Competitive", "Fertile", "Desert","Time")
+      
+      return(ggplot(d %>% melt(., id.vars = colnames(d)[ncol(d)]))+
+               geom_line(aes(x = time, y = value, color = variable), lwd = 1) +
+               theme_classic() +
+               scale_color_manual(values = color_rho2) +
+               labs(x = "Time", y = "Densities", color = "") +
+               theme(legend.text = element_text(size = 11), legend.position = "bottom"))
+    } else {
+      colnames(d) = c("Stress-tolerant", "Competitive", "Fertile", "Desert")
+      
+      d$time = 1:nrow(d)
+      return(ggplot(d %>% melt(., id.vars = colnames(d)[ncol(d)]))+
+               geom_line(aes(x = time, y = value, color = variable), lwd = 1) +
+               the_theme +
+               scale_color_manual(values = color_rho2) +
+               labs(x = "Time", y = "Densities", color = "") +
+               theme(legend.text = element_text(size = 11), legend.position = "bottom"))
+    }
+  }else{
+    
+    colnames(d)=c(paste0(1:(ncol(d)-3)),"Fertile","Degraded","time")
+    
+    return(ggplot(d %>% melt(., measure.vars = colnames(d)[1:(ncol(d)-3)]))+
+             geom_line(aes(x = time, y = value, color = variable), lwd = 1) +
+             the_theme +
+             scale_color_manual(values = rev(color_Nsp(5))) +
+             labs(x = "Time", y = "Densities", color = "Species") +
+             theme(legend.text = element_text(size = 11), legend.position = "bottom"))
+    
+    
+  }
   
 }

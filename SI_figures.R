@@ -2,112 +2,12 @@ source('./Dryland_shift_functions.R')
 library(grid)
 
 
+
+
+
+
 # 2-species ----
-## Multistability along competition gradient with local competition ----
-d2=read.table(paste0("../Table/2_species/PA/Multistability_fixed_traits_PA.csv"),sep=";")
-
-d2$state = sapply(1:nrow(d2), function(x) {
-  if (d2[x, 1] > 0 & d2[x, 2] > 0) {
-    return("Coexistence")
-  }
-  if (d2[x, 1] > 0 & d2[x, 2] == 0) {
-    return("Stress_tolerant")
-  }
-  if (d2[x, 1] == 0 & d2[x, 2] > 0) {
-    return("Competitive")
-  }
-  if (d2[x, 1] == 0 & d2[x, 2] == 0) {
-    return("Desert")
-  }
-})
-
-d2=d2[order(d2$alpha_0,d2$Scena,d2$Delta,d2$Stress),]
-
-all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
-  if (d2$state[x] != d2$state[x+1]){
-    return(paste0(d2$state[x],"/", d2$state[x+1]))
-  }
-  else {return(d2$state[x])}
-})
-
-d_state=d2%>%
-  filter(., Branches=="Degradation")%>%
-  select(.,-Branches)
-d_state$all_state=all_state
-
-
-scale="local"
-d2t=transform(d_state%>% 
-                filter(., Scena %in% c(paste0(scale,"_C_global_F"),paste0(scale,"_C_local_F")))%>%
-                mutate(., Stress=round(Stress,6),alpha_0=round(alpha_0,6)),
-              Scena=factor(Scena,levels=c(paste0(scale,"_C_global_F"),paste0(scale,"_C_local_F")),
-                           labels=c("Global facilitation","Local facilitation")))
-
-color_rho = c("Coexistence" = "#D8CC7B", "Competitive" = "#ACD87B", "Desert" = "#696969", "Stress_tolerant" = "#7BD8D3")
-
-
-d2t$Multistability=sapply(1:nrow(d2t),function(x){
-  if (d2t$all_state[x] %in% c("Competitive","Coexistence","Desert","Stress_tolerant")){
-    return("no_multi")
-  } else{
-    return("multi")
-  }
-})
-
-
-p1_pattern=ggplot(d2t%>%
-                    mutate(.,all_state=recode_factor(all_state,
-                                                     "Competitive/Coexistence"="Coexistence/Competitive",
-                                                     "Coexistence/Stress_tolerant"="Coexistence/Stress-tolerant",
-                                                     "Stress_tolerant"="Stress-tolerant",
-                                                     "Stress_tolerant/Desert"="Stress-tolerant/Desert"))) +
-  geom_tile_pattern(aes(x=Stress,y=alpha_0,fill=all_state,pattern=Multistability),              
-                    colour          = 'transparent',
-                    pattern_spacing = 0.05, 
-                    pattern_density = 0.01, 
-                    pattern_fill    = alpha("black",.7),
-                    pattern_colour  = alpha("black",.7))+
-  
-  theme_classic() +
-  theme(legend.position = "bottom") +
-  labs(x = TeX(r'(Stress, \ $S)'), y = TeX(r'(Strength of competition, \ $\alpha_e)'), fill = "") +
-  theme(legend.text = element_text(size = 11))+
-  scale_fill_manual(values=c("Coexistence" = "#D8CC7B", 
-                             "Competitive" = "#ACD87B", 
-                             "Coexistence/Competitive" = "#DDEFCA",
-                             "Stress-tolerant" = "#7BD8D3",
-                             "Stress-tolerant/Desert" ="#0F8E87",
-                             "Coexistence/Stress-tolerant"="#9BBBB9",
-                             "Coexistence/Desert"="#C19E5E",
-                             "Desert"=  "#696969"
-  ))+
-  facet_grid(Scena~Delta,labeller=label_bquote(cols = delta == .(Delta)))+
-  the_theme+theme(strip.text.x = element_text(size=12),legend.text = element_text(size=9))+
-  scale_pattern_manual(values=rev(c("none" ,"stripe")))
-
-
-Fig_2_SI=p1_pattern+guides(pattern=F)
-
-ggsave("../Figures/Final_figs/SI/Fig_2_with_local_competition.pdf",Fig_2_SI,width = 8,height = 6)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-## Multistability but with mean-field model ----
+## Multistability fixed traits MF model ----
 
 d2=read.table(paste0("../Table/2_species/MF/Multistability_MF.csv"),sep=";")
 
@@ -232,439 +132,551 @@ ggsave("../Figures/Final_figs/SI/Multistability_fixed_traits_MF.pdf",ggarrange(p
 
 
 
-## Multistability varying traits with mean-field model ----
+## Multistability varying traits MF model ----
 
-c_inter_seq=c(0,.1, .2, .3)
-psi1_seq=c(1,0)
+stress_seq=c(seq(0,.82, length.out = 100),seq(0.82,.9, length.out = 10)[-1])
+
+d=tibble()  
+d_bistab=tibble()
 
 
-
-for (Psi_sp1 in psi1_seq){
-  d=tibble()  
+for (stress in stress_seq){
   
-  for (branch in c("Restoration","Degradation")){
-    for (cinter in c_inter_seq){
+  
+  
+  d2=rbind(read.table(paste0("../Table/2_species/MF/Test_interspe_comp_",
+                             .3,"_branch_Degradation_stress_",stress,"_facilitation_",.9,".csv"),sep=";"),
+           read.table(paste0("../Table/2_species/MF/Test_interspe_comp_",
+                             .3,"_branch_Restoration_stress_",stress,"_facilitation_",.9,".csv"),sep=";"))
+  d=rbind(d,d2)
+  
+  
+  
+}
+
+d2=d
+d2[,1:2][d2[,1:2] < 10^-3] = 0
+d2$state = sapply(1:nrow(d2), function(x) {
+  if (d2[x, 1] > 0 & d2[x, 2] > 0) {
+    return("Coexistence")
+  }
+  if (d2[x, 1] > 0 & d2[x, 2] == 0) {
+    return("Sp1")
+  }
+  if (d2[x, 1] == 0 & d2[x, 2] > 0) {
+    return("Sp2")
+  }
+  if (d2[x, 1] == 0 & d2[x, 2] == 0) {
+    return("Desert")
+  }
+})
+d2=d2[order(d2$Psi2,d2$Stress,d2$alpha_0,d2$Psi1),]
+
+all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
+  if (d2$state[x] != d2$state[x+1]){
+    return(paste0(d2$state[x],"/", d2$state[x+1]))
+  }
+  else {return(d2$state[x])}
+})
+
+d_state=d2%>%
+  filter(., Branches=="Degradation")%>%
+  select(.,-Branches)
+d_state$all_state=all_state
+
+d_state$multistab=sapply(1:nrow(d_state),function(x){
+  if (d_state$all_state[x] %in% c( "Sp1/Sp2","Coexistence/Sp1","Sp2/Coexistence",
+                                   "Sp2/Sp1")){
+    return(1)
+  } else {return(0)}
+  
+})
+
+d_state$Sp1_reg=d2$Sp1[which(d2$Branches=="Restoration")]
+d_state$Sp2_reg=d2$Sp2[which(d2$Branches=="Restoration")]
+
+d_final=tibble()
+for (i in unique(d_state$Psi1)){
+  for (j in unique(d_state$Psi2)){
+    for (a0 in unique(d_state$alpha_0)){
+      d_fil=filter(d_state,Psi1==i,Psi2==j,alpha_0==a0)
       
-      d2=read.table(paste0("../Table/2_species/MF/Varying_traits/Multistability_varying_trait_interspe_comp_",
-                           cinter,"_branch_",branch,
-                           "_Psi1_",Psi_sp1,".csv"),sep=";")
-      
-      d=rbind(d,d2)
-      
-    } # end loop interspecific competition
-  } # end loop branch
+      if (i>j){
+        d_final=rbind(d_final,tibble(Psi1=i,Psi2=j,alpha_0=a0,
+                                     Frac_multi=sum(d_fil$multistab)/length(which(d_fil$state!="Desert")),
+                                     Frac_multi_raw=sum(d_fil$multistab),
+                                     Deg=d_fil$Stress[min(which(d_fil$Sp2==0))-1],
+                                     Rest=d_fil$Stress[min(which(d_fil$Sp2_reg==0))]
+        ))
+      }
+    }
+  }
+}
+
+trait1_for_bifu=c(unique(d2$Psi1)[15],unique(d2$Psi1)[49],unique(d2$Psi1)[49])
+trait2_for_bifu=c(unique(d2$Psi2)[13],unique(d2$Psi2)[1],unique(d2$Psi2)[49])
+
+p1=ggplot(d_final)+
+  geom_tile(aes(x=Psi1,y=Psi2,fill=Frac_multi_raw/length(unique(d_state$Stress))))+
+  geom_contour(aes(x=Psi1,y=Psi2,z=Frac_multi_raw/length(unique(d_state$Stress))),
+               color="black",alpha=.3,breaks = c(.1,.15,.2))+
+  geom_point(data=tibble(x=trait1_for_bifu,y=trait2_for_bifu),aes(x=x,y=y),shape=19)+
+  geom_text(data=tibble(x=c(trait1_for_bifu[1],trait1_for_bifu[2]+.05,trait1_for_bifu[3]+.05),
+                        y=c(trait2_for_bifu[1]+.13,trait2_for_bifu[2]+.05,trait2_for_bifu[3]+0.05),
+                        txt=c("(ii)","(i)","(iii)")),aes(x=x,y=y,label=txt),size=4.5)+
+  geom_segment(aes(x = 0.05, y = -0.02, xend = .95, yend = -0.02),arrow = arrow(length = unit(0.3, "cm")))+
+  geom_text(aes(x = .5, y = -0.06,label = "Sensitivity to competition"),stat = "unique")+
+  geom_segment(aes(x = 1.02, y = 0, xend = 1.02, yend = .95),arrow = arrow(length = unit(0.3, "cm")))+
+  geom_text(aes(x = 1.05, y = .45,label = "Trait similarity"),stat = "unique",angle=270)+
+  the_theme+
+  labs(x=TeX(r'(Species 1 trait, $\psi_1$)'),
+       y=TeX(r'(Species 2 trait, $\psi_2$)'),
+       fill="Fraction of community bistability \n along the stress gradient")+
+  scale_fill_gradientn(colors=colorRampPalette(c("#FFFFFF","#E2BFE2","#D48ACF","#650328"))(100))+
+  guides(shape="none")
+
+
+for (i in 1:3){
   
-  
-  
-  
-  d2=d
-  d2[,1:2][d2[,1:2] < 10^-4] = 0
-  
-  
-  #COmputing CSI index
-  set.seed(123)
-  u=runif(2)
-  d2$CSI = sapply(1:nrow(d2),function(x){
-    return(u[1]*d2$Stress_tolerant[x]+u[2]*d2$Competitive[x])
-  })
-  
-  
-  
-  if (Psi_sp1 ==1) {
+  if (i %in% c(1,3)){
+    assign(paste0("p2_",i),
+           ggplot(d2%>%
+                    filter(., Psi2==trait2_for_bifu[i],Psi1==trait1_for_bifu[i])%>%
+                    melt(.,measure.vars=c("Sp1","Sp2"))%>%
+                    mutate(., variable=recode_factor(variable,"Sp1"="Sp. 1","Sp2"="Sp. 2")))+
+             geom_line(aes(x=Stress,y=value,color=variable,linetype=Branches))+
+             scale_color_manual(values=as.character(color_Nsp(5)[c(2,5)]))+
+             the_theme+
+             labs(x="Stress (S)",y="Species cover",color="",linetype="")+
+             theme(axis.title.y = element_blank(),axis.text.y = element_blank(),axis.ticks.y=element_blank(),axis.line.y = element_blank(),
+                   legend.position = "none")+
+             scale_y_continuous(breaks = c(0,.2,.4,.6,.8))+
+             new_scale_color() +
+             
+             geom_line(data=d_state%>%
+                         filter(., Psi2==trait2_for_bifu[i],Psi1==trait1_for_bifu[i]),
+                       aes(x=Stress,y=.85,color=as.factor(multistab),group=as.factor(multistab)),alpha=.3,lwd=2)+
+             scale_color_manual(values=c("white","black"))+
+             guides(color=F)
+    )
     
-    
-    d2$state = sapply(1:nrow(d2), function(x) {
-      if (d2[x, 1] > 0 & d2[x, 2] > 0) {
-        return("Coexistence")
-      }
-      if (d2[x, 1] > 0 & d2[x, 2] == 0) {
-        return("Stress_tolerant")
-      }
-      if (d2[x, 1] == 0 & d2[x, 2] > 0) {
-        return("Species 2")
-      }
-      if (d2[x, 1] == 0 & d2[x, 2] == 0) {
-        return("Desert")
-      }
-    })
-    
-    d2=d2[order(d2$Psi2,d2$Stress,d2$alpha_0,d2$Psi1),]
-    
-    all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
-      if (d2$state[x] != d2$state[x+1]){
-        return(paste0(d2$state[x],"/", d2$state[x+1]))
-      }
-      else {return(d2$state[x])}
-    })
-    
-    d_state=d2%>%
-      filter(., Branches=="Degradation")%>%
-      select(.,-Branches)
-    d_state$all_state=all_state
-    
-    d_state$Multistability=sapply(1:nrow(d_state),function(x){
-      if (d_state$all_state[x] %in% c("Species 2","Coexistence","Desert","Stress_tolerant")){
-        return("no_multi")
-      } else{
-        return("multi")
-      }
-    })
-    
-    color_rho = c("Coexistence" = "#D8CC7B", "Competitive" = "#ACD87B", "Desert" = "#696969", "Stress_tolerant" = "#7BD8D3")
-    
-    appender <- function(string) {
-      TeX(paste("$\\alpha_e = $", string))}
-    
-    
-    
-    
-    p1=ggplot(d_state%>%
-                mutate(all_state=recode_factor(all_state,
-                                               "Desert/Species 2"="Competitive/Desert",
-                                               "Desert/Coexistence"="Coexistence/Desert",
-                                               "Species 2"="Competitive",
-                                               "Desert/Stress_tolerant"="Stress-tolerant/Desert",
-                                               "Coexistence/Species 2"="Coexistence/Competitive",
-                                               "Stress_tolerant"= "Stress-tolerant",
-                                               "Stress_tolerant/Coexistence"="Coexistence/Stress-tolerant",
-                                               "Stress_tolerant/Species 2"="Competitive/Stress-tolerant",
-                                               "Species 2/Coexistence"="Coexistence/Competitive"))) +
-      geom_tile_pattern(aes(x=Stress,y=as.numeric(Psi2),fill=all_state,pattern=Multistability),              
-                        colour          = 'transparent',
-                        pattern_spacing = 0.05, 
-                        pattern_density = 0.01, 
-                        pattern_fill    = alpha("black",.7),
-                        pattern_colour  = alpha("black",.7))+
-      theme_classic() +
-      theme(legend.position = "bottom") +
-      labs(x = "Stress (S)", y = TeX(r'(Trait competitive sp., \ $\psi_2)'), fill = "") +
-      theme(legend.text = element_text(size = 11))+
-      scale_fill_manual(values=c("Coexistence" = "#D8CC7B",
-                                 "Competitive" = "#ACD87B",
-                                 "Coexistence/Competitive" = "#DDEFCA",
-                                 "Stress-tolerant" = "#7BD8D3",
-                                 "Stress-tolerant/Desert" ="#0F8E87",
-                                 "Coexistence/Stress-tolerant"="#9BBBB9",
-                                 "Coexistence/Desert"="#C19E5E",
-                                 "Desert"=  "#696969",
-                                 "Competitive/Stress-tolerant" = "#C998CE"))+
-      facet_grid(.~alpha_0,labeller=label_bquote(cols = alpha[e] == .(alpha_0)))+
-      the_theme+theme(legend.text = element_text(size=9),strip.text.x = element_text(size=13))+
-      scale_y_continuous(sec.axis = sec_axis(trans = ~ (1-.x) ,
-                                             name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)') ))+
-      ggtitle(TeX("$\\psi_1 = 1$"))+
-      scale_pattern_manual(values=rev(c("none" ,"stripe")))
-    
-    
-    
-    
-    
-  } 
-  if (Psi_sp1==0){
-    
-    d2$state = sapply(1:nrow(d2), function(x) {
-      if (d2[x, 1] > 0 & d2[x, 2] > 0) {
-        return("Coexistence")
-      }
-      if (d2[x, 1] > 0 & d2[x, 2] == 0) {
-        return("Competitive")
-      }
-      if (d2[x, 1] == 0 & d2[x, 2] > 0) {
-        return("Species 2")
-      }
-      if (d2[x, 1] == 0 & d2[x, 2] == 0) {
-        return("Desert")
-      }
-    })
-    
-    d2=d2[order(d2$Psi2,d2$Stress,d2$alpha_0,d2$Psi1),]
-    
-    all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
-      if (d2$state[x] != d2$state[x+1]){
-        return(paste0(d2$state[x],"/", d2$state[x+1]))
-      }
-      else {return(d2$state[x])}
-    })
-    
-    d_state=d2%>%
-      filter(., Branches=="Degradation")%>%
-      select(.,-Branches)
-    d_state$all_state=all_state
-    
-    
-    color_rho = c("Coexistence" = "#D8CC7B", "Competitive" = "#ACD87B", "Desert" = "#696969", "Stress_tolerant" = "#7BD8D3")
-    
-    appender <- function(string) {
-      TeX(paste("$\\alpha_e = $", string))}
-    
-    d_state$Multistability=sapply(1:nrow(d_state),function(x){
-      if (d_state$all_state[x] %in% c("Species 2","Coexistence","Desert","Competitive")){
-        return("no_multi")
-      } else{
-        return("multi")
-      }
-    })
-    
-    
-    p2=ggplot(d_state%>%
-                mutate(all_state=recode_factor(all_state,
-                                               "Species 2/Coexistence"="Coexistence/Stress-tolerant",
-                                               "Desert/Species 2"="Stress-tolerant/Desert",
-                                               "Desert/Coexistence"="Coexistence/Desert",
-                                               "Desert/Competitive"="Competitive/Desert",
-                                               "Competitive" = "Competitive",
-                                               "Species 2" = "Stress-tolerant",
-                                               "Coexistence/Competitive" = "Coexistence/Competitive"
-                ),
-                Psi2=round(Psi2,5),
-                Stress=round(Stress,5))) +
-      geom_tile_pattern(aes(x=Stress,y=as.numeric(Psi2),fill=all_state,pattern=Multistability),              
-                        colour          = 'transparent',
-                        pattern_spacing = 0.05, 
-                        pattern_density = 0.01, 
-                        pattern_fill    = alpha("black",.7),
-                        pattern_colour  = alpha("black",.7))+
-      theme_classic() +
-      theme(legend.position = "bottom") +
-      labs(x = "Stress (S)", y = TeX(r'(Trait stress-tolerant sp., \ $\psi_2)'), fill = "") +
-      theme(legend.text = element_text(size = 11))+
-      scale_fill_manual(values=c("Coexistence" = "#D8CC7B",
-                                 "Stress-tolerant" = "#7BD8D3",
-                                 "Competitive" = "#ACD87B",
-                                 "Coexistence/Stress-tolerant" = "#9BBBB9",
-                                 "Stress-tolerant/Desert" ="#0F8E87",
-                                 "Coexistence/Desert"="#C19E5E",
-                                 "Coexistence/Competitive" = "#DDEFCA",
-                                 "Coexistence/Stress-tolerant"="#9BBBB9",
-                                 "Desert"=  "#696969"))+
-      facet_grid(.~alpha_0,labeller=label_bquote(cols = alpha[e] == .(alpha_0)))+
-      the_theme+theme(legend.text = element_text(size=9),strip.text.x = element_text(size=13))+
-      scale_y_continuous(sec.axis = sec_axis(trans = ~ (.x) ,
-                                             name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)') ))+
-      ggtitle(TeX("$\\psi_2 = 0$"))+
-      scale_pattern_manual(values=rev(c("none" ,"stripe")))
-    
-    
+  }else {
+    assign(paste0("p2_",i),
+           ggplot(d2%>%
+                    filter(., Psi2==trait2_for_bifu[i],Psi1==trait1_for_bifu[i])%>%
+                    melt(.,measure.vars=c("Sp1","Sp2"))%>%
+                    mutate(., variable=recode_factor(variable,"Sp1"="Sp. 1","Sp2"="Sp. 2")))+
+             geom_line(aes(x=Stress,y=value,color=variable,linetype=Branches))+
+             scale_color_manual(values=as.character(color_Nsp(5)[c(2,5)]))+
+             the_theme+
+             labs(x="Stress (S)",y="Species cover",color="",linetype="")+
+             scale_y_continuous(breaks = c(0,.2,.4,.6,.8))+
+             theme(legend.text = element_text(size=11))+
+             new_scale_color() +
+             
+             geom_line(data=d_state%>%
+                         filter(., Psi2==trait2_for_bifu[i],Psi1==trait1_for_bifu[i]),
+                       aes(x=Stress,y=.85,color=as.factor(multistab),group=as.factor(multistab)),alpha=.3,lwd=2)+
+             scale_color_manual(values=c("white","black"))+
+             guides(color=F)
+           
+           
+    )
     
   }
 }
 
-ggsave("../Figures/Final_figs/SI/Multistability_varying_traits_MF.pdf",
-       ggarrange(p1+guides(pattern=F)+theme(axis.line.x = element_blank(),axis.text.x=element_blank(),axis.title.x = element_blank(),axis.ticks.x=element_blank()),
-                 p2+guides(pattern=F)+theme(strip.background.x = element_blank(),strip.text.x = element_blank()),
-                 nrow = 2,heights=c(1,1),labels=letters[1:2],common.legend = T,legend = "bottom"),
-       width = 10,height = 7)
 
 
 
-## Tipping points MF model varying trait ----
+
+pbifu=ggarrange(p2_2,p2_1,p2_3,
+                ncol=3,
+                labels = c("(i)","(ii)","(iii)"),common.legend = T,legend = "bottom",widths = c(1.2,1,1),hjust = c(-5,-1.3,-1.7),vjust=4)
+p_tot=ggarrange(
+  ggarrange(ggplot()+theme_void(),p1,ggplot()+theme_void(),ncol=3,widths = c(.15,1,.15)),
+  pbifu,nrow=2,heights =  c(2,1),labels = c(letters[1:2]),hjust = c(-9,0))
+
+ggsave(filename = "../Figures/Final_figs/SI/Multistability_varying_traits_MF.pdf",p_tot,width = 7,height = 7)
 
 
-c_inter_seq=c(0,.1, .2, .3)
-psi1_seq=c(1,0)
 
 
 
-for (Psi_sp1 in psi1_seq){
-  d=tibble()  
-  
-  for (branch in c("Restoration","Degradation")){
-    for (cinter in c_inter_seq){
-      
-      d2=read.table(paste0("../Table/2_species/MF/Varying_traits/Multistability_varying_trait_interspe_comp_",
-                           cinter,"_branch_",branch,
-                           "_Psi1_",Psi_sp1,".csv"),sep=";")
-      
-      d=rbind(d,d2)
-      
-    } # end loop interspecific competition
-  } # end loop branch
-  
-  
-  d2=d
-  d2[,1:2][d2[,1:2] < 10^-4] = 0
-  
-  
-  #COmputing CSI index
-  set.seed(123)
-  u=runif(2)
-  d2$CSI = sapply(1:nrow(d2),function(x){
-    return(u[1]*d2$Stress_tolerant[x]+u[2]*d2$Competitive[x])
-  })
-  
-  
-  
-  if (Psi_sp1 ==1) {
-    
-    
-    #Restoration and degradation points
-    d_tipping=tibble()
-    for (a0 in unique(d2$alpha_0)){
-      for (psi in unique(d2$Psi2)){
-        for (direction in unique(d2$Branches)){
-          
-          d_a0=filter(d2,alpha_0==a0,Psi2==psi,Branches==direction)
-          
-          if (direction=="Restoration") d_a0=d_a0[order(d_a0$Stress,decreasing = T),]
-          
-          density_C=d_a0$Competitive
-          stress_C=stress_ST=d_a0$Stress
-          
-          if (direction=="Restoration"){ #initially absent
-            
-            stress_C=stress_C[-c(1:min(which(abs(diff(density_C))>0)))]
-            density_C=density_C[-c(1:min(which(abs(diff(density_C))>0)))]
-            Tipping_C = stress_C[1]
-            
-          } else{
-            
-            Tipping_C = stress_C[min(which(density_C==0))-1]
-            
-          }
-          
-          d_tipping=rbind(d_tipping,tibble(Competition=a0,Psi2=psi,Branch=direction,
-                                           Tipping_C = Tipping_C))
-          
-        }
-      }
-    }
-    
-    p1=ggplot(d_tipping)+
-      geom_smooth(aes(x=Psi2,y=Tipping_C,color=Branch,group=interaction(Competition,Branch)),se = F)+
-      the_theme+facet_grid(.~Competition,labeller = label_bquote(cols=alpha[e]==.(Competition)))+
-      labs(x=TeX(r'(Trait competitive sp., \ $\psi_2)'),y="Threshold stress",color="")+
-      scale_color_manual(values=c("black","blue"))+
-      scale_x_continuous(sec.axis = sec_axis(trans = ~ (1-.x) ,
-                                             name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)'),
-                                             breaks = c(0,.25,.5,.75,1),labels = c("0","0.25","0.5","0.75","1")),
-                         breaks = c(0,.25,.5,.75,1),labels = c("0","0.25","0.5","0.75","1"))
-    
-  } 
-  if (Psi_sp1==0){
-    
-    #Restoration and degradation points
-    d_tipping=tibble()
-    for (a0 in unique(d2$alpha_0)){
-      for (psi in unique(d2$Psi2)){
-        for (direction in unique(d2$Branches)){
-          
-          d_a0=filter(d2,alpha_0==a0,Psi2==psi,Branches==direction)
-          
-          if (direction=="Restoration") d_a0=d_a0[order(d_a0$Stress,decreasing = T),]
-          
-          density_ST=d_a0$Stress_tolerant
-          stress_ST=stress_ST=d_a0$Stress
-          
-          if (direction=="Restoration"){ #initially absent
-            
-            stress_ST=stress_ST[-c(1:min(which(abs(diff(density_ST))>0)))]
-            density_ST=density_ST[-c(1:min(which(abs(diff(density_ST))>0)))]
-            Tipping_ST = stress_ST[1]
-            
-          } else{
-            
-            Tipping_ST = stress_ST[min(which(density_ST==0))-1]
-            
-          }
-          
-          d_tipping=rbind(d_tipping,tibble(Competition=a0,Psi2=psi,Branch=direction,
-                                           Tipping_ST = Tipping_ST))
-          
-        }
-      }
-    }
-    
-    p2=ggplot(d_tipping)+
-      geom_smooth(aes(x=Psi2,y=Tipping_ST,color=Branch,group=interaction(Competition,Branch)),se = F)+
-      the_theme+facet_grid(.~Competition,labeller = label_bquote(cols=alpha[e]==.(Competition)))+
-      labs(x=TeX(r'(Trait stress-tolerant sp., \ $\psi_1)'),y="Threshold stress",color="")+
-      scale_color_manual(values=c("black","blue"))+
-      scale_x_continuous(sec.axis = sec_axis(trans = ~ (.x) ,
-                                             name = TeX(r'(Trait difference, \ |$\psi_1-\psi_2|)'),
-                                             breaks = c(0,.25,.5,.75,1),labels = c("0","0.25","0.5","0.75","1")),
-                         breaks = c(0,.25,.5,.75,1),labels = c("0","0.25","0.5","0.75","1"))
-    
-    
+
+## Multistability along competition gradient with local competition ----
+d2=read.table(paste0("../Table/2_species/PA/Multistability_fixed_traits_PA.csv"),sep=";")
+
+d2$state = sapply(1:nrow(d2), function(x) {
+  if (d2[x, 1] > 0 & d2[x, 2] > 0) {
+    return("Coexistence")
   }
-}
+  if (d2[x, 1] > 0 & d2[x, 2] == 0) {
+    return("Stress_tolerant")
+  }
+  if (d2[x, 1] == 0 & d2[x, 2] > 0) {
+    return("Competitive")
+  }
+  if (d2[x, 1] == 0 & d2[x, 2] == 0) {
+    return("Desert")
+  }
+})
 
-p_tot=ggarrange(p1+theme(legend.position = "none")+ggtitle(TeX("$\\psi_1 = 1$")),
-                p2+ggtitle(TeX("$\\psi_2 = 0$"))+theme(strip.background.x = element_blank(),
-                                                       strip.text.x = element_blank()),nrow=2,labels = letters[1:2])
+d2=d2[order(d2$alpha_0,d2$Scena,d2$Delta,d2$Stress),]
 
-ggsave("../Figures/Final_figs/SI/Tipping_points_traits_MF.pdf",width = 7,height = 7)
+all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
+  if (d2$state[x] != d2$state[x+1]){
+    return(paste0(d2$state[x],"/", d2$state[x+1]))
+  }
+  else {return(d2$state[x])}
+})
+
+d_state=d2%>%
+  filter(., Branches=="Degradation")%>%
+  select(.,-Branches)
+d_state$all_state=all_state
 
 
-## Net-effects, balance competition-facilitation ----
+scale="local"
+d2t=transform(d_state%>% 
+                filter(., Scena %in% c(paste0(scale,"_C_global_F"),paste0(scale,"_C_local_F")))%>%
+                mutate(., Stress=round(Stress,6),alpha_0=round(alpha_0,6)),
+              Scena=factor(Scena,levels=c(paste0(scale,"_C_global_F"),paste0(scale,"_C_local_F")),
+                           labels=c("Global facilitation","Local facilitation")))
 
-epsilon=10^(-6)
-d2=read.table("../Table/2_species/PA/Net_effect_varying_traits.csv",sep=";")
+color_rho = c("Coexistence" = "#D8CC7B", "Competitive" = "#ACD87B", "Desert" = "#696969", "Stress_tolerant" = "#7BD8D3")
 
-net_effect =sapply(seq(1, nrow(d2) , by = 2),function(x){
-  return((d2$Eq[x+1] - d2$Eq[x]) / epsilon)
+
+d2t$Multistability=sapply(1:nrow(d2t),function(x){
+  if (d2t$all_state[x] %in% c("Competitive","Coexistence","Desert","Stress_tolerant")){
+    return("no_multi")
+  } else{
+    return("multi")
+  }
 })
 
 
-d_net=d2%>%
-  filter(., Type=="control")%>%
-  select(.,-Type)
-d_net$value=net_effect
+Fig_2_SI=ggplot(d2t%>%
+                    mutate(.,all_state=recode_factor(all_state,
+                                                     "Competitive/Coexistence"="Coexistence/Competitive",
+                                                     "Coexistence/Stress_tolerant"="Coexistence/Stress-tolerant",
+                                                     "Stress_tolerant"="Stress-tolerant",
+                                                     "Stress_tolerant/Desert"="Stress-tolerant/Desert"))%>%
+                    mutate(., Delta=recode_factor(Delta,"0.1"="0.1, local dispersal","0.9"="0.9, global dispersal"))) +
+  geom_tile_pattern(aes(x=Stress,y=alpha_0,fill=all_state,pattern=Multistability),              
+                    colour          = 'transparent',
+                    pattern_spacing = 0.05, 
+                    pattern_density = 0.01, 
+                    pattern_fill    = alpha("black",.7),
+                    pattern_colour  = alpha("black",.7))+
+  
+  theme_classic() +
+  theme(legend.position = "bottom") +
+  labs(x = TeX(r'(Stress, \ $S)'), y = TeX(r'(Strength of competition, \ $\alpha_e)'), fill = "") +
+  theme(legend.text = element_text(size = 11))+
+  scale_fill_manual(values=c("Coexistence" = "#D8CC7B", 
+                             "Competitive" = "#ACD87B", 
+                             "Coexistence/Competitive" = "#DDEFCA",
+                             "Stress-tolerant" = "#7BD8D3",
+                             "Stress-tolerant/Desert" ="#0F8E87",
+                             "Coexistence/Stress-tolerant"="#9BBBB9",
+                             "Coexistence/Desert"="#C19E5E",
+                             "Desert"=  "#696969"))+
+  facet_grid(Scena~Delta)+
+  the_theme+theme(strip.text.x = element_text(size=12),legend.text = element_text(size=9),strip.text.y = element_text(size=12))+
+  scale_pattern_manual(values=rev(c("none" ,"stripe")))+
+  theme(legend.key.size = unit(2, 'cm'))
 
 
-p11=ggplot(d_net%>%
-             filter(.,Psi1==1,alpha_0%in% c(.1),Species==1)%>%
-             mutate(.,Species=recode_factor(Species,"1" ="Species 1","2" = "Species 2")))+
-  ggtitle(TeX("$\\psi_1=1, \\alpha_e=0.1$"))+
-  geom_line(aes(x=S,y=value,color=Psi2,group=interaction(Psi1,Psi2,alpha_0,Species)))+
-  labs(x="Stress, S",y=TeX(r'($\frac{\partial \rho_{+_2}}{\partial \psi_2})'),
-       color=TeX(r'($\ \psi_2 \ \ )'))+
+ggsave("../Figures/Final_figs/SI/Multistability_fixed_traits_local_competition.pdf",Fig_2_SI,width = 8,height = 6)
+
+
+
+
+## Multistability along competition gradient with global facilitation ----
+
+d2=read.table(paste0("../Table/2_species/PA/Multistability_fixed_traits_PA.csv"),sep=";")
+d2$state = sapply(1:nrow(d2), function(x) {
+  if (d2[x, 1] > 0 & d2[x, 2] > 0) {
+    return("Coexistence")
+  }
+  if (d2[x, 1] > 0 & d2[x, 2] == 0) {
+    return("Stress_tolerant")
+  }
+  if (d2[x, 1] == 0 & d2[x, 2] > 0) {
+    return("Competitive")
+  }
+  if (d2[x, 1] == 0 & d2[x, 2] == 0) {
+    return("Desert")
+  }
+})
+
+d2=d2[order(d2$alpha_0,d2$Scena,d2$Delta,d2$Stress),]
+
+all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
+  if (d2$state[x] != d2$state[x+1]){
+    return(paste0(d2$state[x],"/", d2$state[x+1]))
+  }
+  else {return(d2$state[x])}
+})
+
+d_state=d2%>%
+  filter(., Branches=="Degradation")%>%
+  select(.,-Branches)
+d_state$all_state=all_state
+
+
+scale="global"
+d2t=transform(d_state%>% 
+                filter(., Scena %in% c(paste0(scale,"_C_global_F"),paste0(scale,"_C_local_F")))%>%
+                mutate(., Stress=round(Stress,6),alpha_0=round(alpha_0,6)),
+              Scena=factor(Scena,levels=c(paste0(scale,"_C_global_F"),paste0(scale,"_C_local_F")),
+                           labels=c("Global facilitation","Local facilitation")))
+
+color_rho = c("Coexistence" = "#D8CC7B", "Competitive" = "#ACD87B", "Desert" = "#696969", "Stress_tolerant" = "#7BD8D3")
+
+
+d2t$Multistability=sapply(1:nrow(d2t),function(x){
+  if (d2t$all_state[x] %in% c("Competitive","Coexistence","Desert","Stress_tolerant")){
+    return("no_multi")
+  } else{
+    return("multi")
+  }
+})
+
+set.seed(432)
+rand_vec=runif(2)
+
+d2$CSI=d2$Stress_tolerant*rand_vec[1]+d2$Competitive*rand_vec[2]
+
+p1=ggplot(d2t%>%
+            mutate(.,all_state=recode_factor(all_state,
+                                             "Desert/Coexistence"="Coexistence/Desert",
+                                             "Coexistence/Stress_tolerant"="Coexistence/Stress-tolerant",
+                                             "Stress_tolerant"="Stress-tolerant",
+                                             "Stress_tolerant/Desert"="Stress-tolerant/Desert",
+                                             "Competitive/Stress_tolerant"="Competitive/Stress-tolerant"))%>%
+            mutate(., Delta=recode_factor(Delta,"0.1"="0.1, local dispersal","0.9"="0.9, global dispersal"))%>%
+            filter(., Scena=="Global facilitation")) +
+  geom_tile_pattern(aes(x=Stress,y=alpha_0,fill=all_state,pattern=Multistability),              
+                    colour          = 'transparent',
+                    pattern_spacing = 0.05, 
+                    pattern_density = 0.01, 
+                    pattern_fill    = "black",
+                    pattern_colour  = "black")+
+  theme_classic() +
+  theme(legend.position = "bottom") +
+  labs(x = TeX(r'(Stress, \ $S)'), y = TeX(r'(Strength of interspecific competition, \ $\alpha_e)'), fill = "") +
+  scale_fill_manual(values=c("Coexistence" = "#D8CC7B", 
+                             "Competitive/Stress-tolerant"="#C998CE",
+                             "Competitive" = "#ACD87B", 
+                             "Competitive/Coexistence" = "#DDEFCA",
+                             "Stress-tolerant" = "#7BD8D3",
+                             "Stress-tolerant/Desert" ="#0F8E87",
+                             "Coexistence/Stress-tolerant"="#9BBBB9",
+                             "Coexistence/Desert"="#C19E5E",
+                             "Desert"=  "#696969"
+  ))+
+  facet_grid(.~Delta,labeller = label_bquote(cols= delta==.(Delta) ))+
+  the_theme+theme(strip.text.x = element_text(size=12),strip.text.y = element_text(size=11))+
+  theme(legend.text = element_text(size = 9))+
+  geom_text(data= tibble(Scena="Local facilitation",Delta="0.1, local dispersal",y=c(0.015,.415),x=1.05,labels=c("b","c")), 
+            aes(x=x, y=y,label=labels), alpha=1, colour="white")+
+  scale_pattern_manual(values=rev(c("none" ,"stripe")))+
+  guides(pattern="none")
+
+  
+
+
+ggsave("../Figures/Final_figs/SI/Multistability_fixed_traits_global_facilitation.pdf",p1,width = 9,height = 5)
+
+
+
+## Multistability, varying the trade-off shape ----
+
+#first: explaining trade-off
+
+
+d=expand.grid(Psi=seq(0,1,length.out=20),Gamma=c(.5,1,1.5))
+d$Psi2=sapply(1:nrow(d),function(x){
+  return(d$Psi[x]^d$Gamma[x])
+})
+
+p=ggplot(d)+
+  geom_line(aes(x=Psi,y=Psi2,color=as.factor(Gamma)))+
+  geom_point(aes(x=Psi,y=Psi2,color=as.factor(Gamma)),shape=1,size=3,fill="white")+
   the_theme+
-  scale_color_stepsn(colours=color_Nsp(6),breaks=seq(0,1,by=.2))+
-  geom_hline(yintercept = 0,linetype=9)
+  labs(x=TeX("$\\psi$"),y=TeX("$\\psi^{\\gamma}$"),color=TeX("$\\gamma$"))+
+  scale_color_viridis_d()
+ggsave( "../Figures/Final_figs/SI/Trade_off_shape.pdf",p,width = 6,height = 4)
 
-p12=ggplot(d_net%>%
-             filter(.,Psi1==1,alpha_0%in% c(.1),Species==2)%>% #see d2, species are inverted for \psi_1=1
-             mutate(.,Species=recode_factor(Species,"1" ="Species 1","2" = "Species 2")))+
-  ggtitle(TeX("$\\psi_1=1, \\alpha_e=0.1$"))+
-  geom_line(aes(x=S,y=value,color=Psi2,group=interaction(Psi1,Psi2,alpha_0,Species)))+
-  labs(x="Stress, S",y=TeX(r'($\frac{\partial \rho_{+_1}}{\partial \psi_2})'),
-       color=TeX(r'($\ \psi_2 \ \ )'))+
+
+
+#second: multistability
+stress_seq=seq(0,.82, length.out = 100)
+
+d=tibble()  
+d_bistab=tibble()
+
+for (tradeoff in c(.5,1.5)){
+  for (stress in stress_seq){
+    
+    
+    
+    d2=rbind(read.table(paste0("../Table/2_species/PA/Multistability_PA/Varying_tradeoff/Test_interspe_comp_",
+                               .3,"_branch_Degradation_stress_",stress,"_tradeoff_",tradeoff,"_facilitation_",.9,".csv"),sep=";"),
+             read.table(paste0("../Table/2_species/PA/Multistability_PA/Varying_tradeoff/Test_interspe_comp_",
+                               .3,"_branch_Restoration_stress_",stress,"_tradeoff_",tradeoff,"_facilitation_",.9,".csv"),sep=";"))
+    d=rbind(d,d2)
+    
+    
+    
+  }
+}
+
+d2=d
+colnames(d2)[1:2]=c("Sp1","Sp2")
+d2[,1:2][d2[,1:2] < 10^-2] = 0
+d2$state = sapply(1:nrow(d2), function(x) {
+  if (d2[x, 1] > 0 & d2[x, 2] > 0) {
+    return("Coexistence")
+  }
+  if (d2[x, 1] > 0 & d2[x, 2] == 0) {
+    return("Sp1")
+  }
+  if (d2[x, 1] == 0 & d2[x, 2] > 0) {
+    return("Sp2")
+  }
+  if (d2[x, 1] == 0 & d2[x, 2] == 0) {
+    return("Desert")
+  }
+})
+d2=d2[order(d2$Psi2,d2$Stress,d2$alpha_0,d2$Psi1),]
+
+all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
+  if (d2$state[x] != d2$state[x+1]){
+    return(paste0(d2$state[x],"/", d2$state[x+1]))
+  }
+  else {return(d2$state[x])}
+})
+
+d_state=d2%>%
+  filter(., Branches=="Degradation")%>%
+  select(.,-Branches)
+d_state$all_state=all_state
+
+d_state$multistab=sapply(1:nrow(d_state),function(x){
+  if (d_state$all_state[x] %in% c( "Sp1/Sp2","Coexistence/Sp1","Coexistence/Sp2",
+                                   "Sp2/Coexistence","Sp1/Coexistence",
+                                   "Sp2/Sp1")){
+    return(1)
+  } else {return(0)}
+  
+})
+
+d_state$Sp1_reg=d2$Sp1[which(d2$Branches=="Restoration")]
+d_state$Sp2_reg=d2$Sp2[which(d2$Branches=="Restoration")]
+
+d_final=tibble()
+for (i in unique(d_state$Psi1)){
+  for (j in unique(d_state$Psi2)){
+    for (a0 in unique(d_state$alpha_0)){
+      for (tradeoff in unique(d_state$Tradeoff)){
+        d_fil=filter(d_state,Psi1==i,Psi2==j,alpha_0==a0,Tradeoff==tradeoff)
+        
+        if (i>j){
+          d_final=rbind(d_final,tibble(Psi1=i,Psi2=j,alpha_0=a0,Tradeoff=tradeoff,
+                                       Frac_multi=sum(d_fil$multistab)/length(which(d_fil$state!="Desert")),
+                                       Frac_multi_raw=sum(d_fil$multistab),
+                                       Deg=d_fil$Stress[min(which(d_fil$Sp2==0))-1],
+                                       Rest=d_fil$Stress[min(which(d_fil$Sp2_reg==0))]
+          ))
+        }
+      }
+    }
+  }
+}
+
+trait1_for_bifu=c(unique(d_state$Psi1)[49],unique(d_state$Psi1)[13])
+trait2_for_bifu=c(unique(d_state$Psi2)[1],unique(d_state$Psi2)[12])
+
+p1=ggplot(d_final)+
+  geom_tile(aes(x=Psi1,y=Psi2,fill=Frac_multi_raw/length(unique(d_state$Stress))))+
+  geom_contour(aes(x=Psi1,y=Psi2,z=Frac_multi_raw/length(unique(d_state$Stress))),
+               color="black",alpha=.3,breaks = c(0,.2,.4))+
+  geom_point(data=tibble(x=trait1_for_bifu,y=trait2_for_bifu),aes(x=x,y=y),shape=19)+
+  geom_text(data=tibble(x=c(trait1_for_bifu[1],trait1_for_bifu[2]+.02),
+                        y=c(trait2_for_bifu[1]+.06,trait2_for_bifu[2]+.12),
+                        txt=c("(i)","(ii)")),aes(x=x,y=y,label=txt),size=4.5)+
   the_theme+
-  scale_color_stepsn(colours=color_Nsp(6),breaks=seq(0,1,by=.2))+
-  geom_hline(yintercept = 0,linetype=9)
-
-p21=ggplot(d_net%>%
-             filter(.,Psi1==0,Species==2,alpha_0 %in% c(.1))%>%
-             mutate(.,Species=recode_factor(Species,"1" ="Species 1","2" = "Species 2")))+ #here we inverse to be coherent with the analysis made 
-  ggtitle(TeX("$\\psi_2=0, \\alpha_e=0.1$"))+
-  geom_line(aes(x=S,y=value,color=Psi2,group=interaction(Psi1,Psi2,alpha_0,Species)))+
-  labs(x="Stress, S",y=TeX(r'($\frac{\partial \rho_{+_2}}{\partial \psi_1})'),
-       color=TeX(r'($\ \psi_1 \ \ )'))+
-  the_theme+
-  scale_color_stepsn(colours=color_Nsp(6),breaks=seq(0,1,by=.2))+
-  geom_hline(yintercept = 0,linetype=9)
+  facet_wrap(.~Tradeoff,labeller = label_bquote(cols = gamma == .(Tradeoff)))+
+  labs(x=TeX(r'(Species 1 trait, $\psi_1$)'),
+       y=TeX(r'(Species 2 trait, $\psi_2$)'),
+       fill="Fraction of community bistability \n along the stress gradient")+
+  scale_fill_gradientn(colors=colorRampPalette(c("#FFFFFF","#E2BFE2","#D48ACF","#650328"))(100))+
+  guides(shape="none")+
+  theme(strip.text.x = element_text(size=13))
 
 
-p22=ggplot(d_net%>%
-             filter(.,Psi1==0,Species==2,alpha_0 %in% c(.2))%>%
-             mutate(.,Species=recode_factor(Species,"1" ="Species 1","2" = "Species 2")))+ #here we inverse to be coherent with the analysis made 
-  ggtitle(TeX("$\\psi_2=0, \\alpha_e=0.2$"))+
-  geom_line(aes(x=S,y=value,color=Psi2,group=interaction(Psi1,Psi2,alpha_0,Species)))+
-  labs(x="Stress, S",y=TeX(r'($\frac{\partial \rho_{+_2}}{\partial \psi_1})'),
-       color=TeX(r'($\ \psi_1 \ \ )'))+
-  the_theme+
-  scale_color_stepsn(colours=color_Nsp(6),breaks=seq(0,1,by=.2))+
-  geom_hline(yintercept = 0,linetype=9)
+for (i in 1:2){
+  
+  assign(paste0("p2_",i),
+         ggplot(d2%>%
+                  filter(., Psi2==trait2_for_bifu[i],Psi1==trait1_for_bifu[i],Tradeoff==0.5)%>%
+                  melt(.,measure.vars=c("Sp1","Sp2"))%>%
+                  mutate(., variable=recode_factor(variable,"Sp1"="Sp. 1","Sp2"="Sp. 2")))+
+           geom_line(aes(x=Stress,y=value,color=variable,linetype=Branches))+
+           scale_color_manual(values=as.character(color_Nsp(5)[c(2,5)]))+
+           the_theme+
+           labs(x="Stress (S)",y="Species cover",color="",linetype="")+
+           scale_y_continuous(breaks = c(0,.2,.4,.6,.8))+
+           theme(legend.text = element_text(size=11))+
+           new_scale_color() +
+           
+           geom_line(data=d_state%>%
+                       filter(., Psi2==trait2_for_bifu[i],Psi1==trait1_for_bifu[i],Tradeoff==0.5),
+                     aes(x=Stress,y=.85,color=as.factor(multistab),group=as.factor(multistab)),alpha=.3,lwd=2)+
+           scale_color_manual(values=c("white","black"))+
+           guides(color=F)
+  )
+  
+  assign(paste0("p3_",i),
+         ggplot(d2%>%
+                  filter(., Psi2==trait2_for_bifu[i],Psi1==trait1_for_bifu[i],Tradeoff==1.5)%>%
+                  melt(.,measure.vars=c("Sp1","Sp2"))%>%
+                  mutate(., variable=recode_factor(variable,"Sp1"="Sp. 1","Sp2"="Sp. 2")))+
+           geom_line(aes(x=Stress,y=value,color=variable,linetype=Branches))+
+           scale_color_manual(values=as.character(color_Nsp(5)[c(2,5)]))+
+           the_theme+
+           labs(x="Stress (S)",y="Species cover",color="",linetype="")+
+           scale_y_continuous(breaks = c(0,.2,.4,.6,.8))+
+           theme(legend.text = element_text(size=11))+
+           new_scale_color() +
+           
+           geom_line(data=d_state%>%
+                       filter(., Psi2==trait2_for_bifu[i],Psi1==trait1_for_bifu[i],Tradeoff==1.5),
+                     aes(x=Stress,y=.85,color=as.factor(multistab),group=as.factor(multistab)),alpha=.3,lwd=2)+
+           scale_color_manual(values=c("white","black"))+
+           guides(color=F)
+  )  
+    
+  
+}
 
 
-p_tot=ggarrange(ggarrange(p11+theme(),
-                          p12,ncol=2,labels = c(letters[1:2]),common.legend = T,legend = "bottom"),
-                ggarrange(p21,
-                          p22+ylab(""),ncol = 2,labels = c(letters[3:4]),common.legend = T,legend = "bottom"),
-                nrow=2)
 
-ggsave("../Figures/Final_figs/SI/Net_effects_varying_traits.pdf",p_tot,width = 7,height = 7)
 
+
+pbifu=ggarrange(ggarrange(p2_1,p2_2+ylab(""), labels = c("(i)","(ii)"),ncol=2,widths = c(1.2,1),hjust = c(-4.5,-3.5),vjust=4),
+                ggarrange(p3_1+ylab(""),p3_2+ylab(""), labels = c("(i)","(ii)"),ncol=2,widths = c(1,1),hjust = c(-4.5,-6),vjust=4),
+                ncol=2,
+                common.legend = T,legend = "bottom",
+                widths = c(1.1,1),labels = c("b","c"))
+p_tot=ggarrange(
+  ggarrange(ggplot()+theme_void(),p1,ggplot()+theme_void(),ncol=3,widths = c(.15,1,.15)),
+  pbifu,nrow=2,heights =  c(2,1),labels = c(letters[1],""),hjust = c(-9,0))
+
+ggsave(filename = "../Figures/Final_figs/SI/Trade_off_multistability_PA.pdf",plot = p_tot,width = 9,height = 7)
 
 
 
@@ -729,268 +741,35 @@ d_clustering=mutate(d_clustering, Scena=recode_factor(Scena,"global_C_global_F"=
 
 
 p=ggplot(d_clustering%>%
-           filter(., alpha_0==.2, S %in% c(.73, .77))%>%
-           group_by(., cintra,alpha_0,S,delta,Scena)%>%
-           summarise(.,.groups ="keep",c11=mean(c11) ))+
-  geom_point(aes(x=as.numeric(delta),y=c11),size=1.5,alpha=.7,shape=1)+
-  facet_grid(Scena~S,labeller=label_bquote(cols = Stress == .(S)),scales = "free")+
-  the_theme+labs(x=TeX("$\\delta$"),y=expression(paste("Stress-tolerant clustering (c"[11],")")))+
-  scale_color_manual(values=as.character(color_rho[c(2,4)]))+
-  geom_hline(yintercept = 1)+ylim(0,3)
+         filter(., alpha_0==.2, S %in% c(.73, .77),
+                delta %in% unique(d_clustering$delta)[seq(1,length(unique(d_clustering$delta)),length.out=15)])%>%
+         group_by(., cintra,alpha_0,S,delta,Scena)%>%
+         summarise(.,.groups ="keep",c11=mean(c11) ))+
+  geom_point(aes(x=Scena,y=c11,color=delta),size=3,shape=1)+
+  geom_line(aes(x=Scena,y=c11,color=delta,group=interaction(delta,S)),lwd=.5)+
+  facet_grid(.~S,labeller=label_bquote(cols = Stress == .(S)),scales = "free_y")+
+  the_theme+labs(x="",color=TeX(r'( Dispersal scale, $\delta)'),y=expression(paste("Stress-tolerant clustering (c"[11],")")))+
+  geom_hline(yintercept = 1)+
+  scale_color_viridis_b(option = "A")
+
 ggsave("../Figures/Final_figs/SI/Clustering_11_dispersal.pdf",p,width = 7,height = 4)
 
 p=ggplot(d_clustering%>%
-         filter(., alpha_0==.2, S %in% c(0))%>%
+         filter(., alpha_0==.2, S %in% c(0),
+                delta %in% unique(d_clustering$delta)[seq(1,length(unique(d_clustering$delta)),length.out=10)])%>%
          melt(., measure.vars=c("Rho_20","Rho_10"))%>%
          mutate(.,variable=recode_factor(variable,"Rho_10"="Pair Stress-tolerant sp./Fertile",
-                                "Rho_20"="Pair Competitive sp./Fertile")))+
-  geom_point(aes(x=as.numeric(delta),y=value,color=variable),size=1.5)+
+                                         "Rho_20"="Pair Competitive sp./Fertile")))+
+  geom_point(aes(x=Scena,y=value,color=delta),size=3,shape=1)+
+  geom_line(aes(x=Scena,y=value,color=delta,group=interaction(delta,variable)),lwd=.5)+
   ggtitle("Stress (S) = 0")+
-  the_theme+labs(x=TeX("$\\delta$"),y=expression(paste("Cover")))+
-  facet_grid(Scena~.,scales = "free")+
-  
-  scale_color_manual(values=c("black","grey"))+
-  labs(color="")
+  facet_wrap(.~variable,scales="free")+
+  the_theme+labs(color=TeX(r'( Dispersal scale, $\delta)'),y=expression(paste("Pair cover")),x="")+
+  scale_color_viridis_b(option = "A")
 
-ggsave("../Figures/Final_figs/SI/Pair_10_20.pdf",p,width = 5,height = 4)
+ggsave("../Figures/Final_figs/SI/Pair_10_20.pdf",p,width = 7,height = 4)
 
 
-
-
-
-## NintA for MF model and PA model ----
-
-load(file="../Table/2_species/MF/Comparing_net_effects.RData")
-d_net=d_all[[1]];d_RNE=d_all[[2]]
-
-
-d_net$value[d_net$value>10]=NA
-d_net$value[d_net$value < -10]=NA
-
-p1=ggplot(d_RNE%>%
-            melt(., measure.vars=c("NintA_st","NintA_comp"))%>%
-            #mutate(., value=rescale(value,to=c(-1,1)))%>%
-            mutate(., variable=recode_factor(variable,"NintA_st"='Stress-tolerant',"NintA_comp"="Competitive")))+
-  geom_tile(aes(x=S,y=alpha_0,fill=value))+
-  facet_wrap(.~variable)+
-  geom_hline(data = subset(d_RNE%>%
-                             melt(., measure.vars=c("NintA_st","NintA_comp"))%>%
-                             mutate(., value=rescale(value,to=c(-1,1)))%>%
-                             mutate(., variable=recode_factor(variable,"NintA_st"='Stress-tolerant',"NintA_comp"="Competitive")),
-                           variable == "Competitive"), aes(yintercept = .1))+
-  geom_text(data = subset(d_RNE%>%
-                            melt(., measure.vars=c("NintA_st","NintA_comp"))%>%
-                            mutate(., value=rescale(value,to=c(-1,1)))%>%
-                            mutate(., variable=recode_factor(variable,"NintA_st"='Stress-tolerant',"NintA_comp"="Competitive")),
-                          variable == "Competitive"), aes(y = .32,x=1.05),label="b")+
-  geom_hline(data = subset(d_RNE%>%
-                             melt(., measure.vars=c("NintA_st","NintA_comp"))%>%
-                             mutate(., value=rescale(value,to=c(-1,1)))%>%
-                             mutate(., variable=recode_factor(variable,"NintA_st"='Stress-tolerant',"NintA_comp"="Competitive")),
-                           variable == "Competitive"), aes(yintercept = .3))+
-  geom_text(data = subset(d_RNE%>%
-                            melt(., measure.vars=c("NintA_st","NintA_comp"))%>%
-                            mutate(., value=rescale(value,to=c(-1,1)))%>%
-                            mutate(., variable=recode_factor(variable,"NintA_st"='Stress-tolerant',"NintA_comp"="Competitive")),
-                          variable == "Competitive"), aes(y = .12,x=1.05),label="c")+
-  the_theme+labs(x="Stress (S)",y=TeX(r'(Competition strength \ $\alpha_e)'),fill="")+
-  scale_fill_gradient2(low="#F73030",mid="white",high="#185BB9")
-
-alpha_for_plot=c(.1, .3)
-
-for (alpha in 1:2){
-  assign(paste0("p1_",alpha),ggplot(d_RNE%>%
-                                      filter(., alpha_0==alpha_for_plot[alpha])%>%
-                                      melt(., measure.vars=c("NintA_comp")))+#%>%
-           #           mutate(., value=rescale(value,to=c(-1,1))))+
-           geom_hline(yintercept = 0,linetype=9,lwd=.5)+
-           geom_line(aes(x=S,y=value))+
-           the_theme+theme(axis.text = element_text(size =9), axis.title = element_text(size = 10))+
-           labs(x="Stress (S)",y=TeX("$\\NInt_{A}$")))
-}
-
-p_right=ggarrange(p1_2+theme(axis.text.x = element_blank(),axis.title.x = element_blank(),
-                             axis.line.x = element_blank(),
-                             axis.ticks.x = element_blank())+
-                    labs(x=""),p1_1,ggplot() + theme_void(),nrow=3,labels=letters[2:3],heights = c(1,1,.1))
-
-p_tot_1=ggarrange(p1+theme(legend.position = "none",
-                           axis.title.x = element_blank(),
-                           axis.text.x = element_blank(),axis.line.x = element_blank(),
-                           axis.ticks.x = element_blank()),p_right,widths = c(2.2,1),labels = c(letters[1],""))
-
-
-
-load(file="../Table/2_species/PA/Comparing_net_effects.RData")
-d_RNE=d_all
-
-
-
-d_RNE[,3:6][d_RNE[,3:6] > 2]=NA
-d_RNE[,3:6][d_RNE[,3:6] < -1]=NA
-
-p2=ggplot(d_RNE%>%
-            melt(., measure.vars=c("NintA_st","NintA_comp"))%>%
-            filter(.,Disp==.1,Scale=="LocalF_GlobalC")%>%
-            #mutate(., value=rescale(value,to=c(-1,1)))%>%
-            mutate(., variable=recode_factor(variable,"NintA_st"='Stress-tolerant',"NintA_comp"="Competitive")))+
-  geom_tile(aes(x=S,y=alpha_0,fill=value))+
-  facet_grid(.~factor(variable,levels=c("Stress-tolerant","Competitive")))+
-  the_theme+labs(x="Stress (S)",y=TeX(r'(Competition strength \ $\alpha_e)'),fill="")+
-  scale_fill_gradient2(low="#F73030",mid="white",high="#185BB9")+
-  geom_hline(data=tibble(variable="Competitive",yint=c(0.1,.3)),aes(yintercept=yint,variable="Competitive"))+
-  geom_text(data=tibble(variable="Competitive",y=c(0.13,.33),x=c(1.04,1.04),label=c("f","e")),aes(y=y,x=x,label=label,variable="Competitive"))
-
-
-alpha_for_plot=c(unique(d_RNE$alpha_0)[(50/3)+1], .3)
-
-for (alpha in 1:2){
-  assign(paste0("p2_",alpha),ggplot(d_RNE%>%
-                                      filter(., alpha_0==alpha_for_plot[alpha],Scale=="LocalF_GlobalC",Disp==.1)%>%
-                                      melt(., measure.vars=c("NintA_comp")))+#%>%
-           #           mutate(., value=rescale(value,to=c(-1,1))))+
-           geom_hline(yintercept = 0,linetype=9,lwd=.5)+
-           geom_line(aes(x=S,y=value))+
-           the_theme+theme(axis.text = element_text(size =9), axis.title = element_text(size = 10))+
-           labs(x="Stress (S)",y=TeX("$\\NInt_{A}$")))
-}
-
-p_right=ggarrange(p2_2+theme(axis.text.x = element_blank(),axis.title.x = element_blank(),
-                             axis.line.x = element_blank(),
-                             axis.ticks.x = element_blank())+
-                    labs(x=""),p2_1,ggplot() + theme_void(),nrow=3,labels=letters[5:6])
-
-p_tot_2=ggarrange(p2+theme(strip.background.x = element_blank(),strip.text.x = element_blank()),p_right,widths = c(2.2,1),labels = c(letters[4],""))
-
-p_tot=ggarrange(p_tot_1,p_tot_2,
-                nrow=2,heights = c(1,1.4))
-ggsave("../Figures/Final_figs/SI/NintA_MF_PA.pdf",p_tot,width = 7,height = 6)
-
-
-
-
-## Niche expansion in MF model ----
-
-d_niche = read.table("../Table/2_species/MF/Niche_expansion_varying_traits.csv",sep=";")
-d_niche = do.call(data.frame,lapply(d_niche,function(x) replace(x, is.infinite(x), NA)))
-
-
-d_niche=read.table("../Table/2_species/MF/Niche_expansion_MF.csv",sep=";")
-alpha_seq=seq(0,.3,length.out=10)
-d_niche$alpha_0=alpha_seq
-p1=ggplot(d_niche%>%
-            melt(.,measure.vars=c("Delta_niche_2")))+
-  geom_tile(aes(x=Facilitation,y=alpha_0,fill=value))+
-  the_theme+
-  scale_fill_gradient2(low = "red",mid = "white",high = "blue")+
-  labs(x="Facilitation ( f )",y=TeX(r'(Competition strength \ $\alpha_e)'),fill="% of competitive species niche change")
-
-
-#niche varying traits
-d_niche = read.table("../Table/2_species/MF/Niche_expansion_varying_traits.csv",sep=";")
-d_niche = do.call(data.frame,lapply(d_niche,function(x) replace(x, is.infinite(x), NA)))
-
-d_niche$Delta_niche_2[1:(nrow(d_niche)/2)] = d_niche$Delta_niche_1[1:(nrow(d_niche)/2)] 
-
-
-
-p3_1=ggplot(NULL)+
-  geom_path(data=d_niche%>%filter(., Psi1==0)%>%
-              melt(., measure.vars=c("Delta_niche_2"))%>%
-              mutate(., variable=recode_factor(variable,"Delta_niche_1"="Species 1","Delta_niche_2"="Species 2"))%>%
-              mutate(., Delta_psi=abs(Psi1-Psi2),
-                     Facilitation=as.factor(Facilitation),
-                     alpha_0=as.factor(alpha_0)),
-            aes(x=Psi2,y=value,group=interaction(alpha_0,Facilitation),color=alpha_0),lwd=1)+
-  geom_point(data=d_niche%>%filter(., Psi1==0)%>%
-               melt(., measure.vars=c("Delta_niche_2"))%>%
-               mutate(., variable=recode_factor(variable,"Delta_niche_1"="Species 1","Delta_niche_2"="Species 2"))%>%
-               mutate(., Delta_psi=abs(Psi1-Psi2),
-                      Facilitation=as.factor(Facilitation),
-                      alpha_0=as.factor(alpha_0))%>%
-               filter(., Psi2 %in% unique(.$Psi2)[seq(1,length(unique(.$Psi2)),by =5)]), #to only have 10 points
-             aes(x=Psi2,y=value,shape=Facilitation,color=alpha_0),fill="white",size=2)+
-  geom_hline(yintercept = 0,linetype=9)+
-  scale_shape_manual(values=c(21,22))+
-  scale_color_manual(values=rev(c("#940000","#FF1F1F","#FFAFAF")))+
-  labs(y = "% of species 1 niche change", x = TeX(r'(Trait species 2, \ $\psi_2)'),
-       color=TeX(r'(\ \ $\alpha_e)'),
-       shape=TeX(r'(Facilitation \ $\f)'))+ggtitle(TeX("$\\psi_1 = 0$"))+
-  the_theme
-
-p3_2=ggplot(NULL)+
-  geom_path(data=d_niche%>%filter(., Psi1==1)%>%
-              melt(., measure.vars=c("Delta_niche_2"))%>%
-              mutate(., variable=recode_factor(variable,"Delta_niche_1"="Species 1","Delta_niche_2"="Species 2"))%>%
-              mutate(., Delta_psi=abs(Psi1-Psi2),
-                     Facilitation=as.factor(Facilitation),
-                     alpha_0=as.factor(alpha_0)),
-            aes(x=Psi2,y=value,group=interaction(alpha_0,Facilitation),color=alpha_0),lwd=1)+
-  geom_point(data=d_niche%>%filter(., Psi1==1)%>%
-               melt(., measure.vars=c("Delta_niche_2"))%>%
-               mutate(., variable=recode_factor(variable,"Delta_niche_1"="Species 1","Delta_niche_2"="Species 2"))%>%
-               mutate(., Delta_psi=abs(Psi1-Psi2),
-                      Facilitation=as.factor(Facilitation),
-                      alpha_0=as.factor(alpha_0))%>%
-               filter(., Psi2 %in% unique(.$Psi2)[seq(1,length(unique(.$Psi2)),by =5)]), #to only have 10 points
-             aes(x=Psi2,y=value,shape=Facilitation,color=alpha_0),fill="white",size=2)+
-  geom_hline(yintercept = 0,linetype=9)+
-  scale_shape_manual(values=c(21,22))+
-  scale_color_manual(values=rev(c("#940000","#FF1F1F","#FFAFAF")))+
-  labs(y = "% of species 2 niche change", x = TeX(r'(Trait species 2, \ $\psi_2)'),
-       color=TeX(r'(\ \ $\alpha_e)'),
-       shape=TeX(r'(Facilitation \ $\f)'))+ggtitle(TeX("$\\psi_1 = 1$"))+
-  the_theme
-p3=ggarrange(p3_2,p3_1,labels = letters[2:3],common.legend = T,legend = "bottom")
-
-p_tot = ggarrange(ggarrange(ggplot() + theme_void(),p1,ggplot() + theme_void(),widths = c(.7,2,.7),ncol=3,labels=c("",letters[1],"")),
-                  p3,nrow=2,labels=c("",""))
-
-ggsave("../Figures/Final_figs/SI/Niche_expansion_MF.pdf",p_tot,width = 8,height = 8)
-
-
-
-## NIntA for varying traits ----
-
-d_RII=read.table("../Table/2_species/PA/RII_varying_traits.csv",sep=";")
-
-d_compe=filter(d_RII,Sp=="Competitive")
-d_stesstol=filter(d_RII,Sp=="Stress_tolerant")
-d_both=filter(d_RII,Sp=="Both")
-
-d_RII=tibble(S=d_both$S,alpha_0=d_both$alpha_0, Psi1=d_both$Psi1,Psi2=d_both$Psi2,Facilitation=d_both$Facilitation,
-             RNE_stress_tol = (d_both$rho_1-d_stesstol$rho_1)/(d_both$rho_1+d_stesstol$rho_1), #acutally its RII
-             RNE_competitive = (d_both$rho_2-d_compe$rho_2)/(d_both$rho_2+d_compe$rho_2),
-             NintA_comp = 2*(d_both$rho_2-d_compe$rho_2)/(d_compe$rho_2+abs(d_both$rho_2-d_compe$rho_2)), #using metrics from Diaz-Sierre MEE 2017
-             NintA_st = 2*(d_both$rho_1-d_stesstol$rho_1)/(d_stesstol$rho_1+abs(d_both$rho_1-d_stesstol$rho_1)),
-             NImpA_comp = 2*(d_both$rho_2-d_compe$rho_2)/(2*max(d_compe$rho_2)-d_compe$rho_2+abs(d_both$rho_2-d_compe$rho_2)), #using metrics from Diaz-Sierre MEE 2017
-             NImpA_st = 2*(d_both$rho_1-d_stesstol$rho_1)/(2*max(d_stesstol$rho_1)-d_stesstol$rho_1+abs(d_both$rho_1-d_stesstol$rho_1)))
-d_RII[,3:6][is.na(d_RII[,3:6])] = NA
-
-
-p1=ggplot(d_RII %>%filter(., Psi1==1)%>%
-            melt(., measure.vars=c("NintA_st","NintA_comp")) %>%
-            mutate(., variable = recode_factor(variable, "NintA_st" = "Species 1", "NintA_comp" = "Species 2"))) +
-  geom_tile(aes(x=round(S,5),y=round(Psi2,5),fill=as.numeric(value)))+
-  facet_grid(variable~alpha_0,labeller = label_bquote(cols= alpha[e] == .(alpha_0)))+
-  scale_fill_gradient2(low="#F73030",mid="white",high="#185BB9")+
-  the_theme+ggtitle(TeX("$\\psi_1 = 1$"))+
-  labs(x="Stress, S",y=TeX(r'(Trait species 2, \ $\psi_2)'),fill=TeX("$NInt_A$"))
-
-p2=ggplot(d_RII %>%filter(., Psi1==0)%>%
-            melt(., measure.vars=c("NintA_st","NintA_comp")) %>%
-            mutate(., variable = recode_factor(variable, "NintA_st" = "Species 2", "NintA_comp" = "Species 1"))) +
-  geom_tile(aes(x=round(S,5),y=round(Psi2,5),fill=as.numeric(value)))+
-  facet_grid(variable~alpha_0,labeller = label_bquote(cols= alpha[e] == .(alpha_0)))+
-  scale_fill_gradient2(low="#F73030",mid="white",high="#185BB9")+
-  the_theme+ggtitle(TeX("$\\psi_2 = 0$"))+
-  labs(x="Stress, S",y=TeX(r'(Trait species 1, \ $\psi_1)'),fill=TeX("$NInt_A$"))
-
-p_tot=ggarrange(p1+theme(axis.title.x = element_blank(),axis.line.x = element_blank(),axis.ticks.x = element_blank()),
-                p2+theme(strip.background.x = element_blank(),strip.text.x = element_blank()),
-                nrow=2,labels = letters[1:2],common.legend = T,legend = "bottom")
-
-ggsave("../Figures/Final_figs/SI/NInt_A_varying_traits.pdf",p_tot,width = 7,height = 8)
 
 
 ## Advantage of CSI compared to Rho+----
@@ -1390,404 +1169,164 @@ for (scena_ID in 1:2){ #for each scenario of species pairs
 
 p=ggplot(d_invade%>%
            mutate(., Scena=recode_factor(Scena,'1'="Global facilitation",'2'="Local facilitation")))+
-  geom_point(aes(x=delta,y=Thresh_invasion,shape=Scena),size=3)+
-  geom_line(aes(x=delta,y=Thresh_invasion,group=Scena))+
-  labs(x=TeX("$\\delta$"),y="Threshold of stress for invasion \n of a desert state",shape="")+
+  geom_point(aes(x=Scena,y=Thresh_invasion,color=delta),size=3,shape=1)+
+  geom_line(aes(x=Scena,y=Thresh_invasion,color=delta,group=interaction(delta)),lwd=.5)+
+  labs(x="",y="Threshold of stress for invasion \n of a desert state",shape="",color=TeX("$\\delta$"))+
   scale_shape_manual(values = c(0,8))+the_theme+
+  scale_color_viridis_b(option = "A")+
   theme(legend.text = element_text(size=12))
+
 
 ggsave("../Figures/Final_figs/SI/Threshold_invasion.pdf",width = 7,height = 4)
 
 
 
+## Restoration point trait & competition species----
 
-## Restoration trajectory trait----
 
-c_inter_seq=c(0,.1, .2, .3)
-psi1_seq=c(1,0)
+stress_seq=seq(0,.82, length.out = 100)
 
-f=.9;disp=.1
-for (Psi_sp1 in psi1_seq){
-  d=tibble()  
+d=tibble()  
+d_bistab=tibble()
+
+
+for (stress in stress_seq){
   
-  for (branch in c("Restoration","Degradation")){
-    for (cinter in c_inter_seq){
+  
+  
+  d2=rbind(read.table(paste0("../Table/2_species/PA/Multistability_PA/Frac_gradient/Test_interspe_comp_",
+                             .3,"_branch_Degradation_stress_",stress,"_delta_",.1,"_facilitation_",.9,".csv"),sep=";"),
+           read.table(paste0("../Table/2_species/PA/Multistability_PA/Frac_gradient/Test_interspe_comp_",
+                             .3,"_branch_Restoration_stress_",stress,"_delta_",.1,"_facilitation_",.9,".csv"),sep=";"))
+  d=rbind(d,d2)
+  
+  
+  
+}
+
+d2=d
+d2[,1:2][d2[,1:2] < 10^-3] = 0
+d2$state = sapply(1:nrow(d2), function(x) {
+  if (d2[x, 1] > 0 & d2[x, 2] > 0) {
+    return("Coexistence")
+  }
+  if (d2[x, 1] > 0 & d2[x, 2] == 0) {
+    return("Stress_tolerant")
+  }
+  if (d2[x, 1] == 0 & d2[x, 2] > 0) {
+    return("Species 2")
+  }
+  if (d2[x, 1] == 0 & d2[x, 2] == 0) {
+    return("Desert")
+  }
+})
+d2=d2[order(d2$Psi2,d2$Stress,d2$alpha_0,d2$Psi1),]
+
+all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
+  if (d2$state[x] != d2$state[x+1]){
+    return(paste0(d2$state[x],"/", d2$state[x+1]))
+  }
+  else {return(d2$state[x])}
+})
+
+d_state=d2%>%
+  filter(., Branches=="Degradation")%>%
+  select(.,-Branches)
+d_state$all_state=all_state
+
+d_state$multistab=sapply(1:nrow(d_state),function(x){
+  if (d_state$all_state[x] %in% c( "Species 2/Stress_tolerant","Coexistence/Stress_tolerant","Species 2/Coexistence",
+                                   "Stress_tolerant/Species 2")){
+    return(1)
+  } else {return(0)}
+  
+})
+
+d_state$Stress_tolerant_reg=d2$Stress_tolerant[which(d2$Branches=="Restoration")]
+d_state$Competitive_reg=d2$Competitive[which(d2$Branches=="Restoration")]
+
+d_final=tibble()
+for (i in unique(d_state$Psi1)){
+  for (j in unique(d_state$Psi2)){
+    for (a0 in unique(d_state$alpha_0)){
+      d_fil=filter(d_state,Psi1==i,Psi2==j,alpha_0==a0)
       
-      d2=read.table(paste0("../Table/2_species/PA/Multistability_PA/Varying_traits/Multistability_varying_trait_interspe_comp_",
-                           cinter,"_branch_",branch,
-                           "_Psi1_",Psi_sp1,"_delta_",disp,"_facilitation_",f,".csv"),sep=";")
-      d=rbind(d,d2)
-      
-    } # end loop interspecific competition
-  } # end loop branch
-  
-  
-  d[,1:2][d[,1:2] < 10^-4] = 0
-  #COmputing CSI index
-  set.seed(123)
-  u=runif(2)
-  d$CSI = sapply(1:nrow(d),function(x){
-    return(u[1]*d$Stress_tolerant[x]+u[2]*d$Competitive[x])
-  })
-  
-  if (Psi_sp1 ==1) {
-    
-    d2=filter(d,Psi1==Psi_sp1)
-    
-    
-    #Restoration and degradation points
-    d_tipping=tibble()
-    for (a0 in unique(d2$alpha_0)){
-      for (psi in unique(d2$Psi2)){
-        for (direction in "Restoration"){
-          
-          d_a0=filter(d2,alpha_0==a0,Psi2==psi,Branches==direction)
-          
-          if (direction=="Restoration") d_a0=d_a0[order(d_a0$Stress,decreasing = T),]
-          
-          density_C=d_a0$Competitive
-          stress_C=stress_ST=d_a0$Stress
-          
-          if (direction=="Restoration"){ #initially absent
-            
-            stress_C=stress_C[-c(1:min(which(abs(diff(density_C))>0)))]
-            density_C=density_C[-c(1:min(which(abs(diff(density_C))>0)))]
-            Tipping_C = stress_C[1]
-            
-          } else{
-            
-            Tipping_C = stress_C[min(which(density_C==0))-1]
-            
-          }
-          
-          d_tipping=rbind(d_tipping,tibble(Competition=a0,Psi2=psi,Branch=direction,
-                                           Tipping = Tipping_C,Psi1=1))
-          
-        }
+      if (i>j){
+        d_final=rbind(d_final,tibble(Psi1=i,Psi2=j,alpha_0=a0,
+                                     Frac_multi=sum(d_fil$multistab)/length(which(d_fil$state!="Desert")),
+                                     Frac_multi_raw=sum(d_fil$multistab),
+                                     Deg=d_fil$Stress[min(which(d_fil$Competitive==0))-1],
+                                     Deg2=d_fil$Stress[max(which(d_fil$Stress_tolerant>0))+1],
+                                     Rest=d_fil$Stress[min(which(d_fil$Competitive_reg==0))],
+                                     Niche_1 = length(which(d_fil$Stress_tolerant>0))/length(which(d_fil$state!="Desert"))  ,
+                                     Niche_2 = length(which(d_fil$Competitive>0))/length(which(d_fil$state!="Desert"))
+        ))
       }
     }
-    
-
-  } 
-  if (Psi_sp1==0){
-    
-    
-    d2=filter(d,Psi1==Psi_sp1)
-    
-    
-    
-    #Restoration and degradation points
-    for (a0 in unique(d2$alpha_0)){
-      for (psi in unique(d2$Psi2)){
-        for (direction in "Restoration"){
-          
-          d_a0=filter(d2,alpha_0==a0,Psi2==psi,Branches==direction)
-          
-          if (direction=="Restoration") d_a0=d_a0[order(d_a0$Stress,decreasing = T),]
-          
-          density_ST=d_a0$Stress_tolerant
-          stress_ST=stress_ST=d_a0$Stress
-          
-          if (direction=="Restoration"){ #initially absent
-            
-            stress_ST=stress_ST[-c(1:min(which(abs(diff(density_ST))>0)))]
-            density_ST=density_ST[-c(1:min(which(abs(diff(density_ST))>0)))]
-            Tipping_ST = stress_ST[1]
-            
-          } else{
-            
-            Tipping_ST = stress_ST[min(which(density_ST==0))-1]
-            
-          }
-          
-          d_tipping=rbind(d_tipping,tibble(Competition=a0,Psi2=psi,Branch=direction,
-                                           Tipping = Tipping_ST,Psi1=0))
-          
-        }
-      }
-    }
-    
   }
 }
 
 
-p2=ggplot(d_tipping %>%filter(., Competition==.3))+
-  geom_smooth(aes(x=Psi2,y=Tipping,color=as.factor(Psi1),group=interaction(Competition,Branch,Psi1)),se = F)+
-  the_theme+
-  labs(x=TeX(r'($\psi_2)'),y="Threshold stress",color=TeX(r'($\psi_1)'))+
-  scale_color_manual(values=c("black","blue"))
+
+# Niche least competitive species
+p1=ggplot(d_final)+
+  geom_tile(aes(x=Psi1,y=Psi2,fill=Niche_1))+
+  the_theme+labs(x=TeX(r'(Species 1 trait, $\psi_1$)'),y=TeX(r'(Species 2 trait, $\psi_2$)'),
+                 fill="Fraction of vegetation states \n where species 1 has a positive cover")+
+  scale_fill_gradientn(colors=colorRampPalette(c("#F9F4E7","#E6CC8B","#E2A472","#B50F02"))(100))+
+  guides(shape=F)
 
 
-p_tot=ggarrange(p1+theme(legend.position = "none",strip.text.x = element_text(size=13))+ggtitle(TeX("$\\psi_1 = 1$")),
-                p2+ggtitle(TeX("$\\psi_2 = 0$"))+theme(strip.background.x = element_blank(),
-                                                       strip.text.x = element_blank()),nrow=2,labels = letters[1:2])
+ggsave("../Figures/Final_figs/SI/Niche_least_competitive_species.pdf",p1,width = 6,height = 5)
 
-ggsave("../Figures/Final_figs/Figure_4.pdf",p_tot,width = 7,height = 7)
+
+#Degradation and restoration points
+
+p1=ggplot(d_final)+
+  geom_tile(aes(x=Psi1,y=Psi2,fill=Deg))+
+  the_theme+labs(x=TeX(r'(Species 1 trait, $\psi_1$)'),y=TeX(r'(Species 2 trait, $\psi_1$)'),fill="Species 2 extinction point")+
+  scale_fill_gradientn(colors=colorRampPalette(c("#F9F4E7","#E6CC8B","#E2A472","#B50F02"))(100))+
+  guides(shape=F)
+
+
+
+#Restoration point traits
+p2=ggplot(d_final)+
+  geom_tile(aes(x=Psi1,y=Psi2,fill=Rest))+
+  the_theme+labs(x=TeX(r'(Species 1 trait, $\psi_1$)'),y=TeX(r'(Species 2 trait, $\psi_2$)'),fill="Species 2 restoration point")+
+  scale_fill_gradientn(colors=colorRampPalette(c("#F9F4E7","#E6CC8B","#E2A472","#B50F02"))(100),
+                       breaks=c(0,.1,.2))+
+  geom_line(data=tibble(x=c(0,1,1,1),y=c(0,0,0,1),group=c(1,1,2,2)),aes(x=x,y=y,group=group),lwd=1)+
+  geom_text(data=tibble(x=c(.5,1.05),
+                        y=c(0.05,.55),
+                        txt=c("(c)","(d)")),aes(x=x,y=y,label=txt),size=4.5)+
+  guides(shape=F)
+
+
+
+p3=ggplot(d_final%>%filter(Psi2==0))+
+  geom_smooth(aes(x=Psi1,y=Rest),se = F,color="black")+ggtitle(TeX("$\\psi_2 = 0$"))+
+  the_theme+labs(x=TeX(r'(Species 1 trait, $\psi_1$)'),y="Species 2 restoration point")
+
+p4=ggplot(d_final%>%filter(Psi1==unique(d_final$Psi1)[49]))+
+  geom_smooth(aes(x=Psi2,y=Rest),se = F,color="black")+ggtitle(TeX("$\\psi_1 = 1$"))+
+  the_theme+labs(x=TeX(r'(Species 2 trait, $\psi_2$)'),y="Species 2 restoration point")
+
+p_bottom=ggarrange(p3,p4,labels = letters[3:4])
+p_tot=ggarrange(ggarrange(p1,p2,ncol=2,labels = letters[1:2]),
+                p_bottom,nrow=2,heights = c(1.5,1))
+
+ggsave("../Figures/Final_figs/SI/Restoration_degration.pdf",p_tot,width = 9,height = 7)
+
+
+
+
+
+
 
 
 # N-species ----
-## Species specific tipping points ----
 
-
-d_ASS_sp=read.table("../Table/N_species/MF/d_ASS_sp.csv",sep=";")
-N_replicate=150
-
-
-#Species-specific tipping points size & frequency
-p=ggplot(d_ASS_sp, aes(x=Trait,y=Tipping/N_replicate,fill=Trait)) + 
-  geom_bar( stat="identity",width = .1)+
-  facet_grid(Branch~Richness)+
-  the_theme+
-  labs(x=TeX("$\\psi$"),y="Frequency of abrupt shift",fill=TeX("$\\psi$"))+
-  scale_fill_gradientn(colours = color_Nsp(100))+
-  scale_x_continuous(breaks = c(0,.5,1),labels = c("0","0.5","1"))
-
-ggsave("../Figures/Final_figs/SI/Specific_specific_tipping_points.pdf",p,width = 9,height = 5)
-
-
-## CSI bifu diagrams----
-
-d=read.table('../Table/N_species/MF/Random_ini.csv',sep=";")
-
-Nsp=15
-p1=ggplot(d%>%filter(.,Branch=="Degradation"))+
-  geom_point(aes(x=Stress,y=CSI,color=Psi_normalized,fill=Psi_normalized),size=.8,shape=1)+
-  facet_grid(Competition~Facilitation,labeller = label_bquote(rows=alpha[e]==.(Competition), cols=f[0]==.(Facilitation)))+
-  the_theme+labs(y="Community index",color=expression(paste(bar(psi),"    ")))+
-  scale_color_gradientn(colors = color_Nsp(Nsp),na.value = "black")+
-  scale_fill_gradientn(colors = color_Nsp(Nsp),na.value = "black")+
-  guides(fill="none")+
-  theme(strip.text.x = element_text(size=12),strip.text.y = element_text(size=12))
-
-p2=ggplot(d%>%filter(.,Branch=="Restoration"))+
-  geom_point(aes(x=Stress,y=CSI,color=Psi_normalized,fill=Psi_normalized),size=.8,shape=1)+
-  facet_grid(Competition~Facilitation,labeller = label_bquote(rows=alpha[e]==.(Competition), cols=f[0]==.(Facilitation)))+
-  the_theme+labs(y="Community index",color=expression(paste(bar(psi),"    ")))+
-  scale_color_gradientn(colors = color_Nsp(Nsp),na.value = "black")+
-  scale_fill_gradientn(colors = color_Nsp(Nsp),na.value = "black")+
-  guides(fill="none")+
-  theme(strip.text.x = element_text(size=12),strip.text.y = element_text(size=12))
-
-
-ggsave("../Figures/Final_figs/SI/CSI_competition_facilitation_15species.pdf",
-       ggarrange(p1,
-                 p2,
-                 nrow = 2,labels = letters[1:2]),
-       width = 7,height = 10)
-
-## Varying the threshold for shifts ----
-
-threshold_seq=c(.05,.075,.125,.15)
-
-for (thresh in 1:length(threshold_seq)){
-  
-  threshold=threshold_seq[thresh]
-  d_tipping=d_richness=d_richness2=d_tot=tibble()
-  
-  for (i in c(5,10,15,20,25,30,35)){
-    
-    d_t=tibble()
-    
-    # pdf(paste0("../Figures/N_species/MF/Bifu_Nsp/Dyn_Nspecies_",i,".pdf"),width = 6,height = 4)
-    
-    Nsp=i
-    list_csv=list.files(paste0('../Table/N_species/MF/',i,'_sp/'))
-    
-    for ( k in 1:length(list_csv)){
-      
-      d2=read.table(paste0("../Table/N_species/MF/",i,"_sp/",list_csv[k]),sep=",")
-      colnames(d2)=c(paste0("Sp_",1:Nsp),"Fertile","Degraded","Random_ini","Competition","Dispersal","Facilitation","Branch","Stress")
-      
-      d2[d2<10^(-4)]=0
-      
-      d_t=rbind(d_t,d2)
-      
-      
-      d_richness=rbind(d_richness,
-                       tibble(Nsp=Nsp,Random_ini=k,
-                              Branch="Degradation",
-                              Richness=length(which(colSums(d2[1:(nrow(d2)/2),])[1:Nsp] !=0))))
-      
-      d_richness=rbind(d_richness,
-                       tibble(Nsp=Nsp,Random_ini=k,
-                              Branch="Restoration",
-                              Richness=length(which(colSums(d2[((nrow(d2)/2)+1):(nrow(d2)),])[1:Nsp] !=0))))
-      
-      
-      # print(
-      #   ggplot(d2%>%melt(., measure.vars=paste0("Sp_",1:Nsp)))+
-      #     geom_line(aes(x=Stress,y=value,color=variable),size=.8)+
-      #     facet_wrap(.~Branch)+
-      #     the_theme+labs(y="",color=expression(paste(bar(psi),"    ")))+ggtitle("Degradation")
-      # )
-      
-      
-      d2$CSI = sapply(1:nrow(d2),function(x){
-        set.seed(432)
-        u=runif(Nsp)
-        return(sum(d2[x,1:Nsp]*u))
-      })
-      
-      d2$Psi_normalized = sapply(1:nrow(d2),function(x){
-        trait=rev(seq(0,1,length.out=Nsp))
-        if (d2$CSI[x]==0){return(NA)
-        }else{  return(sum(d2[x,1:Nsp]*trait)/rowSums(d2[x,1:Nsp]))
-        }
-      })
-      
-      
-      
-      d_tot=rbind(d_tot,d2[,-c(1:Nsp)]%>%add_column(., Nsp=Nsp))
-      
-      for (sp in 1:Nsp){
-        
-        
-        
-        if (any(abs(diff(d2[1:(nrow(d2)/2),sp]))>threshold)){ #if species shift
-          nb_shift=length(which(round((abs(diff(d2[1:(nrow(d2)/2),sp]))),4)>threshold))
-          
-          if (nb_shift %% 2==1){ #case for the first species shifting as it is already present in the system
-            nb_shift=nb_shift+1
-          }
-          
-          
-          d_tipping=rbind(d_tipping,tibble(Species=sp,Nsp=Nsp,Random_ini=k,Tipping=nb_shift/2,Branch="Degradation"))
-        }
-        if (any(abs(diff(d2[((nrow(d2)/2)+1):(nrow(d2)),sp]))>threshold)){
-          nb_shift=length(which(round((abs(diff(d2[((nrow(d2)/2)+1):(nrow(d2)),sp]))),4)>threshold))
-          
-          if (nb_shift %% 2==1){ #case for the first species shifting as it is already present in the system
-            nb_shift=nb_shift+1
-          }
-          
-          d_tipping=rbind(d_tipping,tibble(Species=sp,Nsp=Nsp,Random_ini=k,Tipping=nb_shift/2,Branch="Restoration"))
-        }
-        
-        
-      }
-    }
-    # dev.off()
-    
-    d_t=d_t[order(d_t$Branch),]
-    d_richness2=rbind(d_richness2,tibble(Nsp=Nsp,
-                                         Richness_D=length(which(colSums(d_t[1:(nrow(d_t)/2),])[1:Nsp] !=0)),
-                                         Richness_R=length(which(colSums(d_t[((nrow(d_t)/2)+1):nrow(d_t),])[1:Nsp] !=0))))
-  }
-
-  d_tipping=d_tipping%>%
-    group_by(., Nsp,Random_ini,Branch)%>%
-    summarise(., Nb_different_species=length(unique(Species)),.groups = "keep")
-  
-  assign(paste0("p_",thresh),ggplot(d_tipping%>%filter(., Branch=="Degradation"))+
-    geom_bar(aes(x=Nsp,fill=as.factor(Nb_different_species),y=Nb_different_species),
-             position = "fill",stat="identity",alpha=.75)+
-    labs(x="Number of species",y="Fraction of random initial conditions",fill="Number of shifts")+
-    scale_x_continuous(breaks = seq(5,35,by=5))+
-    the_theme+
-      ggtitle(paste0("Threshold = ",thresh))
-    )
-    
-    
-}
-
-p_tot=ggarrange(p_1,p_2,p_3,p_4,labels = letters[1:4],ncol = 2,nrow = 2,align = "hv")
-ggsave("../Figures/Final_figs/SI/Threshold_tipping.pdf",p_tot,width = 9,height = 10)
-
-
-## Figure N_species restoration ----
-
-
-d_tipping=read.table("../Table/N_species/MF/Multistability_tipping.csv",sep=";")
-d_richness2=read.table("../Table/N_species/MF/Multistability_richness2.csv",sep=";")
-d_richness=read.table("../Table/N_species/MF/Multistability_richness.csv",sep=";")
-
-
-p1=ggplot(d_richness%>%filter(., Branch=="Restoration"))+
-  geom_bar(aes(x=Nsp,fill=as.factor(Richness),y=Richness),
-           position = "fill",stat="identity",alpha=.75)+
-  labs(x="Community richness (N)",y="Fraction of random initial conditions",fill="Number of species")+
-  scale_x_continuous(breaks = seq(5,35,by=5))+
-  geom_point(data=d_richness2,aes(x=Nsp,y=Richness_D/Nsp),shape=1,size=3)+
-  geom_line(data=d_richness2,aes(x=Nsp,y=Richness_D/Nsp))+
-  scale_y_continuous(sec.axis=sec_axis(~., name="Fraction of species observed \n all across replicates"))+
-  the_theme
-
-
-
-d_tot=read.table("../Table/N_species/MF/Multistability_CSI.csv",sep=";")
-colnames(d_tot)[11]="Community richness (N)"
-
-p2=ggplot(d_tot%>%filter(.,Branch==2,`Community richness (N)` %in% c(5,35)))+
-  geom_point(aes(x=Stress,y=CSI,color=Psi_normalized,fill=Psi_normalized),size=.8,shape=21)+
-  facet_wrap(.~`Community richness (N)`,labeller = label_both)+
-  the_theme+labs(y="Community index",color="")+
-  scale_color_gradientn(colors = color_Nsp(100),na.value = "black")+
-  scale_fill_gradientn(colors = color_Nsp(100),na.value = "black")+
-  guides(fill="none")+
-  labs(x="Stress, S")+
-  scale_x_continuous(breaks = c(0,.5,1),labels = c("0","0.5","1"))+
-  theme(strip.text.x = element_text(size=10),strip.text.y = element_text(size=11),
-        panel.background = element_blank(),strip.background.x = element_blank())
-
-d_ASS_sp=read.table("../Table/N_species/MF/d_ASS_sp.csv",sep=";")
-N_replicate=150
-colnames(d_ASS_sp)[6]="Community richness (N)"
-
-#Species-specific tipping points size & frequency
-p3_1=ggplot(filter(d_ASS_sp, `Community richness (N)` %in% c(5),Branch=="Restoration"), 
-            aes(x=Trait,y=Tipping/N_replicate,fill=Trait)) + 
-  geom_bar( stat="identity",width = .1)+
-  facet_grid(.~`Community richness (N)`)+
-  the_theme+
-  labs(x=TeX("$\\psi$"),y="Frequency of abrupt shift",fill="")+
-  scale_fill_gradientn(colours = color_Nsp(100))+
-  scale_x_continuous(breaks = c(0,.5,1),labels = c("0","0.5","1"))+
-  theme(strip.text.x =element_blank(),strip.text.y = element_text(size=11),
-        panel.background = element_blank(),strip.background.x = element_blank())
-
-p3_2=ggplot(filter(d_ASS_sp, `Community richness (N)` %in% c(35),Branch=="Restoration"), 
-            aes(x=Trait,y=Tipping/N_replicate,fill=Trait)) + 
-  geom_bar( stat="identity",width = .025)+
-  facet_grid(.~`Community richness (N)`)+
-  the_theme+
-  labs(x=TeX("$\\psi$"),y="Frequency of abrupt shift",fill="")+
-  scale_fill_gradientn(colours = color_Nsp(100))+
-  scale_x_continuous(breaks = c(0,.5,1),labels = c("0","0.5","1"))+
-  theme(strip.text.x =element_blank(),strip.text.y = element_text(size=11),
-        panel.background = element_blank(),strip.background.x = element_blank(),
-        axis.line.y = element_blank(),axis.text.y = element_blank(),axis.ticks.y = element_blank(),
-        axis.title.y = element_blank())
-
-p3=ggarrange(p3_1,p3_2,ncol = 2,legend = "none",widths = c(1.2,1),labels = c(letters[3],""),hjust = -3,vjust = -2)
-
-Fig6SI=ggarrange(p1,ggarrange(p2,p3,nrow=2,labels = c(letters[2],""),hjust=-2.3,
-                            common.legend = T,legend = "bottom",heights = c(1.2,1)),
-               ncol=2,labels = c(letters[1],"",""),widths = c(1.3,1))
-
-ggsave("../Figures/Final_figs/SI/N_species_restoration.pdf",Fig6SI,width=10,height=5)
-
-
-## All CSI panel ----
-
-
-d_tot=read.table("../Table/N_species/MF/Multistability_CSI.csv",sep=";")
-colnames(d_tot)[11]="Community richness (N)"
-
-p=ggplot(d_tot%>%filter(.,Branch==1))+
-  geom_point(aes(x=Stress,y=CSI,color=Psi_normalized,fill=Psi_normalized),size=.5,shape=21)+
-  facet_wrap(.~`Community richness (N)`,labeller = label_both)+
-  the_theme+labs(y="Community index",color=expression(paste(bar(psi),"    ")))+
-  scale_color_gradientn(colors = color_Nsp(100),na.value = "black")+
-  scale_fill_gradientn(colors = color_Nsp(100),na.value = "black")+
-  guides(fill="none")+
-  labs(x="Stress, S")+
-  theme(strip.text.x = element_text(size=10),strip.text.y = element_text(size=11),
-        panel.background = element_blank(),strip.background.x = element_blank())
-
-
-
-
-ggsave("../Figures/Final_figs/SI/CSI_Nsp_all.pdf",p,width=7,height=5)
 
 ## Test: nb ASS along stress gradient ----
 
@@ -1811,3 +1350,34 @@ ggplot(d_ASS)+
   facet_grid(.~Branch)+
   scale_color_manual(values = colorRampPalette(c("orange","black","green"))(7))
 
+
+
+
+## Number of species gradient stress ----
+
+
+d_richness=read.table("../Table/N_species/MF/Multistability_richness.csv",sep=";")
+
+
+d_richness_mean=d_richness%>%
+  group_by(., Nsp,Branch,Competition)%>%
+  summarise(., mean_richness=mean(Richness),.groups = "keep")
+
+p1=ggplot(d_richness)+
+  geom_bar(aes(x=Competition,fill=as.factor(Richness),color=as.factor(Richness),y=Richness),
+           color="transparent",position = "fill",stat="identity")+
+  geom_point(data=d_richness_mean,aes(x=Competition,y=mean_richness/7),
+             shape=1,size=3,color="white")+
+  facet_wrap(.~Nsp,labeller = label_bquote(cols="Number of species"==.(Nsp)))+
+  labs(x=TeX(r'(Strength of interspecific competition, \ $\alpha_e)'),
+       y="Fraction of replicates",fill="Number of species \n with positive cover")+
+  scale_fill_viridis_d()+
+  scale_color_viridis_d()+
+  the_theme+
+  guides(color="none")+
+  scale_y_continuous(sec.axis=sec_axis(~.*7, name="Mean total number of species"))+
+  theme(strip.text.x = element_text(size=11))+
+  scale_x_continuous(breaks = seq(0.225,.35,by=.025))
+
+
+ggsave("../Figures/Final_figs/SI/Nb_shift_diversity.pdf",p1,width=9,height=5)

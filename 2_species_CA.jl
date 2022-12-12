@@ -443,53 +443,7 @@ end
 
 
 #
-#region : Step 1-- Example of EWS
-
-S_seq = collect(range(0, stop=1, length=40))
-c_seq = [0.15 0.3]
-intra_comp_seq = [0.3]
-param = Get_classical_param()
-size_landscape = 100
-replicate = 1
-count = 1
-scale_competition = ["global"]
-disp_seq = [0.1]
-d2 = zeros(length(S_seq) * length(c_seq) * replicate * length(scale_competition) * length(intra_comp_seq), 12) #Allocating
-
-for disp in disp_seq
-    for scale_comp in scale_competition
-        for aii in intra_comp_seq
-            for stress in S_seq
-                param["S"] = stress
-                for alpha_e in c_seq
-                    param["alpha_0"] = alpha_e
-                    for rep in 1:replicate
-
-                        ini = Get_initial_lattice(size_mat=size_landscape)
-
-                        name_landscape = "../Table/Example_EWS/Landscape_Scalecomp_" * scale_comp * "_Stress_" * repr(round(stress, digits=3)) * "_alpha0_" * repr(alpha_e) * "_cintra_" * repr(aii)
-
-
-
-                        d, state = Run_CA_2_species(; landscape=copy(ini), param=copy(param), time=30000, type_competition=scale_comp, save=true, burning=15000, N_snap=40,
-                            name_save=name_landscape)
-
-                        #display(Plot_dynamics(d))
-                        CSV.write("../Table/Example_EWS/Dynamics_stress_" * repr(round(stress, digits=3)) * "_alpha0_" * repr(alpha_e) * ".csv", Tables.table(d), writeheader=false)
-
-                    end
-                end
-            end
-        end
-    end
-end
-
-
-
-#endregion
-
-
-#region : Step 2-- Convergence CA & PA 
+#region : Step 1-- Convergence CA & PA 
 
 
 
@@ -532,6 +486,60 @@ for disp in disp_seq
         end
     end
 end
+
+
+
+#endregion
+
+
+#region : Step 2-- Illustration competitive exclusion 2 species 
+
+
+
+
+S_seq = collect(range(0, stop=0.2, length=2))[2] #the point where there is bistability in PA
+c_seq = collect(range(0, stop=0.4, length=10))[10]
+intra_comp_seq = [0.3]
+param = Get_classical_param()
+size_landscape = 100
+trajec_seq = ["Degradation" "Restoration"]
+count = 1
+scale_competition = ["global"]
+disp_seq = [0.1]
+d2 = zeros(length(S_seq) * length(c_seq) * length(scale_competition) * length(intra_comp_seq) * 2, 4) #Allocating
+
+for disp in disp_seq
+    for scale_comp in scale_competition
+        for aii in intra_comp_seq
+            for stress in S_seq
+                param["S"] = stress
+                for alpha_e in c_seq
+                    param["alpha_0"] = alpha_e
+                    for traj in trajec_seq
+                        if traj == "Degradation"
+                            ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
+                        else
+                            ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.05, 0.05, 0.49, 0.5])
+                        end
+
+
+                        d, state = Run_CA_2_species(; landscape=copy(ini), param=copy(param), time=5000, type_competition=scale_comp, save=false, burning=15000, N_snap=40,
+                            name_save="")
+
+                        #display(Plot_dynamics(d))
+                        CSV.write("../Table/2_species/CA/Illustration/Dynamics_stress_" * repr(round(stress, digits=3)) *
+                                  "_trajectory_" * traj * "_alpha0_" * repr(alpha_e) * ".csv", Tables.table(d), writeheader=false)
+
+                        CSV.write("../Table/2_species/CA/Illustration/Landscape_stress_" * repr(round(stress, digits=3)) *
+                                  "_trajectory_" * traj * "_alpha0_" * repr(alpha_e) * ".csv", Tables.table(state), writeheader=false)
+
+                    end
+                end
+            end
+        end
+    end
+end
+
 
 
 
