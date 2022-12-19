@@ -396,7 +396,7 @@ function Run_CA_2_species(; time, param, landscape, save, name_save="", burning=
             rho_1, rho_2, rho_f, rho_d, landscape = Ca_2_species_global(landscape=copy(landscape), param=param)
             @views d[k+1, :] = [k + 1 rho_1 rho_2 rho_f rho_d]
 
-            if save && k > burning && k % ((time - burning) / N_snap) == 0
+            if save && k > burning && k % round(((time - burning) / N_snap)) == 0
                 CSV.write(name_save * "_nsave_" * repr(n_save) * ".csv", Tables.table(landscape), writeheader=false)
                 n_save += 1
 
@@ -409,7 +409,7 @@ function Run_CA_2_species(; time, param, landscape, save, name_save="", burning=
             rho_1, rho_2, rho_f, rho_d, landscape = Ca_2_species_local(landscape=copy(landscape), param=param)
             @views d[k+1, :] = [k + 1 rho_1 rho_2 rho_f rho_d]
 
-            if save && k > burning && k % ((time - burning) / N_snap) == 0
+            if save && k > burning && k % round(((time - burning) / N_snap)) == 0
                 CSV.write(name_save * "_nsave_" * repr(n_save) * ".csv", Tables.table(landscape), writeheader=false)
                 n_save += 1
 
@@ -443,7 +443,63 @@ end
 
 
 #
-#region : Step 1-- Convergence CA & PA 
+
+
+#region : Step 1-- Illustration competitive exclusion 2 species (Fig 2) 
+
+
+
+
+S_seq = collect(range(0, stop=0.2, length=2))[2] #the point where there is bistability in PA
+c_seq = collect(range(0, stop=0.4, length=10))[10]
+intra_comp_seq = [0.3]
+param = Get_classical_param()
+size_landscape = 100
+trajec_seq = ["Degradation" "Restoration"]
+count = 1
+scale_competition = ["global"]
+disp_seq = [0.1]
+d2 = zeros(length(S_seq) * length(c_seq) * length(scale_competition) * length(intra_comp_seq) * 2, 4) #Allocating
+
+for disp in disp_seq
+    for scale_comp in scale_competition
+        for aii in intra_comp_seq
+            for stress in S_seq
+                param["S"] = stress
+                for alpha_e in c_seq
+                    param["alpha_0"] = alpha_e
+                    for traj in trajec_seq
+                        if traj == "Degradation"
+                            ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
+                        else
+                            ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.05, 0.05, 0.49, 0.5])
+                        end
+
+
+                        d, state = Run_CA_2_species(; landscape=copy(ini), param=copy(param), time=5000, type_competition=scale_comp, save=false, burning=15000, N_snap=40,
+                            name_save="")
+
+                        #display(Plot_dynamics(d))
+                        CSV.write("../Table/2_species/CA/Illustration/Dynamics_stress_" * repr(round(stress, digits=3)) *
+                                  "_trajectory_" * traj * "_alpha0_" * repr(alpha_e) * ".csv", Tables.table(d), writeheader=false)
+
+                        CSV.write("../Table/2_species/CA/Illustration/Landscape_stress_" * repr(round(stress, digits=3)) *
+                                  "_trajectory_" * traj * "_alpha0_" * repr(alpha_e) * ".csv", Tables.table(state), writeheader=false)
+
+                    end
+                end
+            end
+        end
+    end
+end
+
+
+
+
+#endregion
+
+
+#region : Step 2-- Convergence CA & PA (SI fig)
 
 
 
@@ -492,53 +548,118 @@ end
 #endregion
 
 
-#region : Step 2-- Illustration competitive exclusion 2 species 
+
+#region : Step 3-- Species pairs (Fig 3b)
 
 
-
-
-S_seq = collect(range(0, stop=0.2, length=2))[2] #the point where there is bistability in PA
-c_seq = collect(range(0, stop=0.4, length=10))[10]
-intra_comp_seq = [0.3]
 param = Get_classical_param()
 size_landscape = 100
-trajec_seq = ["Degradation" "Restoration"]
+trajec_seq = ["Degradation"]
 count = 1
 scale_competition = ["global"]
-disp_seq = [0.1]
-d2 = zeros(length(S_seq) * length(c_seq) * length(scale_competition) * length(intra_comp_seq) * 2, 4) #Allocating
+disp_seq = collect(range(0, stop=1, length=12))[[2 11]]
 
 for disp in disp_seq
-    for scale_comp in scale_competition
-        for aii in intra_comp_seq
-            for stress in S_seq
-                param["S"] = stress
-                for alpha_e in c_seq
-                    param["alpha_0"] = alpha_e
-                    for traj in trajec_seq
-                        if traj == "Degradation"
-                            ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
-                        else
-                            ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.05, 0.05, 0.49, 0.5])
-                        end
+    param["S"] = 0
+    param["alpha_0"] = 0.2
+    param["delta"] = disp
+    ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
 
 
-                        d, state = Run_CA_2_species(; landscape=copy(ini), param=copy(param), time=5000, type_competition=scale_comp, save=false, burning=15000, N_snap=40,
-                            name_save="")
+    d, state = Run_CA_2_species(; landscape=copy(ini), param=copy(param), time=5000,
+        type_competition="global", save=false, burning=15000, N_snap=40,
+        name_save="")
+    CSV.write("../Table/2_species/CA/Pairs" * "_delta_" * repr(disp) * ".csv", Tables.table(state), writeheader=false)
 
-                        #display(Plot_dynamics(d))
-                        CSV.write("../Table/2_species/CA/Illustration/Dynamics_stress_" * repr(round(stress, digits=3)) *
-                                  "_trajectory_" * traj * "_alpha0_" * repr(alpha_e) * ".csv", Tables.table(d), writeheader=false)
-
-                        CSV.write("../Table/2_species/CA/Illustration/Landscape_stress_" * repr(round(stress, digits=3)) *
-                                  "_trajectory_" * traj * "_alpha0_" * repr(alpha_e) * ".csv", Tables.table(state), writeheader=false)
-
-                    end
-                end
-            end
-        end
-    end
 end
+
+
+
+
+#endregion
+
+
+
+#region : Step 4-- Clustering species dispersal (Fig 3c)
+
+
+param = Get_classical_param()
+size_landscape = 100
+trajec_seq = ["Degradation"]
+count = 1
+scale_competition = ["global"]
+disp_seq = collect(range(0, stop=1, length=12))[[2 11]]
+
+for disp in disp_seq
+    param["S"] = 0.73
+    param["alpha_0"] = 0.2
+    param["delta"] = disp
+    ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
+
+
+    d, state = Run_CA_2_species(; landscape=copy(ini), param=copy(param), time=5000,
+        type_competition="global", save=false, burning=15000, N_snap=40,
+        name_save="")
+    CSV.write("../Table/2_species/CA/Landscape_clustering" * "_delta_" * repr(disp) * ".csv", Tables.table(state), writeheader=false)
+
+end
+
+
+
+
+#endregion
+
+
+
+#region : Step 5-- Vegetation along dispersal gradient (SI fig)
+
+
+
+param = Get_classical_param()
+size_landscape = 100
+scale_comp = ["global"]
+param["alpha_0"] = 0.4
+disp_seq = [0 0.1 0.2 0.3 0.7 1]
+
+for disp in disp_seq
+    param["delta"] = disp
+    ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
+
+
+    d, state = Run_CA_2_species(; landscape=copy(ini), param=copy(param), time=3000, type_competition=scale_comp, save=false, burning=15000, N_snap=40,
+        name_save="")
+
+    #display(Plot_dynamics(d))
+    CSV.write("../Table/2_species/CA/Dispersal_gradient_delta_" * repr(disp) * ".csv", Tables.table(state), writeheader=false)
+
+
+end
+
+
+
+#endregion
+
+
+#region : Step6-- Propensity colonization
+
+
+param = Get_classical_param()
+size_landscape = 100
+scale_comp = ["global"]
+param["alpha_0"] = 0.4
+disp_seq = [0 0.1 0.2 0.3 0.7 1]
+
+for disp in disp_seq
+    param["delta"] = disp
+    ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
+
+
+    d, state = Run_CA_2_species(; landscape=copy(ini), param=copy(param), time=10000, type_competition=scale_comp, save=true, burning=3000, N_snap=30,
+        name_save="../Table/2_species/CA/Propensity_colonization/Dispersal_gradient_delta_" * repr(disp))
+
+
+end
+
 
 
 

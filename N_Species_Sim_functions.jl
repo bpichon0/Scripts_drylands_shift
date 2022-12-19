@@ -217,6 +217,7 @@ function MF_N_species(du, u, p, t)
 
 end
 
+
 function Reorder_dynamics(sol)
     sol_dyn = reduce(hcat, sol.u)'     #transforming solutions in clean matrix
     sol_dyn = cat(sol_dyn, sol.t, dims=2)

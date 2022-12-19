@@ -14,10 +14,10 @@ the_theme = theme_classic() + theme(
 
 
 color_rho = c("coexistence" = "#D8CC7B", "competitive" = "#ACD87B", "desert" = "#696969", "stress_tol" = "#7BD8D3")
-
-color_rho = c("coexistence" = "#D8CC7B", "competitive" = "#ACD87B", "desert" = "#696969", "stress_tol" = "#7BD8D3")
 color_Nsp=colorRampPalette(c("#077D10",as.character(color_rho[2]),as.character(color_rho[4]),"#2A39EF"))
 color_hys=colorRampPalette(c("#C7B6C8", "#74B6BA" ,"#7783C4" ,"#B56D4E", "#F28E47", "#FCE269"))
+
+
 #creating folders
 dir.create("../",showWarnings = F)
 dir.create("../Table",showWarnings = F)
@@ -113,7 +113,7 @@ end")
 
 
 Run_dynamics_hysteresis = function(plot = F, N_seq_c = 100, N_seq_S = 100, write_table = T) {
-    color_rho = c("coexistence" = "#D8CC7B", "competitive" = "#ACD87B", "desert" = "#696969", "stress_tol" = "#7BD8D3")
+    color_rho = c("coexistence" = "#D8CC7B", "competitive" = "#ACD87B", "desert" = "#696969", "stress_tol" = "#858BE0")
 
     tspan = c(0, 5000)
     t = seq(0, 5000, by = 1)
@@ -815,6 +815,70 @@ end
 
 ")
 
+
+
+
+PA_two_species_varying_trait_global_facilitation = julia_eval("
+
+function PA_two_species_varying_trait_global_facilitation(du,u,p,t)
+
+r, d, f, beta, m, e, cintra, alpha_0, S, delta, z, h, psi_1,psi_2 = p
+rho_1, rho_2, rho_m, rho_12, rho_1m, rho_2m, rho_11, rho_22, rho_mm = u
+
+rho_0 = (1 - rho_1 - rho_2 - rho_m)
+rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
+rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
+rho_0m = rho_m - rho_mm - rho_1m - rho_2m
+
+
+#rho_1
+du[1] = rho_0 * (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
+                                                                        (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) - rho_1 * m
+
+#rho_2
+du[2] = rho_0 * (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 - S * (1 - e * psi_2)) -
+                                                                        (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) - rho_2 * m
+
+#rho_m
+du[3] = rho_0 * d - rho_m * (r + f * ( psi_1 * rho_1 + psi_2 * rho_2))
+
+#rho_12
+du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) *
+        (beta * (1 - S * (1 - e * psi_2)) - (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) +
+        rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) *
+                                      (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
+                                                               (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
+        2 * rho_12 * m
+
+#rho_1m
+du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
+                                                                                                            (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
+        rho_1m * m - rho_1m * (r + f * ( psi_1 * rho_1 + psi_2 * rho_2))
+
+#rho_2m
+du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S * (1 - e * psi_2)) -
+                                                                                                           (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) -
+        rho_2m * m - rho_2m * (r + f * ( psi_1 * rho_1 + psi_2 * rho_2))
+
+#rho_11
+du[7] = 2 * rho_10 * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) *
+        (beta * (1 - S * (1 - e * psi_1 )) - (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
+        2 * rho_11 * m
+
+#rho_22
+du[8] = 2 * rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta *
+                                                                                                                     (1 - S * (1 - e * psi_2)) - (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) -
+        2 * rho_22 * m
+
+#rho_mm
+du[9] = 2 * (rho_0m) * d - 2 * rho_mm * (r + f * ( psi_1 * rho_1 + psi_2 * rho_2))
+
+end
+
+
+")
+
+
 PA_two_species_varying_trait_trade_off = julia_eval("
 
 function PA_two_species_varying_trait_trade_off(du,u,p,t)
@@ -936,7 +1000,7 @@ end
 
 ")
 
-## 3) N species ----
+## 3) N-species ----
 
 Extract_pairs_trait=function(d,Nsp,self=F,clustering=T){
   
@@ -993,7 +1057,7 @@ Extract_pairs_trait=function(d,Nsp,self=F,clustering=T){
 Plot_landscape = function(landscape,Nsp=15){
   color_CA = c("white","white",rev(color_Nsp(Nsp)))
   if (Nsp==2){
-    color_CA = c("white","white",as.character(color_rho[c(4,2)]))
+    color_CA = c("white","white",c("#858BE0",as.character(color_rho[c(2)])))
   }
   
   state=melt(landscape)
@@ -1010,7 +1074,7 @@ Plot_landscape = function(landscape,Nsp=15){
 
 
 plot_dynamics = function(d) {
-  color_rho2 = c("Fertile" = "#D8CC7B", "Competitive" = "#ACD87B", "Desert" = "#696969", "Stress-tolerant" = "#7BD8D3")
+  color_rho2 = c("Fertile" = "#D8CC7B", "Competitive" = "#ACD87B", "Desert" = "#696969", "Stress-tolerant" = "#858BE0")
   
   if (colnames(d)<7){
     
@@ -1039,7 +1103,7 @@ plot_dynamics = function(d) {
     colnames(d)=c(paste0(1:(ncol(d)-3)),"Fertile","Degraded","time")
     
     return(ggplot(d %>% melt(., measure.vars = colnames(d)[1:(ncol(d)-3)]))+
-             geom_line(aes(x = time, y = value, color = variable), lwd = 1) +
+             geom_line(aes(x = time, y = value, color = variable), lwd = .3) +
              the_theme +
              scale_color_manual(values = rev(color_Nsp(5))) +
              labs(x = "Time", y = "Densities", color = "Species") +

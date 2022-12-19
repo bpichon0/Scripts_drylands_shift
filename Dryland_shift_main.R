@@ -28,6 +28,8 @@ de = diffeq_setup()
 
 
 
+
+
 ## 1) Multistability fixed traits ----
 
 
@@ -317,80 +319,84 @@ julia_assign("tspan", tspan)
 N_sim=50
 S_seq =seq(0,.82, length.out = 100)
 psi_seq=seq(0,1,length.out=N_sim)
-c_inter_seq=rev(c(0,.1, .2, .3,.4))
+c_inter_seq=.3
 psi1_seq=seq(0,1,length.out=N_sim)
 f_seq=c(.9)
-dispersal_scale=c(.1)
+dispersal_scale=c(.1,.9)
 branches=c("Degradation","Restoration")
 
-for (facil in f_seq){
-  
-  for (disp in dispersal_scale){
-    
-    for (S in S_seq) { 
-      
-      
-      for (cinter in c_inter_seq){
-        
-        
-        
-        for (branch in branches){
-          
-          if (branch =="Degradation"){ #doing the two branches of the bifurcation diagram
-            state = Get_PA_initial_state(Get_MF_initial_state(c(.4,.4,.1)))
-          }else {
-            state = Get_PA_initial_state(Get_MF_initial_state(c(.005,.005,.49)))
-          }
-          
-          d2 = tibble()
-          
-          
-          for (psi2 in psi_seq){
-            
-            for (psi1 in psi1_seq[which(psi1_seq>psi2)]){
-              
-              julia_assign("state", state)
-              param=Get_PA_parameters()
-              param["delta"]=disp
-              param["cintra"]=.3
-              param["alpha_0"]=cinter
-              param["S"] = S
-              param["psi_1"]=psi1
-              param["psi_2"]=psi2
-              param["f"]=facil
-              julia_assign("p", param)
-              
-              prob = julia_eval("ODEProblem(PA_two_species_varying_trait, state, tspan, p)")
-              
-              
-              sol = de$solve(prob, de$Tsit5(), saveat = t)
-              d = as.data.frame(t(sapply(sol$u, identity)))
-              colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
-              
-              d2 = rbind(d2, d[nrow(d), ] %>% add_column(Stress = S, Psi2 = psi2, Psi1 = psi1,alpha_0=cinter,
-                                                         Branch=branch))
-              
-            }
-          } # end trait value 2nd species
-          
-          d2[d2 < 10^-4] = 0
-          d2$rho_plus = d2$rho_1 + d2$rho_2
-          d2=d2[,c(1,2,10:15)]
-          colnames(d2) = c("Stress_tolerant", "Competitive", "Stress", "Psi2","Psi1","alpha_0","Branches","Rho_plus")
-          write.table(d2,paste0("../Table/2_species/PA/Multistability_PA/Frac_gradient/Test_interspe_comp_",
-                                cinter,"_branch_",branch,
-                                "_stress_",S,"_delta_",disp,"_facilitation_",facil,".csv"),sep=";")
-          
-        } # end loop interspecific competition
-        
-      } # end loop branch
-      
-    } # end loop first species trait
-    
-  } #end loop dispersal
-  
-}#end facilitation loop
+for(scale_f in c("local","global")){
 
+  for (facil in f_seq){
+    
+    for (disp in dispersal_scale){
+      
+      for (S in S_seq) { 
+        
+        for (cinter in c_inter_seq){
+          
+          for (branch in branches){
+            
+            if (branch =="Degradation"){ #doing the two branches of the bifurcation diagram
+              state = Get_PA_initial_state(Get_MF_initial_state(c(.4,.4,.1)))
+            }else {
+              state = Get_PA_initial_state(Get_MF_initial_state(c(.005,.005,.49)))
+            }
+            
+            d2 = tibble()
+            
+            
+            for (psi2 in psi_seq){
+              
+              for (psi1 in psi1_seq[which(psi1_seq>psi2)]){
+                
+                julia_assign("state", state)
+                param=Get_PA_parameters()
+                param["delta"]=disp
+                param["cintra"]=.3
+                param["alpha_0"]=cinter
+                param["S"] = S
+                param["psi_1"]=psi1
+                param["psi_2"]=psi2
+                param["f"]=facil
+                julia_assign("p", param)
+                
+                if (scale_f=="local"){
+                  prob = julia_eval("ODEProblem(PA_two_species_varying_trait, state, tspan, p)")
+                } else {
+                  prob = julia_eval("ODEProblem(PA_two_species_varying_trait_global_facilitation, state, tspan, p)")
+                }
+                
+                
+                sol = de$solve(prob, de$Tsit5(), saveat = t)
+                d = as.data.frame(t(sapply(sol$u, identity)))
+                colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
+                
+                d2 = rbind(d2, d[nrow(d), ] %>% add_column(Stress = S, Psi2 = psi2, Psi1 = psi1,alpha_0=cinter,
+                                                           Branch=branch))
+                
+              }
+            } # end trait value 2nd species
+            
+            d2[d2 < 10^-4] = 0
+            d2$rho_plus = d2$rho_1 + d2$rho_2
+            d2=d2[,c(1,2,10:15)]
+            colnames(d2) = c("Stress_tolerant", "Competitive", "Stress", "Psi2","Psi1","alpha_0","Branches","Rho_plus")
+            write.table(d2,paste0("../Table/2_species/PA/Multistability_PA/Frac_gradient/Test_interspe_comp_",
+                                  cinter,"_branch_",branch,
+                                  "_stress_",round(S,4),"_delta_",disp,"_facilitation_",facil,"_scalefacilitation_",scale_f,".csv"),sep=";")
+            
+          } # end loop interspecific competition
+          
+        } # end loop branch
+        
+      } # end loop first species trait
+      
+    } #end loop dispersal
+    
+  }#end facilitation loop
+
+}#end facilitation scale
 
 
 
@@ -402,7 +408,7 @@ t = seq(0, 2000, by = 1)
 julia_library("DifferentialEquations")
 julia_assign("tspan", tspan)
 
-N_rep = 50
+N_rep = 12
 S_seq = c(0,.1,.73,.77)
 alpha_seq = c(.2)
 f_seq=.9
@@ -427,7 +433,6 @@ for (scena_ID in 1:2){ #for each scenario of species pairs
           
           #Setting the parameters
           param=Get_PA_parameters()
-          param["r"]=0
           param["cintra"]=aii
           param["f"]=f
           param["delta"]=disp
@@ -500,7 +505,123 @@ write.table(d_clustering,"../Table/2_species/PA/Clustering_PA.csv",sep=";")
 
 
 
-## 4) Varying the trade-off shape ----
+## 4) Threshold for invasion and extinction ----
+
+tspan = c(0, 2000) #to avoid long transient
+t = seq(0, 2000, by = 1)
+julia_library("DifferentialEquations")
+julia_assign("tspan", tspan)
+N_rep = 100
+S_seq = c(seq(0,.75,length.out=100),seq(.75,.9,length.out=1400))
+alpha_seq = c(.2)
+f_seq=.9
+delta_seq=seq(0,1,length.out=12)
+aii=.3
+
+
+name_scena=c("global_C_global_F","global_C_local_F")
+
+d_invade=d_extinction=tibble() #initializing the tibble
+
+for (scena_ID in 1:2){ #for each scenario of species pairs
+  
+  for (disp in delta_seq){ #varying dispersal scale
+    
+    for (traj in c("Restoration","Degradation")){ #varying intraspecific competition strength
+      
+      for (f in f_seq){ #varying facilitation strength
+        
+        for (alpha0 in alpha_seq) { #varying competition
+          
+          
+          #Setting the parameters
+          param=Get_PA_parameters()
+          param["cintra"]=aii
+          param["f"]=f
+          param["delta"]=disp
+          param["alpha_0"]=alpha0
+          
+          if (traj=="Restoration"){
+            state=Get_PA_initial_state(ini =c(.05,.05,.49))
+          } else{
+            state=Get_PA_initial_state(ini =c(.4,.4,.1))
+          }
+          
+          julia_assign("state", state)
+          
+          #varying the global interspecific competition
+          
+          d2 = tibble()
+          
+          for (S in S_seq) { #varying the stress 
+            
+            param["S"] = S
+            param["alpha_0"] = alpha0
+            julia_assign("p", param)
+            
+            if (scena_ID==1){  #global C, global F
+              
+              julia_assign("p", param)
+              prob = julia_eval("ODEProblem(PA_two_species_global_C_global_F, state, tspan, p)")
+              
+            }else if (scena_ID==2){ #global C, local F
+              
+              julia_assign("p", param)
+              prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F, state, tspan, p)")
+              
+            }
+            
+            sol = de$solve(prob, de$Tsit5(), saveat = t)
+            d = as.data.frame(t(sapply(sol$u, identity)))
+            
+            colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
+            
+            d2 = rbind(d2, d[nrow(d),] %>% add_column(S = S, alpha_0=alpha0))
+            
+          }
+          d2[d2 < 10^-4] = 0
+          colnames(d2) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm", "S", "alpha_0")
+          d2$rho_plus = d2$rho_1 + d2$rho_2
+          
+          
+          
+          if (traj=="Restoration"){
+            
+            d_invade=rbind(d_invade,tibble(
+              Thresh_invasion=max(d2$S[which((d2$rho_1)>0)]),
+              alpha_0 = alpha0,
+              f=f,delta=disp,Scena=scena_ID,
+              cintra=aii
+            ))
+            
+          } else {
+            
+            d_extinction=rbind(d_extinction,tibble(
+              Thresh_extinction=min(d2$S[which((d2$rho_1)==0)]),
+              alpha_0 = alpha0,
+              f=f,delta=disp,Scena=scena_ID,
+              cintra=aii
+            ))
+            
+            
+          }         
+          
+        } #end competition loop
+        
+      } #end facilitation loop
+      
+    } #end trajectory loop
+    
+  } #end dispersal loop
+  
+} #end scenario loop
+write.table(d_invade,"../Table/2_species/PA/Threshold_invasion.csv",sep=";")
+write.table(d_extinction,"../Table/2_species/PA/Threshold_extinction.csv",sep=";")
+
+
+
+
+## 5) Varying the trade-off shape ----
 
 rm(list = ls())
 source("./Dryland_shift_functions.R")
@@ -594,13 +715,16 @@ for (facil in f_seq){
 
 
 
-# Step 3) Nspecies analysis ----
+
+
+
+# Step 3) N-species analysis ----
 rm(list = ls())
 source("./Dryland_shift_functions.R")
 
 
 threshold=.1
-d_tipping=d_richness=d_richness2=d_tot=d_position_shift=tibble()
+d_tipping=d_richness=d_richness2=d_tot=d_position_shift=d_trait_shift=tibble()
 # pdf(paste0("../Figures/N_species/MF/Dyn_Nspecies.pdf"),width = 6,height = 4)
 
 for (i in c(5,15,25)){
@@ -663,6 +787,7 @@ for (i in c(5,15,25)){
       
       
       if (any(abs(diff(d2[1:(nrow(d2)),sp]))>threshold)){ #if species shift
+        tip=1
         nb_shift=length(which(round((abs(diff(d2[1:(nrow(d2)),sp]))),4)>threshold))
         
         if (nb_shift %% 2==1){ #case for the first species shifting as it is already present in the system
@@ -677,8 +802,13 @@ for (i in c(5,15,25)){
         d_position_shift=rbind(d_position_shift,tibble(Species=sp,Nsp=Nsp,Random_ini=k,Branch="Degradation",
                                                        Stress_shift=d2$Stress[which(round((abs(diff(d2[1:(nrow(d2)),sp]))),4)>threshold)],
                                                        Competition=strsplit(list_csv[k],split = "_")[[1]][5]))
+      }else {
+        tip=0
       }
       
+      d_trait_shift=rbind(d_trait_shift,tibble(Species=sp,Nsp=Nsp,Random_ini=k,Branch="Degradation",
+                                               Tipping=tip,
+                                               Competition=strsplit(list_csv[k],split = "_")[[1]][5]))
       
     }
   }
@@ -694,6 +824,7 @@ write.table(d_richness,"../Table/N_species/MF/Multistability_richness.csv",sep="
 write.table(d_richness2,"../Table/N_species/MF/Multistability_richness2.csv",sep=";")
 write.table(d_tot,"../Table/N_species/MF/Multistability_CSI.csv",sep=";")
 write.table(d_position_shift,"../Table/N_species/MF/Position_shift_stress_gradient.csv",sep=";")
+write.table(d_trait_shift,"../Table/N_species/MF/Trait_shift.csv",sep=";")
 
 
 
