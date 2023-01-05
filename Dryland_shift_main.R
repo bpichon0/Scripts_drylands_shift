@@ -195,8 +195,8 @@ de = diffeq_setup()
 
 
 
-tspan = c(0, 2000) #to avoid long transient
-t = seq(0, 2000, by = 1)
+tspan = c(0, 5000) #to avoid long transient
+t = seq(0, 5000, by = 1)
 julia_library("DifferentialEquations")
 julia_assign("tspan", tspan)
 
@@ -507,12 +507,12 @@ write.table(d_clustering,"../Table/2_species/PA/Clustering_PA.csv",sep=";")
 
 ## 4) Threshold for invasion and extinction ----
 
-tspan = c(0, 2000) #to avoid long transient
-t = seq(0, 2000, by = 1)
+tspan = c(0, 5000) #to avoid long transient
+t = seq(0, 5000, by = 1)
 julia_library("DifferentialEquations")
 julia_assign("tspan", tspan)
 N_rep = 100
-S_seq = c(seq(0,.75,length.out=100),seq(.75,.9,length.out=1400))
+S_seq = seq(0,.9,length.out=1500)
 alpha_seq = c(.2)
 f_seq=.9
 delta_seq=seq(0,1,length.out=12)
@@ -542,7 +542,7 @@ for (scena_ID in 1:2){ #for each scenario of species pairs
           param["alpha_0"]=alpha0
           
           if (traj=="Restoration"){
-            state=Get_PA_initial_state(ini =c(.05,.05,.49))
+            state=Get_PA_initial_state(ini =c(.005,.005,.49))
           } else{
             state=Get_PA_initial_state(ini =c(.4,.4,.1))
           }
@@ -723,14 +723,11 @@ rm(list = ls())
 source("./Dryland_shift_functions.R")
 
 
-threshold=.1
-d_tipping=d_richness=d_richness2=d_tot=d_position_shift=d_trait_shift=tibble()
+
+d_richness=d_tot=d_trait_shift=tibble()
 # pdf(paste0("../Figures/N_species/MF/Dyn_Nspecies.pdf"),width = 6,height = 4)
 
 for (i in c(5,15,25)){
-  
-  d_t=tibble()
-  
   
   Nsp=i
   list_csv=list.files(paste0('../Table/N_species/MF/',i,'_sp/'))
@@ -738,27 +735,35 @@ for (i in c(5,15,25)){
   for ( k in 1:length(list_csv)){
     
     d2=read.table(paste0("../Table/N_species/MF/",i,"_sp/",list_csv[k]),sep=",")
-    colnames(d2)=c(paste0("Sp_",1:Nsp),"Fertile","Degraded","Random_ini","Competition","Dispersal","Facilitation","Branch","Stress")
+    colnames(d2)=c(paste0("Sp_",1:Nsp),"Fertile","Degraded","Random_ini","Competition","Facilitation","Branch","Stress")
     
     d2[d2<10^(-4)]=0
     
-    d_t=rbind(d_t,d2)
     
     
     d_richness=rbind(d_richness,
                      tibble(Nsp=Nsp,Random_ini=k,Competition=strsplit(list_csv[k],split = "_")[[1]][5],
                             Branch="Degradation",
-                            Richness=length(which(colSums(d2[1:(nrow(d2)),])[1:Nsp] !=0))))
+                            Richness=length(which(colSums(d2[1:(nrow(d2)/2),])[1:Nsp] !=0))))
+    
+    d_richness=rbind(d_richness,
+                     tibble(Nsp=Nsp,Random_ini=k,Competition=strsplit(list_csv[k],split = "_")[[1]][5],
+                            Branch="Restoration",
+                            Richness=length(which(colSums(d2[((nrow(d2)/2)+1):(nrow(d2)),])[1:Nsp] !=0))))
     
     
     # print(
-    #   ggplot(d2%>%melt(., measure.vars=paste0("Sp_",1:Nsp)))+
-    #     geom_line(aes(x=Stress,y=value,color=variable),size=.8)+
+    #   ggplot(d2%>%melt(., measure.vars=paste0("Sp_",1:Nsp))%>%
+    #            mutate(., Branch=recode_factor(Branch,"1"="Degradation","2"="Restoration")))+
+    #     geom_line(aes(x=Stress,y=value,color=variable,linetype=as.factor(Branch),
+    #                   group=interaction(variable,Branch))
+    #               ,size=.8)+
     #     ggtitle(paste0("Nsp = ",i,", aij = ",
     #                    strsplit(list_csv[k],split = "_")[[1]][5]))+
-    #     the_theme+labs(y="",color=expression(paste(bar(psi),"    ")))
+    #     the_theme+labs(y="",color=expression(paste(bar(psi),"    ")),linetype="")+
+    #     scale_color_manual(values=rev(color_Nsp(Nsp)))+
+    #     theme(legend.box = "vertical")
     # )
-    
     
     d2$CSI = sapply(1:nrow(d2),function(x){
       set.seed(432)
@@ -777,270 +782,25 @@ for (i in c(5,15,25)){
       return(sum(d2[x,1:Nsp]))
     })
     
-    
-    
-    d_tot=rbind(d_tot,d2[,-c(1:Nsp)]%>%add_column(., Nsp=Nsp,Competition=strsplit(list_csv[k],split = "_")[[1]][5],
-                                                Div_species=length(which(colSums(d2)[1:Nsp]>0))    ))
+    d_tot=rbind(d_tot,d2[,-c(1:Nsp)]%>%add_column(., Nsp=Nsp,Competition=strsplit(list_csv[k],split = "_")[[1]][5]))
     
     for (sp in 1:Nsp){
       
-      
-      
       if (any(abs(diff(d2[1:(nrow(d2)),sp]))>threshold)){ #if species shift
         tip=1
-        nb_shift=length(which(round((abs(diff(d2[1:(nrow(d2)),sp]))),4)>threshold))
-        
-        if (nb_shift %% 2==1){ #case for the first species shifting as it is already present in the system
-          nb_shift=nb_shift+1
-        }
-        
-        
-        d_tipping=rbind(d_tipping,tibble(Species=sp,Nsp=Nsp,Random_ini=k,Tipping=nb_shift/2,Branch="Degradation",
-                                         Competition=strsplit(list_csv[k],split = "_")[[1]][5]))
-        
-        
-        d_position_shift=rbind(d_position_shift,tibble(Species=sp,Nsp=Nsp,Random_ini=k,Branch="Degradation",
-                                                       Stress_shift=d2$Stress[which(round((abs(diff(d2[1:(nrow(d2)),sp]))),4)>threshold)],
-                                                       Competition=strsplit(list_csv[k],split = "_")[[1]][5]))
       }else {
         tip=0
       }
-      
       d_trait_shift=rbind(d_trait_shift,tibble(Species=sp,Nsp=Nsp,Random_ini=k,Branch="Degradation",
                                                Tipping=tip,
                                                Competition=strsplit(list_csv[k],split = "_")[[1]][5]))
-      
     }
   }
-  
-  d_t=d_t[order(d_t$Branch),]
-  d_richness2=rbind(d_richness2,tibble(Nsp=Nsp,Competition=strsplit(list_csv[k],split = "_")[[1]][5],
-                                       Richness_D=length(which(colSums(d_t[1:(nrow(d_t)),])[1:Nsp] !=0))))
 }
 # dev.off()
 
-write.table(d_tipping,"../Table/N_species/MF/Multistability_tipping.csv",sep=";")
 write.table(d_richness,"../Table/N_species/MF/Multistability_richness.csv",sep=";")
-write.table(d_richness2,"../Table/N_species/MF/Multistability_richness2.csv",sep=";")
 write.table(d_tot,"../Table/N_species/MF/Multistability_CSI.csv",sep=";")
-write.table(d_position_shift,"../Table/N_species/MF/Position_shift_stress_gradient.csv",sep=";")
 write.table(d_trait_shift,"../Table/N_species/MF/Trait_shift.csv",sep=";")
-
-
-
-
-
-d_tipping=read.table("../Table/N_species/MF/Multistability_tipping.csv",sep=";")
-d_richness=read.table("../Table/N_species/MF/Multistability_richness.csv",sep=";")
-d_richness2=read.table("../Table/N_species/MF/Multistability_richness2.csv",sep=";")
-d_tot=read.table("../Table/N_species/MF/Multistability_CSI.csv",sep=";")
-d_position_shift=read.table("../Table/N_species/MF/Position_shift_stress_gradient.csv",sep=";")
-
-d_position_shift$Trait=sapply(1:nrow(d_position_shift),function(x){
-  return(seq(1,0, length.out=d_position_shift$Nsp[x])[d_position_shift$Species[x]])
-})
-
-
-
-# Different metrics for analyzing tipping points in community.
-# summarizing these metrics
-
-d_tipping_summarized=d_tipping%>%
-  group_by(., Nsp,Random_ini,Branch,Competition)%>%
-  summarise(., Nb_different_species=length(unique(Species)),.groups = "keep",
-            Nb_tipping=sum(Tipping))
-
-
-d_tipping_mean=d_tipping_summarized%>%
-  group_by(., Nsp,Branch,Competition)%>%
-  summarise(., mean_nb_shift=mean(Nb_tipping),.groups = "keep",
-            mean_number_shift_sp=mean(Nb_different_species))
-
-d_richness_mean=d_richness%>%
-  group_by(., Nsp,Branch,Competition)%>%
-  summarise(., mean_richness=mean(Richness),.groups = "keep")
-
-
-d_position_summarize=d_position_shift%>%
-  group_by(.,Random_ini,Branch,Competition,Nsp)%>%
-  summarise(.,.groups = "keep",Nb_shift=length(unique(Stress_shift)))
-
-d_position_summarize_mean=d_position_summarize%>%
-  group_by(.,Branch,Competition,Nsp)%>%
-  summarise(.,.groups = "keep",Nb_shift_mean=mean(Nb_shift))
-
-
-#Ploting
-
-p1=ggplot(d_tipping_summarized)+
-  geom_bar(aes(x=Competition,fill=as.factor(Nb_different_species),color=as.factor(Nb_different_species),
-               y=Nb_different_species),
-           color="transparent",position = "fill",stat="identity")+
-  geom_point(data=d_tipping_mean,aes(x=Competition,y=mean_number_shift_sp/4),
-             shape=1,size=3,color="white")+
-  labs(x=TeX(r'(Strength of interspecific competition, \ $\alpha_e)'),y="Fraction of replicates",fill="Unique number of species that shifts")+
-  facet_wrap(.~Nsp,labeller = label_bquote(cols="Number of species"==.(Nsp)))+
-  scale_fill_viridis_d()+
-  scale_color_viridis_d()+
-  the_theme+
-  guides(color="none")+
-  scale_y_continuous(sec.axis=sec_axis(~.*4, name="Mean number of unique \n species that shift"))+
-  theme(strip.text.x = element_text(size=11))+
-  scale_x_continuous(breaks = seq(0.225,.35,by=.025))
-
-
-p2=ggplot(d_tipping_summarized)+
-  geom_bar(aes(x=Competition,fill=as.factor(Nb_tipping),color=as.factor(Nb_tipping),
-               y=Nb_tipping),color="transparent",
-           position = "fill",stat="identity")+
-  geom_point(data=d_tipping_mean,aes(x=Competition,y=mean_nb_shift/5),
-             shape=1,size=3,color="white")+
-  labs(x=TeX(r'(Strength of interspecific competition, \ $\alpha_e)'),y="Fraction of replicates",fill="Number of species shifts")+
-  facet_wrap(.~Nsp,labeller = label_bquote(cols="Number of species"==.(Nsp)))+
-  scale_fill_viridis_d()+
-  scale_color_viridis_d()+
-  the_theme+
-  guides(color="none")+
-  scale_y_continuous(sec.axis=sec_axis(~.*5, name="Mean number of species shifts"))+
-  theme(strip.text.x = element_text(size=11))+
-  scale_x_continuous(breaks = seq(0.225,.35,by=.025))
-
-
-p3=ggplot(d_richness)+
-  geom_bar(aes(x=Competition,fill=as.factor(Richness),color=as.factor(Richness),y=Richness),
-           color="transparent",position = "fill",stat="identity")+
-  geom_point(data=d_richness_mean,aes(x=Competition,y=mean_richness/7),
-             shape=1,size=3,color="white")+
-  facet_wrap(.~Nsp,labeller = label_bquote(cols="Number of species"==.(Nsp)))+
-  labs(x=TeX(r'(Strength of interspecific competition, \ $\alpha_e)'),
-       y="Fraction of replicates",fill="Number of species \n with positive cover")+
-  scale_fill_viridis_d()+
-  scale_color_viridis_d()+
-  the_theme+
-  guides(color="none")+
-  scale_y_continuous(sec.axis=sec_axis(~.*7, name="Mean total number of species"))+
-  theme(strip.text.x = element_text(size=11))+
-  scale_x_continuous(breaks = seq(0.225,.35,by=.025))
-
-
-p4=ggplot(d_position_summarize)+
-  geom_bar(aes(x=Competition,fill=as.factor(Nb_shift),color=as.factor(Nb_shift),y=Nb_shift),
-           color="transparent",position = "fill",stat="identity")+
-  geom_point(data=d_position_summarize_mean,aes(x=Competition,y=Nb_shift_mean/4),
-             shape=1,size=3,color="white")+
-  facet_wrap(.~Nsp,labeller = label_bquote(cols="Number of species"==.(Nsp)))+
-  labs(x=TeX(r'(Strength of interspecific competition, \ $\alpha_e)'),
-       y="Fraction of replicates",fill="Number of community transitions")+
-  scale_fill_viridis_d()+
-  scale_color_viridis_d()+
-  the_theme+
-  guides(color="none")+
-  theme(strip.text.x = element_text(size=11))+
-  scale_y_continuous(sec.axis=sec_axis(~.*4, name="Mean number of community transitions"))+
-  scale_x_continuous(breaks = seq(0.225,.35,by=.025))
-
-
-ggsave("../Figures/N_species/MF/Nb_shift_diversity.pdf",
-       ggarrange(
-         ggarrange(p2,p4,ncol = 2,labels=LETTERS[1:2]),
-         ggarrange(p1,p3,ncol=2,labels=LETTERS[3:4]),
-         nrow=2,align = "hv"),width=19,height=10)
-
-
-
-# Community index
-
-d_tot=read.table("../Table/N_species/MF/Multistability_CSI.csv",sep=";")
-
-p=ggplot(d_tot)+
-  geom_point(aes(x=Stress,y=CSI,color=Psi_normalized,fill=Psi_normalized),size=.5,shape=21)+
-  the_theme+labs(y="Community index",color="")+
-  scale_color_gradientn(colors = color_Nsp(100),na.value = "black")+
-  scale_fill_gradientn(colors = color_Nsp(100),na.value = "black")+
-  guides(fill="none")+
-  labs(x="Stress, S")+
-  facet_grid(Nsp~Competition,labeller = label_bquote(cols= alpha[e] ==.(Competition),rows="N species"==.(Nsp)))+
-  theme(strip.text.x = element_text(size=10),strip.text.y = element_text(size=11),
-        panel.background = element_blank(),strip.background.x = element_blank())
-
-ggsave("../Figures/N_species/MF/CSI_aij_Nsp.pdf",p,width = 12,height = 7)
-
-
-
-
-# Which species shifts and how frequently ?
-
-d_richness=read.table("../Table/N_species/MF/Multistability_richness.csv",sep=";")
-N_replicate=150
-
-d_richness$Trait=sapply(1:nrow(d_richness),function(x){
-  return(seq(1,0, length.out=d_richness$Nsp[x])[d_richness$Species[x]])
-})
-
-p=ggplot(filter(d_richness), 
-         aes(x=Trait,y=Richness/N_replicate,fill=Trait)) + 
-  geom_bar( stat="identity",width = .1)+
-  facet_grid(Nsp~Competition)+
-  the_theme+
-  labs(x=TeX("$\\psi$"),y="Frequency of abrupt shift",fill="")+
-  scale_fill_gradientn(colours = color_Nsp(100))
-
-ggsave("../Figures/N_species/MF/Traits_which_shifts.pdf",p,width = 10,height = 6)
-
-
-
-
-
-# Disitribution of abiotic stress conditions at which species shifts
-
-d_position_shift=read.table("../Table/N_species/MF/Position_shift_stress_gradient.csv",sep=";")
-
-d_position_shift$Trait=sapply(1:nrow(d_position_shift),function(x){
-  return(seq(1,0, length.out=d_position_shift$Nsp[x])[d_position_shift$Species[x]])
-})
-
-p=ggplot(d_position_shift)+
-  geom_violin(aes(x=Competition,y=Stress_shift,group=Competition))+
-  geom_jitter(aes(x=Competition,y=Stress_shift,color=Trait,fill=Trait),size=.5,shape=21,alpha=.5,height = 0,width = .01)+
-  the_theme+labs(y="Stress at which species shifts",color=TeX(r'(Trait of species, \ $\psi)'),
-                 x=TeX(r'(Strength of interspecific competition, \ $\alpha_e)'))+
-  scale_color_gradientn(colors = color_Nsp(100),na.value = "black")+
-  scale_fill_gradientn(colors = color_Nsp(100),na.value = "black")+
-  guides(fill="none")+
-  facet_grid(Nsp~.,labeller = label_bquote(rows="N species"==.(Nsp)))+
-  theme(strip.text.x = element_text(size=10),strip.text.y = element_text(size=11),
-        panel.background = element_blank(),strip.background.x = element_blank())+
-  scale_x_continuous(breaks = seq(0.225,.35,by=.025))
-
-ggsave("../Figures/N_species/MF/Stress_at_which_species_shift.pdf",p,width = 8,height = 8)
-
-
-#same but with community scale shifts
-
-d_position_shift=read.table("../Table/N_species/MF/Position_shift_stress_gradient.csv",sep=";")
-
-d_position_shift$Trait=sapply(1:nrow(d_position_shift),function(x){
-  return(seq(1,0, length.out=d_position_shift$Nsp[x])[d_position_shift$Species[x]])
-})
-
-
-d_position_summarize=d_position_shift%>%
-  group_by(.,Random_ini,Branch,Competition,Nsp)%>%
-  summarise(.,.groups = "keep",Community_shift=unique(Stress_shift))
-
-p=ggplot(d_position_summarize)+
-  geom_violin(aes(x=Competition,y=Community_shift,group=Competition))+
-  geom_jitter(aes(x=Competition,y=Community_shift),size=.5,shape=21,alpha=.5,height = 0,width = .01,color="black")+
-  the_theme+labs(y="Stress at which community transition",
-                 x=TeX(r'(Strength of interspecific competition, \ $\alpha_e)'))+
-  guides(fill="none")+
-  facet_grid(Nsp~.,labeller = label_bquote(rows="N species"==.(Nsp)))+
-  theme(strip.text.x = element_text(size=10),strip.text.y = element_text(size=11),
-        panel.background = element_blank(),strip.background.x = element_blank())+
-  scale_x_continuous(breaks = seq(0.225,.35,by=.025))
-
-
-
-ggsave("../Figures/N_species/MF/Stress_at_which_community_shifts.pdf",p,width = 8,height = 8)
 
 

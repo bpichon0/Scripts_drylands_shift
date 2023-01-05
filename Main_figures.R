@@ -163,6 +163,9 @@ all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
 d_state=d2%>%
   filter(., Branches=="Degradation")%>%
   select(.,-Branches)
+
+d_state=d_state[order(d_state$alpha_0,d_state$Scena,d_state$Delta,d_state$Stress),]
+
 d_state$all_state=all_state
 
 
@@ -213,7 +216,7 @@ p1=ggplot(d2t%>%
                              "Competitive/Stress-tolerant"="#C998CE",
                              "Competitive" = "#ACD87B", 
                              "Competitive/Coexistence" = "#DDEFCA",
-                             "Stress-tolerant" = "#ABE7FF",
+                             "Stress-tolerant" = "#BABEFF",
                              "Stress-tolerant/Desert" ="#0F8E87",
                              "Coexistence/Stress-tolerant"="#9BBBB9",
                              "Coexistence/Desert"="#C19E5E",
@@ -238,7 +241,7 @@ d_ribbon=tibble(x=d_invade$delta,ymax=d_invade$Thresh_extinction,
 p2=ggplot(d_threshold%>%filter(., Scena==2))+
   geom_point(aes(x=delta,y=Thresh_extinction,shape=Branch),size=3)+
   geom_line(aes(x=delta,y=Thresh_extinction,group=Branch),lwd=.5)+
-  geom_ribbon(data=d_ribbon%>%filter(., Scena==2),aes(x=x,ymin=ymin,ymax=ymax),fill="#0F8E87", alpha=0.15)+
+  #geom_ribbon(data=d_ribbon%>%filter(., Scena==2),aes(x=x,ymin=ymin,ymax=ymax),fill="#0F8E87", alpha=0.15)+
   labs(x=TeX('$\\delta$'),y="Threshold of stress",color="",shape="")+
   the_theme+
   scale_shape_manual(values=c(1,8))+
@@ -251,7 +254,6 @@ p2=ggplot(d_threshold%>%filter(., Scena==2))+
 
 # clustering of stress-tolerant species
 d_clustering = read.table("../Table/2_species/PA/Clustering_PA.csv",sep=";")
-
 
 d_clustering$c12=d_clustering$c11=d_clustering$c22=0
 name_scena=c("global_C_global_F","global_C_local_F")
@@ -346,6 +348,7 @@ p3=p30 + annotation_custom(grob=ggplotGrob(p_land_1),
 
 
 # density of pairs
+
 d_pairs=d_clustering%>%
   filter(., alpha_0==.2, S %in% c(0),Scena=="Local facilitation",
          delta %in% unique(d_clustering$delta)[seq(1,length(unique(d_clustering$delta)),length.out=15)])%>%
@@ -654,13 +657,13 @@ ggsave("../Figures/Final_figs/Figure_5.pdf",p_tot,width=9,height=7)
 
 
 # Figure 6: Alternative community states ----
+
+
 d_tot=read.table("../Table/N_species/MF/Multistability_CSI.csv",sep=";")
 
 
 
-
-
-p1=ggplot(d_tot%>%filter(., Nsp %in% c(5,25),Competition %in% c(.225,.35)))+
+p1=ggplot(d_tot%>%filter(., Nsp %in% c(5,25),Competition %in% c(.225,.35),Branch==1))+
   geom_point(aes(x=Stress,y=CSI,color=Psi_normalized,fill=Psi_normalized),size=.1,shape=21)+
   the_theme+labs(y="Community index",color="")+
   scale_color_gradientn(colors = color_Nsp(100),na.value = "black")+
@@ -671,7 +674,7 @@ p1=ggplot(d_tot%>%filter(., Nsp %in% c(5,25),Competition %in% c(.225,.35)))+
   theme(strip.text.x = element_text(size=10),strip.text.y = element_text(size=11),
         panel.background = element_blank(),strip.background.y = element_blank())
 
-p2=ggplot(d_tot%>%filter(., Nsp %in% c(5,25),Competition %in% c(.225,.35)))+
+p2=ggplot(d_tot%>%filter(., Nsp %in% c(5,25),Competition %in% c(.225,.35),Branch==1))+
   geom_point(aes(x=Stress,y=Rho_plus,color=Psi_normalized,fill=Psi_normalized),size=.3,shape=21)+
   the_theme+labs(y="Vegetation cover",color="")+
   scale_color_gradientn(colors = color_Nsp(100),na.value = "black")+
@@ -690,7 +693,7 @@ d_richness_mean=d_richness%>%
   group_by(., Nsp,Branch,Competition)%>%
   summarise(., mean_richness=mean(Richness),.groups = "keep")
 
-p3=ggplot(d_richness)+
+p3=ggplot(d_richness%>%filter(., Branch=="Degradation"))+
   geom_bar(aes(x=Competition,fill=as.factor(Richness),color=as.factor(Richness),y=Richness),
            color="transparent",position = "fill",stat="identity")+
   geom_point(data=d_richness_mean,aes(x=Competition,y=mean_richness/7),

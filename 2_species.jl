@@ -1,6 +1,6 @@
 using StatsBase, RCall, Plots, Random, Agents, DifferentialEquations, BenchmarkTools, CSV, Tables, Distributions
 
-#region : Step 0-- Functions, CA, Gillespie
+#region : 0-- Functions, CA, Gillespie
 
 
 function Get_classical_param()
@@ -445,7 +445,7 @@ end
 #
 
 
-#region : Step 1-- Illustration competitive exclusion 2 species (Fig 2) 
+#region : 1-- Illustration competitive exclusion 2 species (Fig 2) 
 
 
 
@@ -499,7 +499,7 @@ end
 #endregion
 
 
-#region : Step 2-- Convergence CA & PA (SI fig)
+#region : 2-- Convergence CA & PA (SI fig)
 
 
 
@@ -549,7 +549,7 @@ end
 
 
 
-#region : Step 3-- Species pairs (Fig 3b)
+#region : 3-- Species pairs (Fig 3b)
 
 
 param = Get_classical_param()
@@ -580,7 +580,7 @@ end
 
 
 
-#region : Step 4-- Clustering species dispersal (Fig 3c)
+#region : 4-- Clustering species dispersal (Fig 3c)
 
 
 param = Get_classical_param()
@@ -611,7 +611,7 @@ end
 
 
 
-#region : Step 5-- Vegetation along dispersal gradient (SI fig)
+#region : 5-- Vegetation along dispersal gradient (SI fig)
 
 
 
@@ -640,14 +640,13 @@ end
 #endregion
 
 
-#region : Step6-- Propensity colonization
-
+#region : 6-- Propensity colonization
 
 param = Get_classical_param()
 size_landscape = 100
 scale_comp = ["global"]
 param["alpha_0"] = 0.4
-disp_seq = [0 0.1 0.2 0.3 0.7 1]
+disp_seq = collect(range(0, stop=1, length=12))
 
 for disp in disp_seq
     param["delta"] = disp

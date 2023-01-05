@@ -4,29 +4,24 @@ include("N_Species_Sim_functions.jl")
 
 #region : testing PA/MF N species 
 
-Nsp = 5
+Nsp = 25
 p = Get_classical_param(N_species=Nsp, type_interaction="classic",
     alpha_0=0.3, scenario_trait="spaced", cintra=0.3, h=1)
 
 
 
-for i in 1:10
+@time for i in 1:10
     Random.seed!(i)
     state = Get_initial_state(Nsp=Nsp, type="random", branch="Degradation", PA=false)
 
     p[9] = 0
     p[10] = 0.1
-    tspan = (0, 100000)
+    tspan = (0, 30000)
     prob = ODEProblem(MF_N_species, state, tspan, p)
 
-    sol = solve(prob, AutoTsit5(Rosenbrock23()), callback=TerminateSteadyState(1e-7))
+    sol = solve(prob, Tsit5(), callback=TerminateSteadyState(1e-7))
     d2 = Reorder_dynamics(sol)
     display(Plot_dynamics(d=d2, Nsp=Nsp, PA=false))
-
-    sol = solve(prob, AutoTsit5(Rosenbrock23()))
-    d2 = Reorder_dynamics(sol)
-    display(Plot_dynamics(d=d2, Nsp=Nsp, PA=false))
-
 end;
 
 Nsp = 25
