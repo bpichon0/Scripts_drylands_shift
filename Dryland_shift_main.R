@@ -4,14 +4,14 @@ source("./Dryland_shift_functions.R")
 d = expand_grid(emax = 1, e = .1, S = seq(0, 1, length.out = 200), psi = c(0, .5, 1))
 
 p = ggplot(d) +
-    geom_line(aes(x = S, y = emax * (1 - S * (1 - e * psi)), color = as.factor(psi), group = psi),size=1) +
-    scale_color_manual(values = color_Nsp(9)[c(2,5,8)]) +
-    theme_classic() +
-    theme(legend.position = "bottom") +
-    labs(
-        x = "Stress, S",
-        y = TeX(r'($Recruitment rate,  (1-S (1-e \psi_i)))'), color = TeX("$\\psi_i$")
-    )
+  geom_line(aes(x = S, y = emax * (1 - S * (1 - e * psi)), color = as.factor(psi), group = psi),size=1) +
+  scale_color_manual(values = color_Nsp(9)[c(2,5,8)]) +
+  theme_classic() +
+  theme(legend.position = "bottom") +
+  labs(
+    x = "Stress, S",
+    y = TeX(r'($Recruitment rate,  (1-S (1-e \psi_i)))'), color = TeX("$\\psi_i$")
+  )
 
 
 
@@ -326,7 +326,7 @@ dispersal_scale=c(.1,.9)
 branches=c("Degradation","Restoration")
 
 for(scale_f in c("local","global")){
-
+  
   for (facil in f_seq){
     
     for (disp in dispersal_scale){
@@ -395,7 +395,7 @@ for(scale_f in c("local","global")){
     } #end loop dispersal
     
   }#end facilitation loop
-
+  
 }#end facilitation scale
 
 
@@ -713,6 +713,174 @@ for (facil in f_seq){
 
 
 
+
+
+
+
+
+## 6) Thresholds of rates----
+
+
+tspan = c(0, 5000) #to avoid long transient
+t = seq(0, 5000, by = 1)
+julia_library("DifferentialEquations")
+julia_assign("tspan", tspan)
+
+
+d2 = tibble()
+N_sim=100
+S_seq = seq(0,1, length.out = N_sim)
+c_seq=c(0,.2,.4)
+name_scena=c("global_C_local_F")
+delta_seq=c(.1,.9)
+branches=c("Degradation","Restoration")
+
+for (branch in branches){
+  
+  if (branch =="Degradation"){ #doing the two branches of the bifurcation diagram
+    state =Get_PA_initial_state(Get_MF_initial_state(c(.4,.4,.1)))
+    S_seq=seq(0,1, length.out = N_sim)
+  }else {
+    state =Get_PA_initial_state(Get_MF_initial_state(c(.005,.005,.49)))
+    S_seq=rev(seq(0,1, length.out = N_sim))
+  }
+  
+  for (disp in delta_seq) {
+    
+    
+    for (ccomp in c_seq){
+      
+      for (S in S_seq) { #varying dispersal scale
+        
+        julia_assign("state", state)
+        param=Get_PA_parameters()
+        param["cintra"]=.3
+        param["S"] = S
+        param["alpha_0"] = ccomp
+        param["delta"]=disp
+        julia_assign("p", param)
+        
+        
+        julia_assign("p", param)
+        prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F, state, tspan, p)")
+        
+        sol = de$solve(prob, de$Tsit5(), saveat = t)
+        d = as.data.frame(t(sapply(sol$u, identity)))
+        colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
+        
+        d2 = rbind(d2, d[nrow(d), ] %>% add_column(S = S, alpha_0 = ccomp,
+                                                   Delta=disp,Branch=branch))
+      }
+    }
+  }
+}      
+d2[d2 < 10^-4] = 0
+
+
+#Get the classical parameters
+param=Get_PA_parameters()
+
+d2$Balance_rate_fertile = param["r"] + param["f"] * d2$rho_1m/d2$rho_m - param["d"] #rho_0
+d2$Balance_recruitment_Comp  = param["beta"]* (1-d2$S)-
+  (param["cintra"]*d2$rho_2 + param["alpha_0"] * d2$rho_1 )
+d2$Balance_recruitment_ST    = param["beta"]* (1-d2$S* (1-param["e"]))-
+  (param["cintra"]*d2$rho_2 + param["alpha_0"] * (1+exp(-1)) * d2$rho_1 )
+
+ggplot(d2%>%melt(., measure.vars=c("rho_1","rho_2")))+
+  geom_line(aes(x=S,y=value,color=variable))+
+  theme_classic()+
+  facet_grid(alpha_0~Branch+Delta)+
+  theme(legend.position = "none")
+
+ggplot(d2%>%melt(., measure.vars=c("Balance_rate_fertile")))+
+  geom_line(aes(x=S,y=value,color=variable))+
+  theme_classic()+
+  facet_grid(alpha_0~Branch+Delta)+
+  theme(legend.position = "none")
+
+
+
+
+
+## 7) Higher restoration, lower degradation ----
+
+
+
+tspan = c(0, 2000) #to avoid long transient
+t = seq(0, 2000, by = 1)
+julia_library("DifferentialEquations")
+julia_assign("tspan", tspan)
+
+
+d2 = tibble()
+N_sim=100
+S_seq = seq(0,1, length.out = N_sim)
+c_seq=seq(0,.4,length.out=N_sim)
+name_scena=c("local_C_local_F","global_C_local_F")
+delta_seq=c(.1,.9)
+branches=c("Degradation","Restoration")
+
+for (branch in branches){
+  
+  if (branch =="Degradation"){ #doing the two branches of the bifurcation diagram
+    state =Get_PA_initial_state(Get_MF_initial_state(c(.4,.4,.1)))
+    S_seq=seq(0,1, length.out = N_sim)
+  }else {
+    state =Get_PA_initial_state(Get_MF_initial_state(c(.005,.005,.49)))
+    S_seq=rev(seq(0,1, length.out = N_sim))
+  }
+  
+  for (disp in delta_seq) {
+    
+    for (scena_ID in 1:2){ #for each scenario of species pairs
+      
+      for (ccomp in c_seq){
+        
+        for (S in S_seq) { #varying dispersal scale
+          
+          julia_assign("state", state)
+          param=Get_PA_parameters()
+          param["r"]=.1
+          param["d"]=.05
+          param["cintra"]=.3
+          param["S"] = S
+          param["alpha_0"] = ccomp
+          param["delta"]=disp
+          julia_assign("p", param)
+          
+          if (scena_ID==1){ 
+            
+            julia_assign("p", param)
+            prob = julia_eval("ODEProblem(PA_two_species_local_C_local_F, state, tspan, p)")
+            
+          }else if (scena_ID==2){ #global C, local F
+            
+            julia_assign("p", param)
+            prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F, state, tspan, p)")
+            
+          }
+          
+          sol = de$solve(prob, de$Tsit5(), saveat = t)
+          d = as.data.frame(t(sapply(sol$u, identity)))
+          colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
+          
+          d2 = rbind(d2, d[nrow(d), ] %>% add_column(S = S, alpha_0 = ccomp,
+                                                     Scena=name_scena[scena_ID],
+                                                     Delta=disp,Branch=branch))
+          
+        }
+      }
+      
+    }
+  }
+}
+
+d2[d2 < 10^-4] = 0
+d2=d2[,c(1:2,10:14)]
+colnames(d2) = c("Stress_tolerant", "Competitive", "Stress", "alpha_0","Scena","Delta","Branches")
+
+
+write.table(d2,paste0("../Table/2_species/PA/Higher_restor_lower_deg.csv"),sep=";")
 
 
 
