@@ -1,10 +1,13 @@
 source('./Dryland_shift_functions.R')
 library(grid)
 
+#*****************************************************************
 
 #---------------------   Main figures   --------------------------
 
-## Figure 2: Dynamics and landscapes ----
+#*****************************************************************
+
+## >> Figure 2: Dynamics and landscapes ----
 
 d2=read.table(paste0("../Table/2_species/PA/Multistability_fixed_traits_PA.csv"),sep=";")
 d2$state = sapply(1:nrow(d2), function(x) {
@@ -135,7 +138,7 @@ ggsave("../Figures/Final_figs/Figure_2.pdf",p_tot,width = 9,height = 7)
 
 
 
-## Figure 3: Scale facilitation, dispersal, multistability ----
+## >> Figure 3: Scale facilitation, dispersal, multistability ----
 
 d2=read.table(paste0("../Table/2_species/PA/Multistability_fixed_traits_PA.csv"),sep=";")
 d2$state = sapply(1:nrow(d2), function(x) {
@@ -407,7 +410,7 @@ Fig_3=ggarrange(p1+guides(pattern=F),p_bottom,nrow=2,heights = c(3,2.3),labels =
 ggsave("../Figures/Final_figs/Figure_3.pdf",Fig_3,width = 9,height = 9)
 
 
-## Figure 4: Multistability trait ----
+## >> Figure 4: Multistability trait ----
 
 
 stress_seq=seq(0,.82, length.out = 100)
@@ -530,7 +533,7 @@ for (i in 1:3){
                     melt(.,measure.vars=c("Stress_tolerant","Competitive"))%>%
                     mutate(., variable=recode_factor(variable,"Stress_tolerant"="Sp. 1","Competitive"="Sp. 2")))+
              geom_line(aes(x=Stress,y=value,color=variable,linetype=Branches))+
-             scale_color_manual(values=c(as.character(color_Nsp(5)[c(2)]),"#858BE0"))+
+             scale_color_manual(values=rev(c(as.character(color_Nsp(5)[c(2)]),"#858BE0")))+
              the_theme+
              labs(x="Stress (S)",y="Species cover",color="",linetype="")+
              theme(axis.title.y = element_blank(),axis.text.y = element_blank(),axis.ticks.y=element_blank(),axis.line.y = element_blank(),
@@ -553,7 +556,7 @@ for (i in 1:3){
                     melt(.,measure.vars=c("Stress_tolerant","Competitive"))%>%
                     mutate(., variable=recode_factor(variable,"Stress_tolerant"="Sp. 1","Competitive"="Sp. 2")))+
              geom_line(aes(x=Stress,y=value,color=variable,linetype=Branches))+
-             scale_color_manual(values=c(as.character(color_Nsp(5)[c(2)]),"#858BE0"))+
+             scale_color_manual(values=rev(c(as.character(color_Nsp(5)[c(2)]),"#858BE0")))+
              the_theme+
              labs(x="Stress (S)",y="Species cover",color="",linetype="")+
              scale_y_continuous(breaks = c(0,.2,.4,.6,.8))+
@@ -592,7 +595,7 @@ ggsave(filename = "../Figures/Final_figs/Figure_4.pdf",plot = p_tot,width = 7,he
 
 
 
-## Figure 5: N-species spatially explicit ----
+## >> Figure 5: N-species spatially explicit ----
 
 d_pa_equal=read.table("../Table/N_species/PA/PA_equal_ini.csv",sep=",")
 d_pa_equal=d_pa_equal[,c(1:15,(ncol(d_pa_equal)-2):ncol(d_pa_equal))]
@@ -603,7 +606,7 @@ d_melt=d_pa_equal%>%
 d_melt$variable=as.character(d_melt$variable)
 
 d_melt$Trait=sapply(1:nrow(d_melt),function(x){
-  seq(0,1,length.out=15)[as.numeric(strsplit(d_melt$variable[x],split = "_")[[1]][2])]
+  seq(1,0,length.out=15)[as.numeric(strsplit(d_melt$variable[x],split = "_")[[1]][2])]
 })
   
 p1=ggplot(d_melt%>%
@@ -612,7 +615,7 @@ p1=ggplot(d_melt%>%
   facet_wrap(.~alpha_0,labeller = label_bquote(cols=alpha[e]==.(alpha_0)),scales = "free")+
   the_theme+
   labs(x="Stress, (S)", y="Species cover",linetype="",color="")+
-  scale_color_gradientn(colours = rev(color_Nsp(15)))+
+  scale_color_gradientn(colours = (color_Nsp(15)))+
   theme(strip.text.x = element_text(size=11))
 
 
@@ -662,10 +665,10 @@ ggsave("../Figures/Final_figs/Figure_5.pdf",p_tot,width=9,height=7)
 
 
 
-## Figure 6: Alternative community states ----
+## >> Figure 6: Alternative community states ----
 
 
-d_tot=read.table("../Table/N_species/MF/Multistability_CSI.csv",sep=";")
+d_tot=read.table("../Table/N_species/PA/Multistability_CSI.csv",sep=";")
 
 
 
@@ -692,17 +695,18 @@ p2=ggplot(d_tot%>%filter(., Nsp %in% c(5,25),Competition %in% c(.225,.35),Branch
         panel.background = element_blank(),strip.background.y = element_blank())
 
 
-d_richness=read.table("../Table/N_species/MF/Multistability_richness.csv",sep=";")
+d_richness=read.table("../Table/N_species/PA/Multistability_richness.csv",sep=";")
 
 
 d_richness_mean=d_richness%>%
   group_by(., Nsp,Branch,Competition)%>%
-  summarise(., mean_richness=mean(Richness),.groups = "keep")
+  summarise(., mean_richness=mean(Richness),.groups = "keep")%>%
+  filter(., Branch=="Degradation")
 
 p3=ggplot(d_richness%>%filter(., Branch=="Degradation"))+
   geom_bar(aes(x=Competition,fill=as.factor(Richness),color=as.factor(Richness),y=Richness),
            color="transparent",position = "fill",stat="identity")+
-  geom_point(data=d_richness_mean,aes(x=Competition,y=mean_richness/7),
+  geom_point(data=d_richness_mean,aes(x=Competition,y=mean_richness/(max(d_richness_mean$mean_richness)+1)),
              shape=1,size=3,color="white")+
   facet_wrap(.~Nsp,labeller = label_bquote(cols="Number of species"==.(Nsp)))+
   labs(x=TeX(r'(Strength of interspecific competition, \ $\alpha_e)'),
@@ -711,7 +715,7 @@ p3=ggplot(d_richness%>%filter(., Branch=="Degradation"))+
   scale_color_viridis_d()+
   the_theme+
   guides(color="none")+
-  scale_y_continuous(sec.axis=sec_axis(~.*7, name="Mean number of species"))+
+  scale_y_continuous(breaks = seq(0,1,b=.25),sec.axis=sec_axis(~.*(max(d_richness_mean$mean_richness)+1), name="Mean number of species"))+
   theme(strip.text.x = element_text(size=11))+
   scale_x_continuous(breaks = seq(0.225,.35,by=.025),labels = c("0.225","0.25",'0.275','0.3','0.325','0.35'))
 
@@ -734,9 +738,15 @@ ggsave("../Figures/Final_figs/Figure_6.pdf",Fig_6,width = 9,height = 8)
 
 
 
+
+#*****************************************************************
+
 #---------------------   SI figures   --------------------------
-#-- 2-species ----
-## Advantage of CSI compared to Rho+----
+#---------------------   2-species    --------------------------
+
+#*****************************************************************
+
+## >> Advantage of CSI compared to Rho+----
 
 list_f=list.files("../Table/2_species/PA/Multistability_PA/Frac_gradient/",pattern = "delta_0.1_facilitation_0.9_scalefacilitation_local")
 
@@ -768,7 +778,7 @@ p=ggplot(d2_fil%>%melt(., measure.vars=c("Rho_plus","CSI"))%>%
 
 ggsave("../Figures/Final_figs/SI/Using_CSI.pdf",p,width = 6,height = 4)
 
-## Competition experienced ----
+## >> Competition experienced ----
 Nsp=15
 trait=rev(seq(0,1,length.out=Nsp))
 comp=comp2=c()
@@ -836,7 +846,7 @@ ggsave("../Figures/Final_figs/SI/Competition_experienced.pdf",
 
 
 
-## Comparing CA & PA ----
+## >> Comparing CA & PA ----
 
 #First layer = Simulations with PA (~Fig 2)
 
@@ -945,7 +955,7 @@ p=ggplot(NULL) +
 ggsave("../Figures/Final_figs/SI/Comparizon_CA_PA.pdf",p,width = 7,height = 6)
 
 
-## Multistability fixed traits MF model ----
+## >> Multistability fixed traits MF model ----
 
 d2=read.table(paste0("../Table/2_species/MF/Multistability_MF.csv"),sep=";")
 
@@ -1071,7 +1081,7 @@ ggsave("../Figures/Final_figs/SI/Multistability_fixed_traits_MF.pdf",ggarrange(p
 
 
 
-## Multistability varying traits MF model ----
+## >> Multistability varying traits MF model ----
 
 stress_seq=c(seq(0,.82, length.out = 100),seq(0.82,.9, length.out = 10)[-1])
 
@@ -1180,7 +1190,7 @@ for (i in 1:3){
                     melt(.,measure.vars=c("Sp1","Sp2"))%>%
                     mutate(., variable=recode_factor(variable,"Sp1"="Sp. 1","Sp2"="Sp. 2")))+
              geom_line(aes(x=Stress,y=value,color=variable,linetype=Branches))+
-             scale_color_manual(values=as.character(color_Nsp(5)[c(2,5)]))+
+             scale_color_manual(values=rev(as.character(color_Nsp(5)[c(2,5)])))+
              the_theme+
              labs(x="Stress (S)",y="Species cover",color="",linetype="")+
              theme(axis.title.y = element_blank(),axis.text.y = element_blank(),axis.ticks.y=element_blank(),axis.line.y = element_blank(),
@@ -1202,7 +1212,7 @@ for (i in 1:3){
                     melt(.,measure.vars=c("Sp1","Sp2"))%>%
                     mutate(., variable=recode_factor(variable,"Sp1"="Sp. 1","Sp2"="Sp. 2")))+
              geom_line(aes(x=Stress,y=value,color=variable,linetype=Branches))+
-             scale_color_manual(values=as.character(color_Nsp(5)[c(2,5)]))+
+             scale_color_manual(values=rev(as.character(color_Nsp(5)[c(2,5)])))+
              the_theme+
              labs(x="Stress (S)",y="Species cover",color="",linetype="")+
              scale_y_continuous(breaks = c(0,.2,.4,.6,.8))+
@@ -1239,37 +1249,7 @@ ggsave(filename = "../Figures/Final_figs/SI/Multistability_varying_traits_MF.pdf
 
 
 
-## Scaling-up 15sp, equal initial conditions ----
-
-
-d_mf_equal=read.table("../Table/N_species/MF/MF_equal_ini.csv",sep=",")
-d_mf_equal=d_mf_equal[,c(1:15,(ncol(d_mf_equal)-2):ncol(d_mf_equal))]
-colnames(d_mf_equal)=c(paste0("Sp_",1:15),"alpha_0", "Branches", "Stress")
-d_melt=d_mf_equal%>%
-  melt(., measure.vars=paste0("Sp_",1:15))
-
-d_melt$variable=as.character(d_melt$variable)
-
-d_melt$Trait=sapply(1:nrow(d_melt),function(x){
-  seq(0,1,length.out=15)[as.numeric(strsplit(d_melt$variable[x],split = "_")[[1]][2])]
-})
-
-p1=ggplot(d_melt%>%
-            mutate(., Branches=recode_factor(Branches,"1"="Degradation","2"="Restoration"))) +
-  geom_line(aes(x=Stress,y=value,color=Trait,group=interaction(Trait,alpha_0,Branches),linetype=as.factor(Branches)))+
-  facet_wrap(.~alpha_0,labeller = label_bquote(cols=alpha[e]==.(alpha_0)),scales = "free")+
-  the_theme+
-  labs(x="Stress, (S)", y="Species cover",linetype="",color="")+
-  scale_color_gradientn(colours = rev(color_Nsp(15)))+
-  theme(strip.text.x = element_text(size=12))
-
-ggsave("../Figures/Final_figs/SI/Equal_ini_MF.pdf",p1,width=8,height=3)
-
-
-
-
-
-## Multistability along competition gradient with local competition ----
+## >> Multistability along competition gradient with local competition ----
 d2=read.table(paste0("../Table/2_species/PA/Multistability_fixed_traits_PA.csv"),sep=";")
 
 d2$state = sapply(1:nrow(d2), function(x) {
@@ -1360,7 +1340,7 @@ ggsave("../Figures/Final_figs/SI/Multistability_fixed_traits_local_competition.p
 
 
 
-## Multistability along competition gradient with global facilitation ----
+## >> Multistability along competition gradient with global facilitation ----
 
 d2=read.table(paste0("../Table/2_species/PA/Multistability_fixed_traits_PA.csv"),sep=";")
 d2$state = sapply(1:nrow(d2), function(x) {
@@ -1458,7 +1438,7 @@ p1=ggplot(d2t%>%
 ggsave("../Figures/Final_figs/SI/Multistability_fixed_traits_global_facilitation.pdf",p1,width = 9,height = 5)
 
 
-## Multistability varying traits with global facilitation ----
+## >> Multistability varying traits with global facilitation ----
 
 param_space=expand.grid(Scale_facil=c("local","global"),Disp=c(.1,.9))
 
@@ -1567,7 +1547,7 @@ p=ggarrange(p_1+labs(fill="")+
 
 ggsave("../Figures/Final_figs/SI/Multistability_traits_scale_facil_disp.pdf",p,width = 7,height = 7)
 
-## Mechanisms for global facilitation: clustering, pairs, thresholds ----
+## >> Mechanisms for global facilitation: clustering, pairs, thresholds ----
 
 
 
@@ -1692,7 +1672,7 @@ p_bottom=ggarrange(p3,
 ggsave(filename = "../Figures/Final_figs/SI/Mechanisms_global_facilitation.pdf",width = 7,height = 4)
 
 
-## Multistability, varying the trade-off shape ----
+## >> Multistability, varying the trade-off shape ----
 
 #first: explaining trade-off
 
@@ -1905,7 +1885,7 @@ ggsave(filename = "../Figures/Final_figs/SI/Trade_off_multistability_PA.pdf",plo
 
 
 
-## Comparing degradation and restoration points trade-off ----
+## >> Comparing degradation and restoration points trade-off ----
 
 #convex and concave trade-off
 stress_seq=seq(0,.82, length.out = 100)
@@ -2159,7 +2139,7 @@ ggsave("../Figures/Final_figs/SI/Comparizon_linear_non_linear_tradeoff.pdf",widt
 
 
 
-## Restoration & extinction points trait space----
+## >> Restoration & extinction points trait space----
 
 
 stress_seq=seq(0,.82, length.out = 100)
@@ -2305,7 +2285,7 @@ ggsave("../Figures/Final_figs/SI/Restoration_degration.pdf",p_tot,width = 9,heig
 
 
 
-## Landscapes along dispersal gradient ----
+## >> Landscapes along dispersal gradient ----
 
 list_landscape=list.files("../Table/2_species/CA/",pattern = "Dispersal")
 for (i in 1:length(list_landscape)){
@@ -2320,78 +2300,7 @@ p=ggarrange(p_land_1+ggtitle(TeX("$\\delta = 0$")),p_land_2+ggtitle(TeX("$\\delt
 
 ggsave("../Figures/Final_figs/SI/Dynamics_landscape_dispersal.pdf",p,width = 7,height = 4)
 
-## Propensity of colonization along dispersal gradient ----
-
-list_file_prop=list.files('../Table/2_species/CA/Propensity_colonization')
-
-d_propensity=tibble()
-N_rep=1
-
-for (f in list_file_prop){
-  
-  
-  
-  landscape=read.table(paste0("../Table/2_species/CA/Propensity_colonization/",f),sep=",")
-  save_landscape=landscape
-  
-  delta=as.numeric(strsplit(x = f,split = "_")[[1]][4])
-  
-  #propensity colonization fertile species 1 = \beta (\delta * \rho_1 + (1-\delta) * q_{1|0}) in each fertile sites
-  #yet this metric depends on the vegetation cover and the number sites colonized. 
-  #Therefore, we take the mean (dividing by the total number of site 1)
-  
-  landscape[landscape != 1] = 0
-  neigh_1= simecol::neighbors(x =as.matrix(landscape),state = 1, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)
-  propensity_species_1 = sum((delta * sum(landscape)/length(landscape) + (1-delta) * neigh_1[which(save_landscape==0)]))
-  propensity_species_1=propensity_species_1/(length(which(save_landscape==1))*length(which(save_landscape==0)))
-  
-  #propensity colonization fertile species 2
-  
-  landscape=save_landscape
-  landscape[landscape != 2] = 0
-  neigh_2= simecol::neighbors(x =as.matrix(landscape),state = 2, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)
-  propensity_species_2 = sum(delta * sum(landscape)/length(landscape) + (1-delta) * neigh_2[which(save_landscape==0)])
-  propensity_species_2=propensity_species_2/(length(which(save_landscape==2))*length(which(save_landscape==0)))
-  
-  d_propensity=rbind(d_propensity,tibble(Delta=delta,Replicate=N_rep,
-                                         Sp1_cover=length(which(save_landscape==1))/(length(landscape)),
-                                         Sp2_cover=length(which(save_landscape==2))/(length(landscape)),
-                                         Prop_sp1=propensity_species_1,
-                                         Prop_sp2=propensity_species_2))
-  
-  if (N_rep==30){
-    N_rep=0
-  }
-  
-  N_rep=N_rep+1
-}
-
-d_averaged=d_propensity%>%
-  group_by(., Delta)%>%
-  summarise(., .groups = "keep",Prop1_mean=mean(Prop_sp1),Prop2_mean=mean(Prop_sp2),
-            mean_Sp1=mean(Sp1_cover),mean_Sp2=mean(Sp2_cover))
-
-ggplot(NULL)+
-  geom_point(data=d_averaged%>%
-               melt(., measure.vars=c("Prop1_mean","Prop2_mean")),
-             aes(x=Delta,y=value,color=variable))+
-  geom_line(data=d_averaged%>%
-              melt(., measure.vars=c("Prop1_mean","Prop2_mean")),
-            aes(x=Delta,y=value,color=variable))+
-  the_theme+
-  scale_y_log10()
-
-
-
-
-
-
-
-
-
-
-
-## Mechanisms associated with competition ----
+## >> Bifurcation diagrams effect of competition ----
 julia_setup()
 de = diffeq_setup()
 
@@ -2409,7 +2318,7 @@ c_seq=c(.25,.3,.35)
 name_scena=c("global_C_local_F")
 delta_seq=c(.1,.9)
 branches=c("Degradation","Restoration")
-type_ini_cond=c("equal","low_ST","low_comp")
+type_ini_cond=c("equal","low_ST","low_comp")[1]
 
 for (branch in branches){
   for (type_ini in type_ini_cond){
@@ -2523,8 +2432,282 @@ ggsave("../Figures/Final_figs/SI/Mechanism_priority.pdf",p_tot_w_legend,width=10
 
 
 
-#-- N-species ----
-## Main fig N-species with mean-field model ----
+## >> Net effect between and whithin species before the shift ----
+
+tspan = c(0, 30000)
+t = seq(0, 30000, by = 1)
+julia_library("DifferentialEquations")
+julia_assign("tspan", tspan)
+state = Get_PA_initial_state(Get_MF_initial_state(c(.4,.4,.1)))
+julia_assign("state", state)
+
+N_sim = 60;epsilon=10^(-8)
+C_for_analyse = c(.25,.3,.35)
+S_seq = seq(0, 1, length.out = N_sim)
+type_seq=c("self","mutual")
+
+d2 = tibble()
+param=Get_PA_parameters()  
+param=c(param[1:3],"beta1"=1,"beta2"=1,param[5:12])
+
+for (comp in C_for_analyse) {
+  
+  for (type in type_seq){
+    
+    for (S in S_seq) {
+      
+      for (sp in 1:2) { #for both species
+        
+        param["S"] = S
+        param["alpha_0"] = comp # update parameters
+        param["delta"] = .1
+        julia_assign("p", param)
+        
+        
+        # first without press perturbation
+        
+        prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F_press, state, tspan, p)")
+        
+        
+        sol = de$solve(prob, de$Tsit5(), saveat = t)
+        d = as.data.frame(t(sapply(sol$u, identity)))
+        
+        if (type=="mutual"){
+          d2 = rbind(d2, as_tibble(mean(d[(nrow(d)-3000):nrow(d),c(1,2)[-sp]])) %>%
+                       add_column(S = S, alpha_0 = comp, Type = "control",Species=c(1,2)[sp],
+                                  Disp=disp,Direction=type)) 
+          
+        } else {
+          d2 = rbind(d2, as_tibble(mean(d[(nrow(d)-3000):nrow(d),c(1,2)[sp]])) %>%
+                       add_column(S = S, alpha_0 = comp, Type = "control",Species=c(1,2)[sp],
+                                  Disp=disp,Direction=type)) 
+          
+        }
+        
+        # with press perturbation on growth rate proxy
+        
+        param[paste0("beta",sp)] = param[paste0("beta",sp)] + epsilon # press
+        julia_assign("p", param)
+        
+        
+        julia_assign("p", param)
+        prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F_press, state, tspan, p)")
+        
+        sol = de$solve(prob, de$Tsit5(), saveat = t)
+        d = as.data.frame(t(sapply(sol$u, identity)))
+        if (type=="mutual"){
+          d2 = rbind(d2, as_tibble(mean(d[(nrow(d)-3000):nrow(d),c(1,2)[-sp]])) %>%
+                       add_column(S = S, alpha_0 = comp, Type = "press",Species=c(1,2)[sp],
+                                  Disp=disp,Direction=type))
+          
+        } else {
+          d2 = rbind(d2, as_tibble(mean(d[(nrow(d)-3000):nrow(d),c(1,2)[sp]])) %>%
+                       add_column(S = S, alpha_0 = comp, Type = "press",Species=c(1,2)[sp],
+                                  Disp=disp,Direction=type))
+          
+        }
+        param[paste0("beta",sp)] = 1
+      }
+    }
+  }
+}
+
+
+d2[d2 < epsilon] = 0
+colnames(d2) = c("Eq", "S", "alpha_0", "Type","Species","Disp","Direction")
+
+
+net_effect =sapply(seq(1, nrow(d2) , by = 2),function(x){
+  return((d2$Eq[x+1] - d2$Eq[x]) / epsilon)
+})
+
+d_net=d2%>%
+  filter(., Type=="control")%>%
+  select(.,-Type)
+d_net$value=net_effect
+
+index=1
+for (i in c(.25,.3,.35)){
+  for (direction in c("mutual","self")){
+    assign(paste0("p_",index),
+           ggplot(NULL)+
+             geom_line(data=d_net%>%filter(., Direction==direction,alpha_0==i)%>%
+                         mutate(., Species=recode_factor(Species,'1'=ifelse(direction=="mutual",
+                                                                            "Effect of ST sp. on Comp. sp.",
+                                                                            "Effect of ST sp. on ST. sp."),
+                                                         '2'=ifelse(direction=="mutual",
+                                                                    "Effect of Comp. sp. on ST sp.",
+                                                                    "Effect of Comp. sp. on Comp. sp."))),
+                       aes(x=S,y=value,color=as.factor(Species)))+
+             geom_point(data=d_net%>%filter(., Direction==direction,alpha_0==i)%>%
+                          mutate(., Species=recode_factor(Species,'1'=ifelse(direction=="mutual",
+                                                                             "Effect of ST sp. on Comp. sp.",
+                                                                             "Effect of ST sp. on ST. sp."),
+                                                          '2'=ifelse(direction=="mutual",
+                                                                     "Effect of Comp. sp. on ST sp.",
+                                                                     "Effect of Comp. sp. on Comp. sp.")))%>%
+                          filter(., S %in% seq(0,1,length.out=N_sim)[seq(1,N_sim,length.out=12)]),
+                        aes(x=S,y=value,color=as.factor(Species)),size=2,shape=1)+
+             scale_color_manual(values=rev(c("green", "blue")))+
+             labs(x="Stress (S)",y="Net effect",color="")+
+             the_theme+
+             geom_hline(yintercept = 0,linetype=9)
+           
+           
+           
+    )
+    index=index+1
+  }
+}
+
+p_tot=ggarrange(ggarrange(p_1+ggtitle(TeX("$\\alpha_e = 0.25$")),p_3+ggtitle(TeX("$\\alpha_e = 0.3$")),
+                p_5+ggtitle(TeX("$\\alpha_e = 0.35$")),common.legend = T,legend = "bottom",ncol=3,labels = c(letters[1],"","")),
+                ggarrange(p_2+ggtitle(TeX("$\\alpha_e = 0.25$")),
+                p_4+ggtitle(TeX("$\\alpha_e = 0.3$")),p_6+ggtitle(TeX("$\\alpha_e = 0.35$")),
+                ncol=3,common.legend = T,legend="bottom",labels = c(letters[2],"","")),nrow=2)
+
+
+
+ggsave("../Figures/Final_figs/SI/Net_effet_prior_shift.pdf",p_tot,width = 8,height = 5)
+
+
+## >> State diagram lower degradation, higher restoration ----
+
+d2=read.table(paste0("../Table/2_species/PA/Higher_restor_lower_deg.csv"),sep=";")
+d2$state = sapply(1:nrow(d2), function(x) {
+  if (d2[x, 1] > 0 & d2[x, 2] > 0) {
+    return("Coexistence")
+  }
+  if (d2[x, 1] > 0 & d2[x, 2] == 0) {
+    return("Stress_tolerant")
+  }
+  if (d2[x, 1] == 0 & d2[x, 2] > 0) {
+    return("Competitive")
+  }
+  if (d2[x, 1] == 0 & d2[x, 2] == 0) {
+    return("Desert")
+  }
+})
+
+d2=d2[order(d2$alpha_0,d2$Scena,d2$Delta,d2$Stress),]
+
+all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
+  if (d2$state[x] != d2$state[x+1]){
+    return(paste0(d2$state[x],"/", d2$state[x+1]))
+  }
+  else {return(d2$state[x])}
+})
+
+d_state=d2%>%
+  filter(., Branches=="Degradation")%>%
+  select(.,-Branches)
+
+d_state=d_state[order(d_state$alpha_0,d_state$Scena,d_state$Delta,d_state$Stress),]
+
+d_state$all_state=all_state
+
+
+scale="global"
+d2t=transform(d_state%>% 
+                filter(., Scena %in% c(paste0(scale,"_C_global_F"),paste0(scale,"_C_local_F")))%>%
+                mutate(., Stress=round(Stress,6),alpha_0=round(alpha_0,6)),
+              Scena=factor(Scena,levels=c(paste0(scale,"_C_global_F"),paste0(scale,"_C_local_F")),
+                           labels=c("Global facilitation","Local facilitation")))
+
+color_rho = c("Coexistence" = "#D8CC7B", "Competitive" = "#ACD87B", "Desert" = "#696969", "Stress_tolerant" = "#7BD8D3")
+
+
+d2t$Multistability=sapply(1:nrow(d2t),function(x){
+  if (d2t$all_state[x] %in% c("Competitive","Coexistence","Desert","Stress_tolerant")){
+    return("no_multi")
+  } else{
+    return("multi")
+  }
+})
+
+set.seed(432)
+rand_vec=runif(2)
+
+d2$CSI=d2$Stress_tolerant*rand_vec[1]+d2$Competitive*rand_vec[2]
+
+p=ggplot(d2t%>%
+            mutate(.,all_state=recode_factor(all_state,
+                                             "Desert/Coexistence"="Coexistence/Desert",
+                                             "Coexistence/Stress_tolerant"="Coexistence/Stress-tolerant",
+                                             "Stress_tolerant"="Stress-tolerant",
+                                             "Stress_tolerant/Desert"="Stress-tolerant/Desert",
+                                             "Competitive/Stress_tolerant"="Competitive/Stress-tolerant"))%>%
+            mutate(., Delta=recode_factor(Delta,"0.1"="0.1, local dispersal","0.9"="0.9, global dispersal"))%>%
+            filter(., Scena=="Local facilitation")%>%
+            mutate(., Delta=as.character(Delta))) +
+  geom_tile_pattern(aes(x=Stress,y=alpha_0,fill=all_state,pattern=Multistability),              
+                    colour          = 'transparent',
+                    color          = 'transparent',
+                    pattern_spacing = 0.05, 
+                    pattern_density = 0.01, 
+                    pattern_fill    = "black",
+                    pattern_colour  = "black")+
+  theme_classic() +
+  theme(legend.position = "bottom") +
+  labs(x = TeX(r'(Stress, \ $S)'), y = TeX(r'(Strength of interspecific competition, \ $\alpha_e)'), fill = "") +
+  scale_fill_manual(values=c("Coexistence" = "#D8CC7B", 
+                             "Competitive/Stress-tolerant"="#C998CE",
+                             "Competitive" = "#ACD87B", 
+                             "Competitive/Coexistence" = "#DDEFCA",
+                             "Stress-tolerant" = "#BABEFF",
+                             "Stress-tolerant/Desert" ="#0F8E87",
+                             "Coexistence/Stress-tolerant"="#9BBBB9",
+                             "Coexistence/Desert"="#C19E5E",
+                             "Desert"=  "#696969"
+  ))+
+  facet_grid(.~Delta,labeller = label_bquote(cols= delta==.(Delta) ))+
+  the_theme+theme(strip.text.x = element_text(size=12),strip.text.y = element_text(size=11))+
+  theme(legend.text = element_text(size = 9))+
+  scale_pattern_manual(values=rev(c("transparent" ,"stripe")))
+
+
+ggsave("../Figures/Final_figs/SI/Lower_degradation_higher_restoration.pdf",p,width = 9,height = 5)
+
+
+#*****************************************************************
+
+#---------------------   SI figures   --------------------------
+#---------------------   N-species    --------------------------
+
+#*****************************************************************
+
+## >> Scaling-up 15sp, equal initial conditions ----
+
+
+d_mf_equal=read.table("../Table/N_species/MF/MF_equal_ini.csv",sep=",")
+d_mf_equal=d_mf_equal[,c(1:15,(ncol(d_mf_equal)-2):ncol(d_mf_equal))]
+colnames(d_mf_equal)=c(paste0("Sp_",1:15),"alpha_0", "Branches", "Stress")
+d_melt=d_mf_equal%>%
+  melt(., measure.vars=paste0("Sp_",1:15))
+
+d_melt$variable=as.character(d_melt$variable)
+
+d_melt$Trait=sapply(1:nrow(d_melt),function(x){
+  seq(0,1,length.out=15)[as.numeric(strsplit(d_melt$variable[x],split = "_")[[1]][2])]
+})
+
+p1=ggplot(d_melt%>%
+            mutate(., Branches=recode_factor(Branches,"1"="Degradation","2"="Restoration"))) +
+  geom_line(aes(x=Stress,y=value,color=Trait,group=interaction(Trait,alpha_0,Branches),linetype=as.factor(Branches)))+
+  facet_wrap(.~alpha_0,labeller = label_bquote(cols=alpha[e]==.(alpha_0)),scales = "free")+
+  the_theme+
+  labs(x="Stress, (S)", y="Species cover",linetype="",color="")+
+  scale_color_gradientn(colours = rev(color_Nsp(15)))+
+  theme(strip.text.x = element_text(size=12))
+
+ggsave("../Figures/Final_figs/SI/Equal_ini_MF.pdf",p1,width=8,height=3)
+
+
+
+
+
+
+## >> Main fig N-species with mean-field model ----
 d_tot=read.table("../Table/N_species/MF/Multistability_CSI.csv",sep=";")
 
 p1=ggplot(d_tot%>%filter(., Nsp %in% c(5,25),Competition %in% c(.225,.35),Branch==1))+
@@ -2555,7 +2738,8 @@ d_richness=read.table("../Table/N_species/MF/Multistability_richness.csv",sep=";
 
 d_richness_mean=d_richness%>%
   group_by(., Nsp,Branch,Competition)%>%
-  summarise(., mean_richness=mean(Richness),.groups = "keep")
+  summarise(., mean_richness=mean(Richness),.groups = "keep")%>%
+  filter(., Branch=="Degradation")
 
 p3=ggplot(d_richness%>%filter(., Branch=="Degradation"))+
   geom_bar(aes(x=Competition,fill=as.factor(Richness),color=as.factor(Richness),y=Richness),
@@ -2582,11 +2766,7 @@ ggsave("../Figures/Final_figs/SI/N_species_CSI_cover_MF.pdf",Fig_6_SI,width = 9,
 
 
 
-
-## Example succession species
-
-
-## Example of species succession gradient stress N-species ----
+## >> Example of species succession gradient stress N-species MF ----
 
 
 Fig_to_plot=tibble(Nsp=c(5,15,15,15,25),Number_plot=c(3,169,214,737,397))
@@ -2628,34 +2808,51 @@ p=ggarrange(p_1+ggtitle(TeX(r'(N species = 5, \ $\alpha_e = 0.3)'))+
 ggsave("../Figures/Final_figs/SI/Example_bifu_Nspecies.pdf",width = 7,height = 5)
 
 
-
-## Which species shifts and how frequently ? ----
-
-Trait_shift=read.table("../Table/N_species/MF/Trait_shift.csv",sep=";")
-N_replicate=150
+## >> Example of species succession gradient stress N-species PA ----
 
 
-Trait_shift_sum=Trait_shift%>%
-  group_by(., Nsp,Branch,Competition,Species)%>%
-  summarise(., .groups = "keep",Sum_tipping=sum(Tipping))
-
-Trait_shift_sum$Trait=sapply(1:nrow(Trait_shift_sum),function(x){
-  return(seq(1,0, length.out=Trait_shift_sum$Nsp[x])[Trait_shift_sum$Species[x]])
-})
-
-p=ggplot(filter(Trait_shift_sum), 
-         aes(x=Trait,y=Sum_tipping/N_replicate,fill=Trait)) + 
-  geom_bar( stat="identity",width = .05)+
-  facet_grid(Nsp~Competition)+
-  the_theme+
-  labs(x=TeX("$\\psi$"),y="Frequency of abrupt shift",fill="")+
-  scale_fill_gradientn(colours = color_Nsp(100))
-
-ggsave("../Figures/Final_figs/SI/Traits_which_shifts.pdf",p,width = 10,height = 6)
+Fig_to_plot=tibble(Nsp=c(5,5,15,25),Number_plot=c(492,498,36,5))
 
 
+for (i in 1:nrow(Fig_to_plot)){
+  
+  Nsp=Fig_to_plot$Nsp[i]
+  list_csv=list.files(paste0('../Table/N_species/PA/',Nsp,'_sp/'))
+  d2=read.table(paste0("../Table/N_species/PA/",Nsp,"_sp/",list_csv[Fig_to_plot$Number_plot[i]]),sep=",")
+  colnames(d2)=c(paste0(1:Nsp),"Random_ini","Competition","Facilitation","Branch","Stress")
+  
+  d2[d2<10^(-4)]=0
+  
+  
+  
+  assign(paste0("p_",i),
+         ggplot(d2%>%
+                  melt(., measure.vars=paste0(1:Nsp))%>%
+                  mutate(., Trait=sapply(1:nrow(.),function(x){
+                    return(seq(1,0,length.out=Nsp)[as.numeric(.$variable[x])])
+                  }))%>%
+                  mutate(., Branch=recode_factor(Branch, "1"="High initial cover","2"= "Low initial cover")))+
+           geom_line(aes(x=Stress,y=value,color=Trait,group=interaction(variable,Branch),linetype=as.factor(Branch)),size=.8)+
+           the_theme+labs(x="Stress, S",y="Species cover",color=TeX("$\\psi$   "),linetype="")+
+           scale_color_gradientn(colors=color_Nsp(Nsp))+
+           theme(legend.box = "vertical")
+  )
+}
 
-## All CSI/Rho_+ bifurcation competition/Nsp ----
+p=ggarrange(p_1+ggtitle(TeX(r'(N species = 5, \ $\alpha_e = 0.325)'))+
+              theme(axis.title.x = element_blank(),axis.text.x = element_blank(),axis.ticks.x=element_blank(),axis.line.x = element_blank()),
+            p_2+ggtitle(TeX(r'(N species = 15, \ $\alpha_e = 0.35)'))+
+              theme(axis.title.x = element_blank(),axis.text.x = element_blank(),axis.ticks.x=element_blank(),axis.line.x = element_blank(),
+                    axis.title.y = element_blank(),axis.text.y = element_blank(),axis.ticks.y=element_blank(),axis.line.y = element_blank()),
+            p_3+ggtitle(TeX(r'(N species = 15, \ $\alpha_e = 0.35)')),
+            p_4+ggtitle(TeX(r'(N species = 25, \ $\alpha_e = 0.325)'))+
+              theme(axis.title.y = element_blank(),axis.text.y = element_blank(),axis.ticks.y=element_blank(),axis.line.y = element_blank()),
+            nrow=2,ncol=2,heights = c(1,1.1),common.legend = T,legend="bottom")
+
+ggsave("../Figures/Final_figs/SI/Example_bifu_Nspecies_PA.pdf",p,width = 7,height = 5)
+
+
+## >> All CSI/Rho_+ bifurcation competition/Nsp ----
 
 # Community index
 
@@ -2698,4 +2895,28 @@ ggsave("../Figures/Final_figs/SI/Vegetation_cover_aij_Nsp.pdf",p,width = 12,heig
 
 
 
+
+
+## >> Number ASS along the stress gradient ----
+
+d_tot=read.table("../Table/N_species/PA/Multistability_CSI.csv",sep=";")
+
+test=filter(d_tot,Competition==.225,Branch==1,Nsp==25)
+
+d=tibble()
+
+for (i in unique(test$Stress)){
+  
+  
+  
+  print(length(unique(round(filter(test,Stress==i)$CSI,2))))
+  
+  
+}
+
+
+
+
+
+#XXX add number species
 

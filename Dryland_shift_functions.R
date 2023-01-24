@@ -23,9 +23,11 @@ dir.create("../",showWarnings = F)
 dir.create("../Table",showWarnings = F)
 dir.create("../Table/2_species",showWarnings = F)
 
+#***********************************************************
 
+# ----------------- 1) Mean field analysis -------------------
 
-# 1) Mean field analysis ----
+#***********************************************************
 
 Get_MF_parameters = function() {
     return(c(
@@ -243,7 +245,12 @@ Get_recruitment_rates = function(eq, param) {
 }
 
 
-# 2) Pair approximation analysis ----
+
+#***********************************************************
+
+# ------------ 2) Pair approximation analysis --------------
+
+#***********************************************************
 
 Get_PA_parameters = function() {
   param=c(
@@ -273,7 +280,7 @@ get_mean_densities = function(d) {
 }
 
 
-## a) local facilitation ----
+## >> a) local facilitation ----
 
 PA_two_species_local_C_local_F = julia_eval("
 
@@ -516,7 +523,7 @@ end
 ")
 
 
-## b) global facilitation ----
+## >> b) global facilitation ----
 
 PA_two_species_local_C_global_F = julia_eval("
 
@@ -753,7 +760,7 @@ end
 
 
 
-## c) varying trait ----
+## >> c) varying trait ----
 
 PA_two_species_varying_trait = julia_eval("
 
@@ -1000,7 +1007,14 @@ end
 
 ")
 
-## 3) N-species ----
+
+
+#***********************************************************
+
+# ------------ 3) N-species --------------
+
+#***********************************************************
+
 
 Extract_pairs_trait=function(d,Nsp,self=F,clustering=T){
   
