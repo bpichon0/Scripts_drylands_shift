@@ -821,14 +821,14 @@ write.table(d2,paste0("../Table/2_species/PA/Higher_restor_lower_deg.csv"),sep="
 #***********************************************************
 
 
-## 1) PA N-species
+## >> 1) PA N-species ----
 rm(list = ls())
 source("./Dryland_shift_functions.R")
 
 
 
 d_richness=d_tot=d_trait_shift=tibble()
-pdf(paste0("../Figures/N_species/PA/Dyn_Nspecies.pdf"),width = 6,height = 4)
+# pdf(paste0("../Figures/N_species/PA/Dyn_Nspecies.pdf"),width = 6,height = 4)
 
 for (i in c(5,15,25)){
   
@@ -857,21 +857,21 @@ for (i in c(5,15,25)){
                             Richness=length(which(colSums(d2[((nrow(d2)/2)+1):(nrow(d2)),])[1:Nsp] !=0))))
     
     
-    print(
-      ggplot(d2%>%melt(., measure.vars=paste0("Sp_",1:Nsp))%>%
-               mutate(., Branch=recode_factor(Branch,"1"="Degradation","2"="Restoration")))+
-        geom_line(aes(x=Stress,y=value,color=variable,linetype=as.factor(Branch),
-                      group=interaction(variable,Branch))
-                  ,size=.8)+
-        ggtitle(paste0("Nsp = ",i,", aij = ",
-                       strsplit(list_csv[k],split = "_")[[1]][5]))+
-        the_theme+labs(y="",color=expression(paste(bar(psi),"    ")),linetype="")+
-        scale_color_manual(values=rev(color_Nsp(Nsp)))+
-        theme(legend.box = "vertical")
-    )
+    # print(
+    #   ggplot(d2%>%melt(., measure.vars=paste0("Sp_",1:Nsp))%>%
+    #            mutate(., Branch=recode_factor(Branch,"1"="Degradation","2"="Restoration")))+
+    #     geom_line(aes(x=Stress,y=value,color=variable,linetype=as.factor(Branch),
+    #                   group=interaction(variable,Branch))
+    #               ,size=.8)+
+    #     ggtitle(paste0("Nsp = ",i,", aij = ",
+    #                    strsplit(list_csv[k],split = "_")[[1]][5]))+
+    #     the_theme+labs(y="",color=expression(paste(bar(psi),"    ")),linetype="")+
+    #     scale_color_manual(values=rev(color_Nsp(Nsp)))+
+    #     theme(legend.box = "vertical")
+    # )
     
     d2$Entropy = sapply(1:nrow(d2),function(x){
-      return(sum(d2[x,1:Nsp]*log(d2[x,1:Nsp])))
+      return(sum(d2[x,1:Nsp]*log(d2[x,1:Nsp]),na.rm = T))
     })
     
     d2$CSI = sapply(1:nrow(d2),function(x){
@@ -899,12 +899,12 @@ for (i in c(5,15,25)){
     
   }
 }
-dev.off()
+# dev.off()
 
 write.table(d_richness,"../Table/N_species/PA/Multistability_richness.csv",sep=";")
 write.table(d_tot,"../Table/N_species/PA/Multistability_CSI.csv",sep=";")
 
-## 2) MF N-species
+## >> 2) MF N-species ----
 rm(list = ls())
 source("./Dryland_shift_functions.R")
 
@@ -924,8 +924,6 @@ for (i in c(5,15,25)){
     colnames(d2)=c(paste0("Sp_",1:Nsp),"Fertile","Degraded","Random_ini","Competition","Facilitation","Branch","Stress")
     
     d2[d2<10^(-4)]=0
-    
-    
     
     d_richness=rbind(d_richness,
                      tibble(Nsp=Nsp,Random_ini=k,Competition=strsplit(list_csv[k],split = "_")[[1]][5],
@@ -957,6 +955,11 @@ for (i in c(5,15,25)){
       return(sum(d2[x,1:Nsp]*u))
     })
     
+    d2$Entropy = sapply(1:nrow(d2),function(x){
+      return(sum(d2[x,1:Nsp]*log(d2[x,1:Nsp]),na.rm = T))
+    })
+    
+    
     d2$Psi_normalized = sapply(1:nrow(d2),function(x){
       trait=rev(seq(0,1,length.out=Nsp))
       if (d2$CSI[x]==0){return(NA)
@@ -967,6 +970,11 @@ for (i in c(5,15,25)){
     d2$Rho_plus = sapply(1:nrow(d2),function(x){
       return(sum(d2[x,1:Nsp]))
     })
+    
+    d2$Nb_sp = sapply(1:nrow(d2),function(x){
+      return(length(which(d2[x,1:Nsp] != 0)))
+    })
+    
     
     d_tot=rbind(d_tot,d2[,-c(1:Nsp)]%>%add_column(., Nsp=Nsp,Competition=strsplit(list_csv[k],split = "_")[[1]][5]))
     

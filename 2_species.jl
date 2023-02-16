@@ -638,29 +638,3 @@ end
 
 
 #endregion
-
-
-#region : 6-- Propensity colonization
-
-param = Get_classical_param()
-size_landscape = 100
-scale_comp = ["global"]
-param["alpha_0"] = 0.4
-disp_seq = collect(range(0, stop=1, length=12))
-
-for disp in disp_seq
-    param["delta"] = disp
-    ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
-
-
-    d, state = Run_CA_2_species(; landscape=copy(ini), param=copy(param), time=10000, type_competition=scale_comp, save=true, burning=3000, N_snap=30,
-        name_save="../Table/2_species/CA/Propensity_colonization/Dispersal_gradient_delta_" * repr(disp))
-
-
-end
-
-
-
-
-
-#endregion

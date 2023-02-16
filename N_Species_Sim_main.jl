@@ -4,180 +4,182 @@ include("N_Species_Sim_functions.jl")
 
 #region : testing PA/MF N species 
 
-Nsp = 25
+Nsp = 5
 p = Get_classical_param(N_species=Nsp, type_interaction="classic",
     alpha_0=0.3, scenario_trait="spaced", cintra=0.3, h=1)
 
 
 
-@time for i in 1:10
+@time for i in eachindex(1:100)
     Random.seed!(i)
-    state = Get_initial_state(Nsp=Nsp, type="random", branch="Degradation", PA=false)
+    state = Get_initial_state(Nsp=Nsp, type="random", branch="Degradation", PA=true)
 
-    p[9] = 0
-    p[10] = 0.1
-    tspan = (0, 30000)
-    prob = ODEProblem(MF_N_species, state, tspan, p)
+    p[9] = 0.3363636
+    tspan = (0, 100000)
+    prob = ODEProblem(PA_N_species, state, tspan, p)
 
-    sol = solve(prob, Tsit5(), callback=TerminateSteadyState(1e-7))
+    sol = solve(prob, callback=TerminateSteadyState(1e-10))
     d2 = Reorder_dynamics(sol)
-    display(Plot_dynamics(d=d2, Nsp=Nsp, PA=false))
+    display(Plot_dynamics(d=d2, Nsp=Nsp, PA=true))
 end;
 
-Nsp = 25
-p = Get_classical_param(N_species=Nsp, type_interaction="classic",
-    alpha_0=0.3, scenario_trait="spaced", cintra=0.3, h=1)
-tspan = (0, 30000)
-
-Random.seed!(213)
+Random.seed!(86)
 state = Get_initial_state(Nsp=Nsp, type="random", branch="Degradation", PA=true)
+
+p[9] = 0.3727273
+
+tspan = (0, 100000)
 prob = ODEProblem(PA_N_species, state, tspan, p)
 
-@time sol = solve(prob, Tsit5(), callback=TerminateSteadyState(1e-7));
+sol = solve(prob, callback=TerminateSteadyState(1e-12))
 d2 = Reorder_dynamics(sol)
-Plot_dynamics(d=d2, Nsp=Nsp, PA=true)
+display(Plot_dynamics(d=d2, Nsp=Nsp, PA=true))
 
+
+
+
+@time for j in [5, 15], i in eachindex(1:10)
+    Nsp = j
+    p = Get_classical_param(N_species=Nsp, type_interaction="classic",
+        alpha_0=0.275, scenario_trait="spaced", cintra=0.3, h=1)
+
+    Random.seed!(i)
+    state = Get_initial_state(Nsp=Nsp, type="random", branch="Degradation", PA=true)
+
+    p[9] = 0
+    tspan = (0, 100000)
+    prob = ODEProblem(PA_N_species, state, tspan, p)
+
+    sol = solve(prob, callback=TerminateSteadyState(1e-10))
+    d2 = Reorder_dynamics(sol)
+    display(Plot_dynamics(d=d2, Nsp=Nsp, PA=true))
+end;
 
 
 #endregion
 
 
-#region : 15sp equal initial conditions PA (Fig 5)
+#region : 5 equal initial conditions PA (Fig 5)
 
 N_sim = 100
-N_sim2 = 3
-N_random_ini = 1
-
-Nsp = 15
-a0_seq = collect(range(0, 0.3, length=N_sim2))
-f_seq = collect(range(0, 0.9, length=3))[3]
-tspan = (0.0, 35000)
+Nsp = 5
+a0_seq = [0 0.15 0.3]
+tspan = (0.0, 200000)
 branches = ["Degradation", "Restoration"]
-delta_seq = collect(range(0.1, 0.9, length=2))[1]
 
 
-N_tot_sim = N_sim * N_sim2 * length(f_seq) * length(delta_seq) * 2 * N_random_ini
+N_tot_sim = N_sim * length(a0_seq) * 2
 
 d = zeros(N_tot_sim, Int(((Nsp^2 + 7 * Nsp) / 2) + 5) + 3)
 dt = 1
 
-for random_ini in 1:1
-    #frac = rand(Nsp) #taking relative proportion of species
-    frac = zeros(Nsp) .+ 1 #same initial proportion
+#frac = rand(Nsp) #taking relative proportion of species
+frac = zeros(Nsp) .+ 1 #same initial proportion
 
-    for a0 in a0_seq
-
-        for disp in delta_seq
-
-            global p = Get_classical_param(N_species=Nsp, type_interaction="classic",
-                alpha_0=a0, scenario_trait="spaced", cintra=0.3, h=1)
-
-            for facil in f_seq
+for a0 in a0_seq
 
 
-
-                for branch_bifu in 1:2
-
-                    if branch_bifu == 1 # Degradation
-                        state = Get_initial_state(Nsp=Nsp, type="equal", branch="Degradation", PA=true)
-                        S_seq = collect(range(0, 1, length=N_sim))
-
-                    else #Restoration
-                        state = Get_initial_state(Nsp=Nsp, type="equal", branch="Restoration", PA=true)
-                        S_seq = reverse(collect(range(0, 1, length=N_sim))) #to gradually decrease the level of stress
-
-                    end
-
-                    for stress in S_seq
-
-                        p[9] = stress
-
-                        prob = ODEProblem(PA_N_species, state, tspan, p)
-                        sol = solve(prob, Tsit5())
-                        d2 = Reorder_dynamics(sol)
+    global p = Get_classical_param(N_species=Nsp, type_interaction="classic",
+        alpha_0=a0, scenario_trait="spaced", cintra=0.3, h=1)
 
 
-                        d[dt, :] = push!(d2[size(d2)[1], 1:(Int(((Nsp^2 + 7 * Nsp) / 2) + 5))], a0, branch_bifu, stress)
-                        dt = dt + 1
-                    end
-                end
+    for branch_bifu in eachindex(1:2)
 
+        if branch_bifu == 1 # Degradation
+            state = Get_initial_state(Nsp=Nsp, type="equal", branch="Degradation", PA=true)
+            S_seq = collect(range(0, 1, length=N_sim))
 
-            end
+        else #Restoration
+            state = Get_initial_state(Nsp=Nsp, type="equal", branch="Restoration", PA=true)
+            S_seq = reverse(collect(range(0, 1, length=N_sim))) #to gradually decrease the level of stress
+
         end
+
+        for stress in S_seq
+
+            p[9] = stress
+
+            prob = ODEProblem(PA_N_species, state, tspan, p)
+            sol = solve(prob, callback=TerminateSteadyState(1e-8))
+            d2 = Reorder_dynamics(sol)
+
+
+            d[dt, :] = push!(d2[size(d2)[1], 1:(Int(((Nsp^2 + 7 * Nsp) / 2) + 5))], a0, branch_bifu, stress)
+            dt = dt + 1
+        end
+        print("Stress finished")
     end
+
+
+
 end
+
 
 CSV.write("../Table/N_species/PA/PA_equal_ini.csv", Tables.table(d), writeheader=false)
 
 #endregion
 
-#region : 15sp equal initial conditions MF (Fig SI)
+
+#region : 5sp equal initial conditions MF (Fig SI)
 
 N_sim = 100
-N_sim2 = 3
 N_random_ini = 1
 
-Nsp = 15
+Nsp = 5
 a0_seq = collect(range(0, 0.3, length=N_sim2))
-f_seq = collect(range(0, 0.9, length=3))[3]
-tspan = (0.0, 25000)
+tspan = (0.0, 200000)
 branches = ["Degradation", "Restoration"]
-delta_seq = collect(range(0.1, 0.9, length=2))[1]
 
 
-N_tot_sim = N_sim * N_sim2 * length(f_seq) * length(delta_seq) * 2 * N_random_ini
+N_tot_sim = N_sim * length(a0_seq) * 2
 
 d = zeros(N_tot_sim, Nsp + 2 + 3)
 dt = 1
 
-for random_ini in 1:1
-    #frac = rand(Nsp) #taking relative proportion of species
-    frac = zeros(Nsp) .+ 1 #same initial proportion
+#frac = rand(Nsp) #taking relative proportion of species
+frac = zeros(Nsp) .+ 1 #same initial proportion
 
-    for a0 in a0_seq
-
-        for disp in delta_seq
-
-            global p = Get_classical_param(N_species=Nsp, type_interaction="classic",
-                alpha_0=a0, scenario_trait="spaced", cintra=0.3, h=1)
+for a0 in a0_seq
 
 
-            for facil in f_seq
+    global p = Get_classical_param(N_species=Nsp, type_interaction="classic",
+        alpha_0=a0, scenario_trait="spaced", cintra=0.3, h=1)
 
 
 
-                for branch_bifu in 1:2
-
-                    if branch_bifu == 1 # Degradation
-                        state = Get_initial_state(Nsp=Nsp, type="equal", branch="Degradation", PA=false)
-                        S_seq = collect(range(0, 1, length=N_sim))
-
-                    else #Restoration
-                        state = Get_initial_state(Nsp=Nsp, type="equal", branch="Restoration", PA=false)
-                        S_seq = reverse(collect(range(0, 1, length=N_sim))) #to gradually decrease the level of stress
-
-                    end
-
-                    for stress in S_seq
-
-                        p[9] = stress
-
-                        prob = ODEProblem(MF_N_species, state, tspan, p)
-                        sol = solve(prob, Tsit5())
-                        d2 = Reorder_dynamics(sol)
 
 
-                        d[dt, :] = push!(d2[size(d2)[1], 1:(Nsp+2)], a0, branch_bifu, stress)
-                        dt = dt + 1
-                    end
-                end
+    for branch_bifu in eachindex(1:2)
+
+        if branch_bifu == 1 # Degradation
+            state = Get_initial_state(Nsp=Nsp, type="equal", branch="Degradation", PA=false)
+            S_seq = collect(range(0, 1, length=N_sim))
+
+        else #Restoration
+            state = Get_initial_state(Nsp=Nsp, type="equal", branch="Restoration", PA=false)
+            S_seq = reverse(collect(range(0, 1, length=N_sim))) #to gradually decrease the level of stress
+
+        end
+
+        for stress in S_seq
+
+            p[9] = stress
+
+            prob = ODEProblem(MF_N_species, state, tspan, p)
+            sol = solve(prob, callback=TerminateSteadyState(1e-8))
+            d2 = Reorder_dynamics(sol)
 
 
-            end
+            d[dt, :] = push!(d2[size(d2)[1], 1:(Nsp+2)], a0, branch_bifu, stress)
+            dt = dt + 1
         end
     end
+
+
+
+
 end
+
 
 CSV.write("../Table/N_species/MF/MF_equal_ini.csv", Tables.table(d), writeheader=false)
 
@@ -186,7 +188,6 @@ CSV.write("../Table/N_species/MF/MF_equal_ini.csv", Tables.table(d), writeheader
 
 
 #endregion
-
 
 
 #region: 5 species example spatially explicit (Fig 5)
@@ -208,7 +209,7 @@ tradeoff_seq = collect(range(0.25, 1, length=4))[4]
 N_tot_sim = N_sim * N_sim2 * length(f_seq) * length(tradeoff_seq) * 2 * N_random_ini
 
 
-for random_ini in 1:N_random_ini
+for random_ini in eachindex(1:N_random_ini)
 
 
     for a0 in a0_seq
@@ -223,7 +224,7 @@ for random_ini in 1:N_random_ini
 
                 p["f"] = facil
 
-                for branch_bifu in 1:2
+                for branch_bifu in eachindex(1:2)
 
                     if branch_bifu == 1 # Degradation
                         state = Get_initial_lattice(param=p, size_mat=100, branch="Degradation", type_ini="equal")
@@ -336,16 +337,7 @@ end
     S_seq = collect(range(0, 0.9, length=N_sim_S))
     a0_seq = collect(range(0.225, 0.35, length=length_aij_seq))
     facil = 0.9
-
-    if Nsp == 5
-        tspan = (0.0, 20000)
-    elseif Nsp == 15
-        tspan = (0.0, 30000)
-    elseif Nsp == 25
-        tspan = (0.0, 40000)
-    else
-        tspan = (0.0, 40000)
-    end
+    tspan = (0.0, 1000000)
 
     for random_ini in N_random_ini
 
@@ -373,7 +365,7 @@ end
                     p[9] = stress
 
                     prob = ODEProblem(MF_N_species, state, tspan, p)
-                    sol = solve(prob, Tsit5(), callback=TerminateSteadyState(1e-7))
+                    sol = solve(prob, callback=TerminateSteadyState(1e-10))
                     d2 = Reorder_dynamics(sol)
 
 
@@ -390,7 +382,7 @@ end
 end
 
 
-pmap(Run_sim_MF, 1:150)
+pmap(Run_sim_MF, 1:250)
 
 @everywhere function Run_sim_MF(N_random_ini)
 
@@ -402,16 +394,7 @@ pmap(Run_sim_MF, 1:150)
     S_seq = collect(range(0, 0.9, length=N_sim_S))
     a0_seq = collect(range(0.225, 0.35, length=length_aij_seq))
     facil = 0.9
-
-    if Nsp == 5
-        tspan = (0.0, 20000)
-    elseif Nsp == 15
-        tspan = (0.0, 30000)
-    elseif Nsp == 25
-        tspan = (0.0, 40000)
-    else
-        tspan = (0.0, 40000)
-    end
+    tspan = (0.0, 1000000)
 
     for random_ini in N_random_ini
 
@@ -440,7 +423,7 @@ pmap(Run_sim_MF, 1:150)
                     p[9] = stress
 
                     prob = ODEProblem(MF_N_species, state, tspan, p)
-                    sol = solve(prob, Tsit5(), callback=TerminateSteadyState(1e-7))
+                    sol = solve(prob, callback=TerminateSteadyState(1e-10))
                     d2 = Reorder_dynamics(sol)
 
 
@@ -457,7 +440,7 @@ pmap(Run_sim_MF, 1:150)
 end
 
 
-pmap(Run_sim_MF, 1:150)
+pmap(Run_sim_MF, 1:250)
 
 
 
@@ -472,16 +455,7 @@ pmap(Run_sim_MF, 1:150)
     S_seq = collect(range(0, 0.9, length=N_sim_S))
     a0_seq = collect(range(0.225, 0.35, length=length_aij_seq))
     facil = 0.9
-
-    if Nsp == 5
-        tspan = (0.0, 20000)
-    elseif Nsp == 15
-        tspan = (0.0, 30000)
-    elseif Nsp == 25
-        tspan = (0.0, 40000)
-    else
-        tspan = (0.0, 40000)
-    end
+    tspan = (0.0, 1000000)
 
     for random_ini in N_random_ini
 
@@ -510,7 +484,7 @@ pmap(Run_sim_MF, 1:150)
                     p[9] = stress
 
                     prob = ODEProblem(MF_N_species, state, tspan, p)
-                    sol = solve(prob, Tsit5(), callback=TerminateSteadyState(1e-7))
+                    sol = solve(prob, callback=TerminateSteadyState(1e-10))
                     d2 = Reorder_dynamics(sol)
 
 
@@ -527,7 +501,7 @@ pmap(Run_sim_MF, 1:150)
 end
 
 
-pmap(Run_sim_MF, 1:150)
+pmap(Run_sim_MF, 1:250)
 
 
 
@@ -542,16 +516,7 @@ pmap(Run_sim_MF, 1:150)
     S_seq = collect(range(0, 0.9, length=N_sim_S))
     a0_seq = collect(range(0.225, 0.35, length=length_aij_seq))
     facil = 0.9
-
-    if Nsp == 5
-        tspan = (0.0, 20000)
-    elseif Nsp == 15
-        tspan = (0.0, 30000)
-    elseif Nsp == 25
-        tspan = (0.0, 40000)
-    else
-        tspan = (0.0, 40000)
-    end
+    tspan = (0.0, 1000000)
 
     for random_ini in N_random_ini
 
@@ -580,7 +545,7 @@ pmap(Run_sim_MF, 1:150)
                     p[9] = stress
 
                     prob = ODEProblem(PA_N_species, state, tspan, p)
-                    sol = solve(prob, Tsit5(), callback=TerminateSteadyState(1e-7))
+                    sol = solve(prob, callback=TerminateSteadyState(1e-10))
                     d2 = Reorder_dynamics(sol)
 
 
@@ -597,7 +562,7 @@ pmap(Run_sim_MF, 1:150)
 end
 
 
-pmap(Run_sim_PA, 1:150)
+pmap(Run_sim_PA, 1:250)
 
 
 
@@ -611,16 +576,7 @@ pmap(Run_sim_PA, 1:150)
     S_seq = collect(range(0, 0.9, length=N_sim_S))
     a0_seq = collect(range(0.225, 0.35, length=length_aij_seq))
     facil = 0.9
-
-    if Nsp == 5
-        tspan = (0.0, 20000)
-    elseif Nsp == 15
-        tspan = (0.0, 30000)
-    elseif Nsp == 25
-        tspan = (0.0, 40000)
-    else
-        tspan = (0.0, 40000)
-    end
+    tspan = (0.0, 1000000)
 
     for random_ini in N_random_ini
 
@@ -647,7 +603,7 @@ pmap(Run_sim_PA, 1:150)
                     p[9] = stress
 
                     prob = ODEProblem(PA_N_species, state, tspan, p)
-                    sol = solve(prob, Tsit5(), callback=TerminateSteadyState(1e-7))
+                    sol = solve(prob, callback=TerminateSteadyState(1e-10))
                     d2 = Reorder_dynamics(sol)
 
 
@@ -664,7 +620,7 @@ pmap(Run_sim_PA, 1:150)
 end
 
 
-pmap(Run_sim_PA, 1:150)
+pmap(Run_sim_PA, 1:250)
 
 
 
@@ -679,16 +635,7 @@ pmap(Run_sim_PA, 1:150)
     S_seq = collect(range(0, 0.9, length=N_sim_S))
     a0_seq = collect(range(0.225, 0.35, length=length_aij_seq))
     facil = 0.9
-
-    if Nsp == 5
-        tspan = (0.0, 20000)
-    elseif Nsp == 15
-        tspan = (0.0, 30000)
-    elseif Nsp == 25
-        tspan = (0.0, 40000)
-    else
-        tspan = (0.0, 40000)
-    end
+    tspan = (0.0, 1000000)
 
     for random_ini in N_random_ini
 
@@ -716,7 +663,7 @@ pmap(Run_sim_PA, 1:150)
                     p[9] = stress
 
                     prob = ODEProblem(PA_N_species, state, tspan, p)
-                    sol = solve(prob, Tsit5(), callback=TerminateSteadyState(1e-7))
+                    sol = solve(prob, callback=TerminateSteadyState(1e-10))
                     d2 = Reorder_dynamics(sol)
 
 
@@ -733,7 +680,7 @@ pmap(Run_sim_PA, 1:150)
 end
 
 
-pmap(Run_sim_PA, 1:150)
+pmap(Run_sim_PA, 1:250)
 
 
 
