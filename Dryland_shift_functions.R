@@ -22,6 +22,8 @@ color_hys=colorRampPalette(c("#C7B6C8", "#74B6BA" ,"#7783C4" ,"#B56D4E", "#F28E4
 dir.create("../",showWarnings = F)
 dir.create("../Table",showWarnings = F)
 dir.create("../Table/2_species",showWarnings = F)
+dir.create("../Figures",showWarnings = F)
+dir.create("../Figures/SI",showWarnings = F)
 
 #***********************************************************
 

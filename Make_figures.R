@@ -132,7 +132,7 @@ p_bottom = ggarrange(ggarrange(p3_1+ylab("Cover"),
 
 p_tot=ggarrange(p_top,p_middle,p_bottom,nrow=3,heights = c(1.35,1,1.1))
 
-ggsave("../Figures/Final_figs/Figure_2.pdf",p_tot,width = 9,height = 7)
+ggsave("../Figures/Figure_2.pdf",p_tot,width = 9,height = 7)
 
 
 
@@ -407,7 +407,7 @@ p_bottom=ggarrange(p4,
                    p2,ncol=3,labels = letters[2:4],align = "h")
 Fig_3=ggarrange(p1+guides(pattern=F),p_bottom,nrow=2,heights = c(3,2.3),labels = c(letters[1],""))
 
-ggsave("../Figures/Final_figs/Figure_3.pdf",Fig_3,width = 9,height = 9)
+ggsave("../Figures/Figure_3.pdf",Fig_3,width = 9,height = 9)
 
 
 ## >> Figure 4: Multistability trait ----
@@ -587,7 +587,7 @@ p_tot=ggarrange(
   ggarrange(ggplot()+theme_void(),p1,ggplot()+theme_void(),ncol=3,widths = c(.15,1,.15)),
   pbifu,nrow=2,heights =  c(2,1),labels = c(letters[1:2]),hjust = c(-9,0))
 
-ggsave(filename = "../Figures/Final_figs/Figure_4.pdf",plot = p_tot,width = 7,height = 7)
+ggsave(filename = "../Figures/Figure_4.pdf",plot = p_tot,width = 7,height = 7)
 
 
 
@@ -664,7 +664,7 @@ p_bottom=ggarrange(p_left,p_right,ncol=2,legend="none")
 p_tot=ggarrange(ggarrange(ggplot()+theme_void(),p1,ggplot()+theme_void(),ncol=3,widths = c(.05,.7,.05)),
                 p_bottom,nrow=2,heights = c(1.5,2),labels = c(letters[1],""))
 
-ggsave("../Figures/Final_figs/Figure_5.pdf",p_tot,width=9,height=7)
+ggsave("../Figures/Figure_5.pdf",p_tot,width=9,height=7)
 
 
 
@@ -731,7 +731,7 @@ p3=ggplot(d%>%filter(., Branch==1))+
 Fig_6=ggarrange(ggarrange(p2,p1,common.legend = T,legend = "bottom",nrow=2,labels = letters[1:2]),
                 ggarrange(ggplot()+theme_void(),p3,ggplot()+theme_void(),nrow=3,heights = c(.05,1.5,.05),labels = c("",letters[3],"")),ncol=2,widths =  c(1.2,1))
 
-ggsave("../Figures/Final_figs/Figure_6.pdf",Fig_6,width = 9,height = 8)
+ggsave("../Figures/Figure_6.pdf",Fig_6,width = 9,height = 8)
 
 
 
@@ -744,11 +744,7 @@ ggsave("../Figures/Final_figs/Figure_6.pdf",Fig_6,width = 9,height = 8)
 
 #*****************************************************************
 
-#---------------------   SI figures   --------------------------
-#---------------------   2-species    --------------------------
-
-#*****************************************************************
-
+#---------------------   SI figures 2-species  --------------------------
 ## >> Advantage of CSI compared to Rho+----
 
 list_f=list.files("../Table/2_species/PA/Multistability_PA/Frac_gradient/",pattern = "delta_0.1_facilitation_0.9_scalefacilitation_local")
@@ -779,7 +775,7 @@ p=ggplot(d2_fil%>%melt(., measure.vars=c("Rho_plus","CSI"))%>%
   scale_linetype_manual(values=c(1,9))+
   theme(axis.text.x = element_text(size = 9),axis.text.y = element_text(size = 9),strip.text.y = element_text(size=9))
 
-ggsave("../Figures/Final_figs/SI/Using_CSI.pdf",p,width = 6,height = 4)
+ggsave("../Figures/SI/Using_CSI.pdf",p,width = 6,height = 4)
 
 ## >> Competition experienced ----
 Nsp=15
@@ -840,7 +836,7 @@ p2=ggplot(tibble(Com=comp,Trait=trait,Comp2=comp2))+
   labs(x=TeX(r'(Trait species i, $\psi_i)'),y=TeX(r'(\ $\psi_i \sum_j e^{-|\psi_i-\psi_j|})'),color="")+
   scale_color_gradientn(colours = color_Nsp(15))
 
-ggsave("../Figures/Final_figs/SI/Competition_experienced.pdf",
+ggsave("../Figures/SI/Competition_experienced.pdf",
        ggarrange(
          ggarrange(p1,
                    ggarrange(p_1,p_2,p_3,nrow = 3,labels = c('i','ii','iii'),heights = c(1,1,1.4)),labels = c("a","","",""),widths = c(2,1)),
@@ -955,7 +951,7 @@ p=ggplot(NULL) +
                              "Desert"=  "#696969"
   ))+
   the_theme+theme(strip.text.x = element_text(size=12),legend.text = element_text(size=9))
-ggsave("../Figures/Final_figs/SI/Comparizon_CA_PA.pdf",p,width = 7,height = 6)
+ggsave("../Figures/SI/Comparizon_CA_PA.pdf",p,width = 7,height = 6)
 
 
 ## >> Multistability fixed traits MF model ----
@@ -1062,7 +1058,7 @@ for (u in 1:2){
 p2=ggarrange(p_1_2+xlab(""),p_2_2+xlab(""),p_1_1+xlab(""),p_2_1,nrow = 4,common.legend = T,legend = "bottom",labels = c(letters[2],"",letters[3],""))
 
 
-ggsave("../Figures/Final_figs/SI/Multistability_fixed_traits_MF.pdf",ggarrange(p+guides(pattern=F),p2,ncol = 2,widths = c(2,1),labels=c(letters[1],"")),
+ggsave("../Figures/SI/Multistability_fixed_traits_MF.pdf",ggarrange(p+guides(pattern=F),p2,ncol = 2,widths = c(2,1),labels=c(letters[1],"")),
        width = 10,height = 6)
 
 
@@ -1245,7 +1241,7 @@ p_tot=ggarrange(
   ggarrange(ggplot()+theme_void(),p1,ggplot()+theme_void(),ncol=3,widths = c(.15,1,.15)),
   pbifu,nrow=2,heights =  c(2,1),labels = c(letters[1:2]),hjust = c(-9,0))
 
-ggsave(filename = "../Figures/Final_figs/SI/Multistability_varying_traits_MF.pdf",p_tot,width = 7,height = 7)
+ggsave(filename = "../Figures/SI/Multistability_varying_traits_MF.pdf",p_tot,width = 7,height = 7)
 
 
 
@@ -1337,7 +1333,7 @@ Fig_2_SI=ggplot(d2t%>%
   scale_pattern_manual(values=rev(c("transparent" ,"stripe")))+
   guides(pattern="none")
 
-ggsave("../Figures/Final_figs/SI/Multistability_fixed_traits_local_competition.pdf",Fig_2_SI,width = 8,height = 6)
+ggsave("../Figures/SI/Multistability_fixed_traits_local_competition.pdf",Fig_2_SI,width = 8,height = 6)
 
 
 
@@ -1438,7 +1434,7 @@ p1=ggplot(d2t%>%
 
 
 
-ggsave("../Figures/Final_figs/SI/Multistability_fixed_traits_global_facilitation.pdf",p1,width = 9,height = 5)
+ggsave("../Figures/SI/Multistability_fixed_traits_global_facilitation.pdf",p1,width = 9,height = 5)
 
 
 ## >> Multistability varying traits with global facilitation ----
@@ -1548,7 +1544,7 @@ p=ggarrange(p_1+labs(fill="")+
               theme(axis.title.y = element_blank(),axis.text.y = element_blank(),axis.ticks.y=element_blank(),axis.line.y = element_blank()),
             nrow=2,ncol=2,heights = c(1,1.1))
 
-ggsave("../Figures/Final_figs/SI/Multistability_traits_scale_facil_disp.pdf",p,width = 7,height = 7)
+ggsave("../Figures/SI/Multistability_traits_scale_facil_disp.pdf",p,width = 7,height = 7)
 
 ## >> Mechanisms for global facilitation: clustering, pairs, thresholds ----
 
@@ -1672,7 +1668,7 @@ p_bottom=ggarrange(p3,
                    ggarrange(p2,ggplot()+theme_void(),nrow=2,heights = c(1,.25)),
                    p1,ncol=3,labels = letters[1:3],align = "h")
 
-ggsave(filename = "../Figures/Final_figs/SI/Mechanisms_global_facilitation.pdf",width = 7,height = 4)
+ggsave(filename = "../Figures/SI/Mechanisms_global_facilitation.pdf",width = 7,height = 4)
 
 
 ## >> Multistability, varying the trade-off shape ----
@@ -1700,7 +1696,7 @@ p=ggplot(d)+
   the_theme+
   labs(x=TeX("$\\psi$"),y=TeX("$\\psi^{\\gamma}$"),color=TeX("$\\gamma$"))+
   scale_color_viridis_d()
-ggsave( "../Figures/Final_figs/SI/Trade_off_shape.pdf",p,width = 6,height = 4)
+ggsave( "../Figures/SI/Trade_off_shape.pdf",p,width = 6,height = 4)
 
 
 
@@ -1882,7 +1878,7 @@ p_tot=ggarrange(
   ggarrange(ggplot()+theme_void(),p1,ggplot()+theme_void(),ncol=3,widths = c(.15,1,.15)),
   pbifu,nrow=2,heights =  c(2,1),labels = c(letters[1],""),hjust = c(-9,0))
 
-ggsave(filename = "../Figures/Final_figs/SI/Trade_off_multistability_PA.pdf",plot = p_tot,width = 9,height = 7)
+ggsave(filename = "../Figures/SI/Trade_off_multistability_PA.pdf",plot = p_tot,width = 9,height = 7)
 
 
 
@@ -2135,7 +2131,7 @@ p_tot=ggarrange(
 )
 
 
-ggsave("../Figures/Final_figs/SI/Comparizon_linear_non_linear_tradeoff.pdf",width = 7,height = 10)
+ggsave("../Figures/SI/Comparizon_linear_non_linear_tradeoff.pdf",width = 7,height = 10)
 
 
 
@@ -2238,7 +2234,7 @@ p1=ggplot(d_final)+
   guides(shape=F)
 
 
-ggsave("../Figures/Final_figs/SI/Niche_least_competitive_species.pdf",p1,width = 6,height = 5)
+ggsave("../Figures/SI/Niche_least_competitive_species.pdf",p1,width = 6,height = 5)
 
 
 #Degradation and restoration points
@@ -2277,7 +2273,7 @@ p_bottom=ggarrange(p3,p4,labels = letters[3:4])
 p_tot=ggarrange(ggarrange(p1,p2,ncol=2,labels = letters[1:2]),
                 p_bottom,nrow=2,heights = c(1.5,1))
 
-ggsave("../Figures/Final_figs/SI/Restoration_degration.pdf",p_tot,width = 9,height = 7)
+ggsave("../Figures/SI/Restoration_degration.pdf",p_tot,width = 9,height = 7)
 
 
 
@@ -2301,7 +2297,7 @@ p=ggarrange(p_land_1+ggtitle(TeX("$\\delta = 0$")),p_land_2+ggtitle(TeX("$\\delt
             p_land_5+ggtitle(TeX("$\\delta = 0.7$")),p_land_6+ggtitle(TeX("$\\delta = 1$")),nrow=2,ncol=3)
 
 
-ggsave("../Figures/Final_figs/SI/Dynamics_landscape_dispersal.pdf",p,width = 7,height = 4)
+ggsave("../Figures/SI/Dynamics_landscape_dispersal.pdf",p,width = 7,height = 4)
 
 ## >> Bifurcation diagrams effect of competition ----
 julia_setup()
@@ -2429,7 +2425,7 @@ p_tot = ggarrange(p1+theme(strip.text.x = element_text(size = 10)),
                   ncol=2,nrow=2,common.legend = T,legend="none")
 
 p_tot_w_legend=ggarrange(p_tot,get_legend(p4),nrow=2,heights = c(10,1))
-ggsave("../Figures/Final_figs/SI/Mechanism_priority.pdf",p_tot_w_legend,width=10,height = 5)
+ggsave("../Figures/SI/Mechanism_priority.pdf",p_tot_w_legend,width=10,height = 5)
 
 
 
@@ -2571,7 +2567,7 @@ p_tot=ggarrange(ggarrange(p_1+ggtitle(TeX("$\\alpha_e = 0.25$")),p_3+ggtitle(TeX
 
 
 
-ggsave("../Figures/Final_figs/SI/Net_effet_prior_shift.pdf",p_tot,width = 8,height = 5)
+ggsave("../Figures/SI/Net_effet_prior_shift.pdf",p_tot,width = 8,height = 5)
 
 
 ## >> State diagram lower degradation, higher restoration ----
@@ -2669,16 +2665,12 @@ p=ggplot(d2t%>%
   scale_pattern_manual(values=rev(c("transparent" ,"stripe")))
 
 
-ggsave("../Figures/Final_figs/SI/Lower_degradation_higher_restoration.pdf",p,width = 9,height = 5)
+ggsave("../Figures/SI/Lower_degradation_higher_restoration.pdf",p,width = 9,height = 5)
 
 
 #*****************************************************************
 
-#---------------------   SI figures   --------------------------
-#---------------------   N-species    --------------------------
-
-#*****************************************************************
-
+#---------------------   SI figures N-species  --------------------------
 ## >> Scaling-up 5sp, equal initial conditions ----
 
 
@@ -2703,7 +2695,7 @@ p1=ggplot(d_melt%>%
   scale_color_gradientn(colours = (color_Nsp(5)))+
   theme(strip.text.x = element_text(size=12))
 
-ggsave("../Figures/Final_figs/SI/Equal_ini_MF.pdf",p1,width=8,height=3)
+ggsave("../Figures/SI/Equal_ini_MF.pdf",p1,width=8,height=3)
 
 
 
@@ -2711,31 +2703,27 @@ ggsave("../Figures/Final_figs/SI/Equal_ini_MF.pdf",p1,width=8,height=3)
 
 
 ## >> Colored by number of species ----
+d_tot=read.table("../Table/N_species/PA/Multistability_CSI.csv",sep=";")
 
-p1=ggplot(d_tot%>%filter(., Nsp %in% c(5,25),Competition %in% c(.225,.30),Branch==1))+
-  geom_point(aes(x=Stress,y=CSI,color=Nb_sp,fill=Nb_sp),size=.1,shape=21)+
-  the_theme+labs(y="Community index",color="")+
-  scale_color_viridis_c(option = "E")+
-  scale_fill_viridis_c(option = "E")+
-  guides(fill="none")+
-  labs(x="Stress, S",color="Number of species \n in the community  ")+
-  facet_grid(Nsp~Competition,labeller = label_bquote(cols= alpha[e] ==.(Competition),rows="# species"==.(Nsp)))+
-  theme(strip.text.x = element_text(size=10),strip.text.y = element_text(size=11),
-        panel.background = element_blank(),strip.background.y = element_blank())
+for (i in 1:4){
+  for (j in 1:2){
+    assign(paste0("p_",i,"_",j),
+           ggplot(d_tot%>%filter(., Nsp %in% c(5,25)[i],Competition %in% c(.225,.30)[j],Branch==1))+
+             geom_point(aes(x=Stress,y=Rho_plus,color=Nb_sp,fill=Nb_sp),size=.3,shape=21)+
+             the_theme+labs(y="Vegetation cover",color="")+
+             scale_color_viridis_c(option = "E")+
+             scale_fill_viridis_c(option = "E")+
+             guides(fill="none")+
+             labs(x="Stress, S",color="Number of species \n in the community  ")+
+             facet_grid(Nsp~Competition,labeller = label_bquote(cols= alpha[e] ==.(Competition),rows="# species"==.(Nsp)))+
+             theme(strip.text.x = element_text(size=10),strip.text.y = element_text(size=11),
+                   panel.background = element_blank(),strip.background.y = element_blank())
+           )
+  }
+}
+p=ggarrange(p_1_1+labs(x=""),p_1_2,p_2_1+labs(x="",y=""),p_2_2+labs(y=""),nrow=2,ncol=2)
 
-p2=ggplot(d_tot%>%filter(., Nsp %in% c(5,25),Competition %in% c(.225,.30),Branch==1))+
-  geom_point(aes(x=Stress,y=Rho_plus,color=Nb_sp,fill=Nb_sp),size=.3,shape=21)+
-  the_theme+labs(y="Vegetation cover",color="")+
-  scale_color_viridis_c(option = "E")+
-  scale_fill_viridis_c(option = "E")+
-  guides(fill="none")+
-  labs(x="Stress, S",color="Number of species \n in the community  ")+
-  facet_grid(Nsp~Competition,labeller = label_bquote(cols= alpha[e] ==.(Competition),rows="# species"==.(Nsp)))+
-  theme(strip.text.x = element_text(size=10),strip.text.y = element_text(size=11),
-        panel.background = element_blank(),strip.background.y = element_blank())
-
-ggsave("../Figures/Final_figs/SI/Nsp_CSI_colored_nbspecies.pdf",
-       p2,width = 6,height =4 )
+ggsave("../Figures/SI/Nsp_CSI_colored_nbspecies.pdf",p,width = 7,height =6 )
 
 
 ## >> Main fig N-species with mean-field model ----
@@ -2801,7 +2789,7 @@ p3=ggplot(d%>%filter(., Branch==1))+
 Fig_6_SI=ggarrange(ggarrange(p2,p1,common.legend = T,legend = "bottom",nrow=2,labels = letters[1:2]),
                 ggarrange(ggplot()+theme_void(),p3,ggplot()+theme_void(),nrow=3,heights = c(.05,1.5,.05),labels = c("",letters[3],"")),ncol=2,widths =  c(1.2,1))
 
-ggsave("../Figures/Final_figs/SI/N_species_CSI_cover_MF.pdf",Fig_6_SI,width = 9,height = 8)
+ggsave("../Figures/SI/N_species_CSI_cover_MF.pdf",Fig_6_SI,width = 9,height = 8)
 
 
 
@@ -2845,7 +2833,7 @@ p=ggarrange(p_1+ggtitle(TeX(r'(N species = 5, \ $\alpha_e = 0.3)'))+
               theme(axis.title.y = element_blank(),axis.text.y = element_blank(),axis.ticks.y=element_blank(),axis.line.y = element_blank()),
             nrow=2,ncol=2,heights = c(1,1.1),common.legend = T,legend="bottom")
 
-ggsave("../Figures/Final_figs/SI/Example_bifu_Nspecies.pdf",width = 7,height = 5)
+ggsave("../Figures/SI/Example_bifu_Nspecies.pdf",width = 7,height = 5)
 
 
 ## >> Example of species succession gradient stress N-species PA ----
@@ -2890,7 +2878,7 @@ p=ggarrange(p_1+ggtitle(TeX(r'(N species = 5, \ $\alpha_e = 0.325)'))+
               theme(axis.title.y = element_blank(),axis.text.y = element_blank(),axis.ticks.y=element_blank(),axis.line.y = element_blank()),
             nrow=2,ncol=2,heights = c(1,1.1),common.legend = T,legend="bottom")
 
-ggsave("../Figures/Final_figs/SI/Example_bifu_Nspecies_PA.pdf",p,width = 7,height = 5)
+ggsave("../Figures/SI/Example_bifu_Nspecies_PA.pdf",p,width = 7,height = 5)
 
 
 ## >> All CSI/Rho_+ bifurcation competition/Nsp ----
@@ -2910,7 +2898,7 @@ p=ggplot(d_tot%>%filter(., Branch==1))+
   theme(strip.text.x = element_text(size=13),strip.text.y = element_text(size=12),
         panel.background = element_blank(),strip.background.x = element_blank())
 
-ggsave("../Figures/Final_figs/SI/CSI_aij_Nsp.pdf",p,width = 12,height = 7)
+ggsave("../Figures/SI/CSI_aij_Nsp.pdf",p,width = 12,height = 7)
 
 
 #community scale vegetation cover
@@ -2928,7 +2916,7 @@ p=ggplot(d_tot%>%filter(., Branch==1))+
   theme(strip.text.x = element_text(size=13),strip.text.y = element_text(size=12),
         panel.background = element_blank(),strip.background.x = element_blank())
 
-ggsave("../Figures/Final_figs/SI/Vegetation_cover_aij_Nsp.pdf",p,width = 12,height = 7)
+ggsave("../Figures/SI/Vegetation_cover_aij_Nsp.pdf",p,width = 12,height = 7)
 
 
 # Community index MF
@@ -2946,15 +2934,4 @@ p=ggplot(d_tot%>%filter(., Branch==1))+
   theme(strip.text.x = element_text(size=13),strip.text.y = element_text(size=12),
         panel.background = element_blank(),strip.background.x = element_blank())
 
-ggsave("../Figures/Final_figs/SI/CSI_aij_Nsp_MF.pdf",p,width = 12,height = 7)
-
-
-
-
-
-
-
-
-
-
-
+ggsave("../Figures/SI/CSI_aij_Nsp_MF.pdf",p,width = 12,height = 7)
