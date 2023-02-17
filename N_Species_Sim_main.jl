@@ -300,17 +300,6 @@ display(Plot_landscape(landscape))
 using Distributed
 
 
-mkdir("./Table")
-
-mkdir("./Table/MF")
-mkdir("./Table/PA")
-
-species_seq = [5 15 25]
-for k in species_seq
-    mkdir("./Table/MF/" * repr(k) * "_sp")
-    mkdir("./Table/PA/" * repr(k) * "_sp")
-end
-
 addprocs(25, exeflags="--project=$(Base.active_project())")
 
 
@@ -373,7 +362,7 @@ end
                     dt = dt + 1
                 end
             end
-            CSV.write("./Table/MF/" * repr(Nsp) * "_sp/Sim_Nrandom_" * repr(random_ini) *
+            CSV.write("../Table/N_species/MF/" * repr(Nsp) * "_sp/Sim_Nrandom_" * repr(random_ini) *
                       "_a0_" * repr(a0) * "_Nsp_" * repr(Nsp) *
                       "_f_" * repr(facil) * ".csv", Tables.table(d), writeheader=false)
 
@@ -431,7 +420,7 @@ pmap(Run_sim_MF, 1:250)
                     dt = dt + 1
                 end
             end
-            CSV.write("./Table/MF/" * repr(Nsp) * "_sp/Sim_Nrandom_" * repr(random_ini) *
+            CSV.write("./Table/N_species/MF/" * repr(Nsp) * "_sp/Sim_Nrandom_" * repr(random_ini) *
                       "_a0_" * repr(a0) * "_Nsp_" * repr(Nsp) *
                       "_f_" * repr(facil) * ".csv", Tables.table(d), writeheader=false)
 
@@ -492,7 +481,7 @@ pmap(Run_sim_MF, 1:250)
                     dt = dt + 1
                 end
             end
-            CSV.write("./Table/MF/" * repr(Nsp) * "_sp/Sim_Nrandom_" * repr(random_ini) *
+            CSV.write("./Table/N_species/MF/" * repr(Nsp) * "_sp/Sim_Nrandom_" * repr(random_ini) *
                       "_a0_" * repr(a0) * "_Nsp_" * repr(Nsp) *
                       "_f_" * repr(facil) * ".csv", Tables.table(d), writeheader=false)
 
@@ -553,7 +542,7 @@ pmap(Run_sim_MF, 1:250)
                     dt = dt + 1
                 end
             end
-            CSV.write("./Table/PA/" * repr(Nsp) * "_sp/Sim_Nrandom_" * repr(random_ini) *
+            CSV.write("./Table/N_species/PA/" * repr(Nsp) * "_sp/Sim_Nrandom_" * repr(random_ini) *
                       "_a0_" * repr(a0) * "_Nsp_" * repr(Nsp) *
                       "_f_" * repr(facil) * ".csv", Tables.table(d), writeheader=false)
 
@@ -611,7 +600,7 @@ pmap(Run_sim_PA, 1:250)
                     dt = dt + 1
                 end
             end
-            CSV.write("./Table/PA/" * repr(Nsp) * "_sp/Sim_Nrandom_" * repr(random_ini) *
+            CSV.write("./Table/N_species/PA/" * repr(Nsp) * "_sp/Sim_Nrandom_" * repr(random_ini) *
                       "_a0_" * repr(a0) * "_Nsp_" * repr(Nsp) *
                       "_f_" * repr(facil) * ".csv", Tables.table(d), writeheader=false)
 
@@ -671,7 +660,7 @@ pmap(Run_sim_PA, 1:250)
                     dt = dt + 1
                 end
             end
-            CSV.write("./Table/PA/" * repr(Nsp) * "_sp/Sim_Nrandom_" * repr(random_ini) *
+            CSV.write("./Table/N_species/PA/" * repr(Nsp) * "_sp/Sim_Nrandom_" * repr(random_ini) *
                       "_a0_" * repr(a0) * "_Nsp_" * repr(Nsp) *
                       "_f_" * repr(facil) * ".csv", Tables.table(d), writeheader=false)
 

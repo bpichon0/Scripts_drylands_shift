@@ -19,9 +19,23 @@ color_hys=colorRampPalette(c("#C7B6C8", "#74B6BA" ,"#7783C4" ,"#B56D4E", "#F28E4
 
 
 #creating folders
+
+## For simulations
+
 dir.create("../",showWarnings = F)
 dir.create("../Table",showWarnings = F)
 dir.create("../Table/2_species",showWarnings = F)
+for (i in c("PA","MF","CA")) dir.create(paste0("../Table/2_species/",i),showWarnings = F)
+
+
+dir.create("../Table/N_species",showWarnings = F)
+for (i in c(5,15,25)){
+    for (j in c("PA","MF")){
+        dir.create(paste0("../Table/N_species/",j,"/",i,"_sp"),showWarnings = F)
+    }
+}
+
+#For figures
 dir.create("../Figures",showWarnings = F)
 dir.create("../Figures/SI",showWarnings = F)
 

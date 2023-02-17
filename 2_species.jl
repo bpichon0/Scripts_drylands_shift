@@ -46,49 +46,6 @@ end
 
 
 
-"Function to map the neighbors in the lattice"
-function Spatial_grid(size_landscape)
-
-    R"position2rowcol = function(position, size = 4){
-      row = ceiling(position/size)
-      column = (position-1)%%size + 1
-      return(c(row, column))
-    }"
-
-    R"
-    grid.distance = function(pos1, pos2, size = 4,border = T){
-      pos1.rowcol = position2rowcol(pos1, size = size)
-      pos2.rowcol = position2rowcol(pos2, size = size)
-      
-      dist.vector = abs(pos1.rowcol - pos2.rowcol)
-      if (border == F & dist.vector[1] == size - 1){
-        dist.vector[1] = 1
-      }
-      if (border == F & dist.vector[2] == size - 1){
-        dist.vector[2] = 1
-      }
-      return(sum(dist.vector))
-    }
-    "
-    R"disp_matrix_grid_4 = function(size = 4, border = F){
-      npatches = size*size
-      neigh = matrix(rep(0, npatches**2), nrow = npatches)
-      for (k in 1:npatches){
-        for (l in 1:npatches){
-          if (grid.distance(k, l, size = size, border = border) == 1){
-            neigh[k, l] = 1
-            neigh[l, k] = 1
-          }
-        }
-      }
-      return(neigh)
-    }"
-
-    @rput size_landscape
-    R"A=disp_matrix_grid_4(size_landscape)"
-    @rget A
-    return (A)
-end
 
 
 
