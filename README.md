@@ -35,7 +35,7 @@ Simulatations are then post-processed using `Dryland_shift_main.R` script.
 ### Model description
 
 <p align="center">
-    <img src="https://github.com/bpichon0/Scripts_drylands_shift/Example/Model.png" width="600">
+    <img src="https://github.com/bpichon0/Scripts_drylands_shift/blob/master/Example/Model.png" width="600">
 </p>
 
 <p align="center">
@@ -73,7 +73,7 @@ Plot_landscape_Nspecies(landscape) # spatial organization of the vegetation
 ```
 
 <p align="center">
-    <img src="https://github.com/bpichon0/Scripts_drylands_shift/Example/Temporal_dynamics.png" width="400">
+    <img src="https://github.com/bpichon0/Scripts_drylands_shift/blob/master/Example/Temporal_dynamics.png" width="400">
 </p>
 
 <p align="center">
@@ -83,7 +83,7 @@ Plot_landscape_Nspecies(landscape) # spatial organization of the vegetation
 
 
 <p align="center">
-    <img src="https://github.com/bpichon0/Scripts_drylands_shift/Example/Landscape_asymp_state.png" width="400">
+    <img src="https://github.com/bpichon0/Scripts_drylands_shift/blob/master/Example/Landscape_asymp_state.png" width="400">
 </p>
 
 <p align="center">
@@ -118,7 +118,7 @@ Plot_dynamics_Nspecies(d=dyn, Nsp=Nsp)
 
 
 <p align="center">
-    <img src="https://github.com/bpichon0/Scripts_drylands_shift/Example/PA_dynamics.png" width="400">
+    <img src="https://github.com/bpichon0/Scripts_drylands_shift/blob/master/Example/PA_dynamics.png" width="400">
 </p>
 
 <p align="center">
