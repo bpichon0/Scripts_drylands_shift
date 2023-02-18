@@ -35,7 +35,7 @@ Simulatations are then post-processed using `Dryland_shift_main.R` script.
 ### Model description
 
 <p align="center">
-    <img src="https://github.com/bpichon0/Scripts_drylands_shift/blob/master/Example/Model.jpg" width="600">
+    <img src="https://github.com/bpichon0/Scripts_drylands_shift/blob/master/Example/Model.jpg" width="1000">
 </p>
 
 <p align="center">
