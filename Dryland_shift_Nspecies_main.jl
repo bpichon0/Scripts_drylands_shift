@@ -1,4 +1,14 @@
-include("N_Species_Sim_functions.jl")
+include("Dryland_shift_Nspecies_function.jl")
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -11,7 +21,7 @@ include("N_Species_Sim_functions.jl")
 S_seq = collect(range(0, stop=0.2, length=2))[2] #the point where there is bistability in PA
 c_seq = collect(range(0, stop=0.4, length=10))[10]
 intra_comp_seq = [0.3]
-param = Get_classical_param()
+param = Get_classical_param_2species()
 size_landscape = 100
 trajec_seq = ["Degradation" "Restoration"]
 count = 1
@@ -25,12 +35,12 @@ for disp in disp_seq
             for stress in S_seq
                 param["S"] = stress
                 for alpha_e in c_seq
-                    param["alpha_0"] = alpha_e
+                    param["alpha_e"] = alpha_e
                     for traj in trajec_seq
                         if traj == "Degradation"
-                            ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
+                            ini = Get_initial_lattice_2species(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
                         else
-                            ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.05, 0.05, 0.49, 0.5])
+                            ini = Get_initial_lattice_2species(size_mat=size_landscape, frac=[0.05, 0.05, 0.49, 0.5])
                         end
 
 
@@ -64,7 +74,7 @@ end
 S_seq = collect(range(0, stop=0.8, length=10)) #the point where there is bistability in PA
 c_seq = collect(range(0, stop=0.4, length=10))
 intra_comp_seq = [0.3]
-param = Get_classical_param()
+param = Get_classical_param_2species()
 size_landscape = 100
 trajec_seq = ["Degradation" "Restoration"]
 count = 1
@@ -78,12 +88,12 @@ for disp in disp_seq
             for stress in S_seq
                 param["S"] = stress
                 for alpha_e in c_seq
-                    param["alpha_0"] = alpha_e
+                    param["alpha_e"] = alpha_e
                     for traj in trajec_seq
                         if traj == "Degradation"
-                            ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
+                            ini = Get_initial_lattice_2species(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
                         else
-                            ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.05, 0.05, 0.49, 0.5])
+                            ini = Get_initial_lattice_2species(size_mat=size_landscape, frac=[0.05, 0.05, 0.49, 0.5])
                         end
 
 
@@ -110,18 +120,18 @@ end
 #region : 3-- Species pairs (Fig 3b)
 
 
-param = Get_classical_param()
+param = Get_classical_param_2species()
 size_landscape = 100
 trajec_seq = ["Degradation"]
 count = 1
 scale_competition = ["global"]
-disp_seq = collect(range(0, stop=1, length=12))[[2 11]]
+disp_seq = collect(range(0, stop=1, length=12))
 
 for disp in disp_seq
     param["S"] = 0
-    param["alpha_0"] = 0.2
+    param["alpha_e"] = 0.2
     param["delta"] = disp
-    ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
+    ini = Get_initial_lattice_2species(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
 
 
     d, state = Run_CA_2_species(; landscape=copy(ini), param=copy(param), time=5000,
@@ -141,7 +151,7 @@ end
 #region : 4-- Clustering species dispersal (Fig 3c)
 
 
-param = Get_classical_param()
+param = Get_classical_param_2species()
 size_landscape = 100
 trajec_seq = ["Degradation"]
 count = 1
@@ -150,9 +160,9 @@ disp_seq = collect(range(0, stop=1, length=12))[[2 11]]
 
 for disp in disp_seq
     param["S"] = 0.73
-    param["alpha_0"] = 0.2
+    param["alpha_e"] = 0.2
     param["delta"] = disp
-    ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
+    ini = Get_initial_lattice_2species(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
 
 
     d, state = Run_CA_2_species(; landscape=copy(ini), param=copy(param), time=5000,
@@ -173,15 +183,15 @@ end
 
 
 
-param = Get_classical_param()
+param = Get_classical_param_2species()
 size_landscape = 100
 scale_comp = ["global"]
-param["alpha_0"] = 0.4
+param["alpha_e"] = 0.4
 disp_seq = [0 0.1 0.2 0.3 0.7 1]
 
 for disp in disp_seq
     param["delta"] = disp
-    ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
+    ini = Get_initial_lattice_2species(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
 
 
     d, state = Run_CA_2_species(; landscape=copy(ini), param=copy(param), time=3000, type_competition=scale_comp, save=false, burning=15000, N_snap=40,
@@ -218,8 +228,8 @@ frac = zeros(Nsp) .+ 1 #same initial proportion
 for a0 in a0_seq
 
 
-    global p = Get_classical_param(N_species=Nsp, type_interaction="classic",
-        alpha_0=a0, scenario_trait="spaced", cintra=0.3, h=1)
+    global p = Get_classical_param_Nspecies(N_species=Nsp,
+        alpha_e=a0, scenario_trait="spaced", cintra=0.3)
 
 
     for branch_bifu in eachindex(1:2)
@@ -281,8 +291,8 @@ frac = zeros(Nsp) .+ 1 #same initial proportion
 for a0 in a0_seq
 
 
-    global p = Get_classical_param(N_species=Nsp, type_interaction="classic",
-        alpha_0=a0, scenario_trait="spaced", cintra=0.3, h=1)
+    global p = Get_classical_param_Nspecies(N_species=Nsp,
+        alpha_e=a0, scenario_trait="spaced", cintra=0.3)
 
 
 
@@ -355,8 +365,8 @@ for random_ini in eachindex(1:N_random_ini)
 
         for tradeoff in tradeoff_seq
 
-            global p = Get_classical_param(N_species=Nsp, type_interaction="classic",
-                alpha_0=a0, scenario_trait="spaced", cintra=0.3, h=1)
+            global p = Get_classical_param_dict(N_species=Nsp,
+                alpha_e=a0, scenario_trait="spaced", cintra=0.3)
 
 
             for facil in f_seq
@@ -366,10 +376,10 @@ for random_ini in eachindex(1:N_random_ini)
                 for branch_bifu in eachindex(1:2)
 
                     if branch_bifu == 1 # Degradation
-                        state = Get_initial_lattice(param=p, size_mat=100, branch="Degradation", type_ini="equal")
+                        state = Get_initial_lattice_Nspecies(param=p, size_mat=100, branch="Degradation", type_ini="equal")
 
                     else #Restoration
-                        state = Get_initial_lattice(param=p, size_mat=100, branch="Restoration", type_ini="equal")
+                        state = Get_initial_lattice_Nspecies(param=p, size_mat=100, branch="Restoration", type_ini="equal")
                     end
 
                     for stress in S_seq
@@ -377,7 +387,7 @@ for random_ini in eachindex(1:N_random_ini)
                         p["S"] = stress
 
                         d2, landscape = Gillespie_CA_N_species(; param=copy(p), landscape=copy(state), tmax=tmax, type_competition="global")
-                        display(Plot_dynamics(d=d2, Nsp=5))
+
                         CSV.write("../Table/N_species/CA/Sim_Nrandom_" * repr(random_ini) *
                                   "_a0_" * repr(a0) * "_tradeoff_" * repr(tradeoff) * "_Nsp_" * repr(Nsp) * "_stress_" * repr(stress) *
                                   "_f_" * repr(facil) * ".csv", Tables.table(d2), writeheader=false)
@@ -386,10 +396,8 @@ for random_ini in eachindex(1:N_random_ini)
                                   "_a0_" * repr(a0) * "_tradeoff_" * repr(tradeoff) * "_Nsp_" * repr(Nsp) * "_stress_" * repr(stress) *
                                   "_f_" * repr(facil) * ".csv", Tables.table(landscape), writeheader=false)
 
-
-                        display(Plot_landscape(landscape))
-
                     end
+
                 end
 
 
@@ -402,36 +410,10 @@ end
 #endregion
 
 
-#region : 9-- 15 species example spatially explicit (Fig 5)
-
-
-Nsp = 15
-S_seq = collect(range(0, 0.7, length=3))[1]
-a0_seq = collect(range(0, 0.4, length=3))[1]
-tmax = 20000
-branches = ["Degradation"]
-
-global p = Get_classical_param(N_species=Nsp, type_interaction="classic",
-    alpha_0=0, scenario_trait="spaced", cintra=0.3, h=1)
-
-state = Get_initial_lattice(param=p, size_mat=100, branch="Degradation", type_ini="equal")
-
-
-d2, landscape = Gillespie_CA_N_species(; param=copy(p), landscape=copy(state), tmax=tmax, type_competition="global")
-display(Plot_dynamics(d=d2, Nsp=15))
-
-display(Plot_landscape(landscape))
 
 
 
-
-
-
-#endregion
-
-
-
-#region : 10-- Full simulations for Fig 6 & SI 
+#region : 9-- Full simulations for Fig 6 & SI 
 
 
 
@@ -481,8 +463,8 @@ end
                     branches = "Restoration"
                 end
 
-                global p = Get_classical_param(N_species=Nsp, type_interaction="classic",
-                    alpha_0=a0, scenario_trait="spaced", cintra=0.3, h=1, trade_off=1)
+                global p = Get_classical_param_Nspecies(N_species=Nsp,
+                    alpha_e=a0, scenario_trait="spaced", cintra=0.3, trade_off=1)
 
 
                 Random.seed!(random_ini)
@@ -538,8 +520,8 @@ pmap(Run_sim_MF, 1:250)
                     branches = "Restoration"
                 end
 
-                global p = Get_classical_param(N_species=Nsp, type_interaction="classic",
-                    alpha_0=a0, scenario_trait="spaced", cintra=0.3, h=1, trade_off=1)
+                global p = Get_classical_param_Nspecies(N_species=Nsp,
+                    alpha_e=a0, scenario_trait="spaced", cintra=0.3, trade_off=1)
 
 
                 Random.seed!(random_ini)
@@ -599,8 +581,8 @@ pmap(Run_sim_MF, 1:250)
                     branches = "Restoration"
                 end
 
-                global p = Get_classical_param(N_species=Nsp, type_interaction="classic",
-                    alpha_0=a0, scenario_trait="spaced", cintra=0.3, h=1, trade_off=1)
+                global p = Get_classical_param_Nspecies(N_species=Nsp,
+                    alpha_e=a0, scenario_trait="spaced", cintra=0.3, trade_off=1)
 
 
                 Random.seed!(random_ini)
@@ -660,8 +642,8 @@ pmap(Run_sim_MF, 1:250)
                     branches = "Restoration"
                 end
 
-                global p = Get_classical_param(N_species=Nsp, type_interaction="classic",
-                    alpha_0=a0, scenario_trait="spaced", cintra=0.3, h=1, trade_off=1)
+                global p = Get_classical_param_Nspecies(N_species=Nsp,
+                    alpha_e=a0, scenario_trait="spaced", cintra=0.3, trade_off=1)
 
 
                 Random.seed!(random_ini)
@@ -719,8 +701,8 @@ pmap(Run_sim_PA, 1:250)
                     branches = "Restoration"
                 end
 
-                global p = Get_classical_param(N_species=Nsp, type_interaction="classic",
-                    alpha_0=a0, scenario_trait="spaced", cintra=0.3, h=1, trade_off=1)
+                global p = Get_classical_param_Nspecies(N_species=Nsp,
+                    alpha_e=a0, scenario_trait="spaced", cintra=0.3, trade_off=1)
 
 
                 Random.seed!(random_ini)
@@ -779,8 +761,8 @@ pmap(Run_sim_PA, 1:250)
                     branches = "Restoration"
                 end
 
-                global p = Get_classical_param(N_species=Nsp, type_interaction="classic",
-                    alpha_0=a0, scenario_trait="spaced", cintra=0.3, h=1, trade_off=1)
+                global p = Get_classical_param_Nspecies(N_species=Nsp,
+                    alpha_e=a0, scenario_trait="spaced", cintra=0.3, trade_off=1)
 
 
                 Random.seed!(random_ini)
