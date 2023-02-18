@@ -128,7 +128,7 @@ Plot_dynamics_Nspecies(d=dyn, Nsp=Nsp)
 </p>
 
 <p align="center">
-    <b>Figure 3: Temporal dynamics of the pair-approximation model.</b>
+    <b>Figure 3: Temporal dynamics with the pair-approximation model.</b>
 </p>
 
 
