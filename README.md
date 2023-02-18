@@ -1,9 +1,9 @@
 # Code for running the model and analyses of vegetation dynamics in drylands
 
-This repository contains the code used to perform simulations and the postprocessing for both main text and supplementary informations.
-
 Contact: Benoît Pichon, **benoit.pichon0@gmail.com**
 
+
+This repository contains the code used to perform simulations and the postprocessing for both main text and supplementary informations.
 All the code was made on R (*v4.1.0*) and Julia (*1.7.3*).
 
 Here is the different steps to reproduce the figures:
@@ -11,7 +11,7 @@ Here is the different steps to reproduce the figures:
 
 ## `Installing Julia dependancies`
 
-To install julia dependancies go into your working directory, press "]" and enter "activate .". Once activating the local folder, all dependancies can be loaded using "instantiate".
+To install julia dependancies go into your working directory, press "]" and enter "activate .". Once activating the local folder, all dependancies can be loaded using "] instantiate".
 
 
 ## `Replicating the figures`
@@ -46,6 +46,10 @@ The model describes the temporal changes of a landscape of $n \times n$ sites.
 Each site can be in one of $N+2$ states: colonized by the plant $i$ ($+_i$), with a fertile soil ($0$) or in a degraded soil state ($-$).
 The transitions between the different states are probabilistic and depend on the local neighborhood of a focal site (*e.g.* the local vegetation density) and the trait of the plants (Fig. 1a).
 
+Each plant species $i$ is characterized by a strategy modelled as a position $\psi_i$ along the competitivity <-> stress-tolerance trade-off.
+This strategy determines whether the species $i$ facilitates its local environment as well as its tolerance to competition and abiotic stress (*e.g.,* aridity).
+
+
 
 
 ### A toy example
@@ -60,7 +64,8 @@ include("Dryland_shift_Nspecies_function.jl") #loading the functions
 
 Nsp = 5 #number of species
 p = Get_classical_param_dict(N_species=Nsp, alpha_e=0.1, #level of interspecific competition
-            scenario_trait="spaced", cintra=0.3) #species traits are equally spaced along the trade-off axis 
+            scenario_trait="spaced", #species traits are equally spaced along the trade-off axis. Other methods are possible: you can give the composition of the community in term of strategies or consider randomly distributed species ("random") along this axis
+             cintra=0.3)
 
 state = Get_initial_lattice_Nspecies(param=p, size_mat=100, branch="Degradation", type_ini="equal") #intial lattice
 
