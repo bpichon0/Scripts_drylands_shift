@@ -2,64 +2,203 @@ include("N_Species_Sim_functions.jl")
 
 
 
-#region : testing PA/MF N species 
 
-Nsp = 5
-p = Get_classical_param(N_species=Nsp, type_interaction="classic",
-    alpha_0=0.3, scenario_trait="spaced", cintra=0.3, h=1)
-
-
-
-@time for i in eachindex(1:100)
-    Random.seed!(i)
-    state = Get_initial_state(Nsp=Nsp, type="random", branch="Degradation", PA=true)
-
-    p[9] = 0.3363636
-    tspan = (0, 100000)
-    prob = ODEProblem(PA_N_species, state, tspan, p)
-
-    sol = solve(prob, callback=TerminateSteadyState(1e-10))
-    d2 = Reorder_dynamics(sol)
-    display(Plot_dynamics(d=d2, Nsp=Nsp, PA=true))
-end;
-
-Random.seed!(86)
-state = Get_initial_state(Nsp=Nsp, type="random", branch="Degradation", PA=true)
-
-p[9] = 0.3727273
-
-tspan = (0, 100000)
-prob = ODEProblem(PA_N_species, state, tspan, p)
-
-sol = solve(prob, callback=TerminateSteadyState(1e-12))
-d2 = Reorder_dynamics(sol)
-display(Plot_dynamics(d=d2, Nsp=Nsp, PA=true))
+#region : 1-- Illustration competitive exclusion 2 species (Fig 2) 
 
 
 
 
-@time for j in [5, 15], i in eachindex(1:10)
-    Nsp = j
-    p = Get_classical_param(N_species=Nsp, type_interaction="classic",
-        alpha_0=0.275, scenario_trait="spaced", cintra=0.3, h=1)
+S_seq = collect(range(0, stop=0.2, length=2))[2] #the point where there is bistability in PA
+c_seq = collect(range(0, stop=0.4, length=10))[10]
+intra_comp_seq = [0.3]
+param = Get_classical_param()
+size_landscape = 100
+trajec_seq = ["Degradation" "Restoration"]
+count = 1
+scale_competition = ["global"]
+disp_seq = [0.1]
+d2 = zeros(length(S_seq) * length(c_seq) * length(scale_competition) * length(intra_comp_seq) * 2, 4) #Allocating
 
-    Random.seed!(i)
-    state = Get_initial_state(Nsp=Nsp, type="random", branch="Degradation", PA=true)
+for disp in disp_seq
+    for scale_comp in scale_competition
+        for aii in intra_comp_seq
+            for stress in S_seq
+                param["S"] = stress
+                for alpha_e in c_seq
+                    param["alpha_0"] = alpha_e
+                    for traj in trajec_seq
+                        if traj == "Degradation"
+                            ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
+                        else
+                            ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.05, 0.05, 0.49, 0.5])
+                        end
 
-    p[9] = 0
-    tspan = (0, 100000)
-    prob = ODEProblem(PA_N_species, state, tspan, p)
 
-    sol = solve(prob, callback=TerminateSteadyState(1e-10))
-    d2 = Reorder_dynamics(sol)
-    display(Plot_dynamics(d=d2, Nsp=Nsp, PA=true))
-end;
+                        d, state = Run_CA_2_species(; landscape=copy(ini), param=copy(param), time=5000, type_competition=scale_comp, save=false, burning=15000, N_snap=40,
+                            name_save="")
+
+                        #display(Plot_dynamics(d))
+                        CSV.write("../Table/2_species/CA/Illustration/Dynamics_stress_" * repr(round(stress, digits=3)) *
+                                  "_trajectory_" * traj * "_alpha0_" * repr(alpha_e) * ".csv", Tables.table(d), writeheader=false)
+
+                        CSV.write("../Table/2_species/CA/Illustration/Landscape_stress_" * repr(round(stress, digits=3)) *
+                                  "_trajectory_" * traj * "_alpha0_" * repr(alpha_e) * ".csv", Tables.table(state), writeheader=false)
+
+                    end
+                end
+            end
+        end
+    end
+end
+
+
 
 
 #endregion
 
 
-#region : 5 equal initial conditions PA (Fig 5)
+#region : 2-- Convergence CA & PA (SI fig)
+
+
+
+S_seq = collect(range(0, stop=0.8, length=10)) #the point where there is bistability in PA
+c_seq = collect(range(0, stop=0.4, length=10))
+intra_comp_seq = [0.3]
+param = Get_classical_param()
+size_landscape = 100
+trajec_seq = ["Degradation" "Restoration"]
+count = 1
+scale_competition = ["global"]
+disp_seq = [0.1]
+d2 = zeros(length(S_seq) * length(c_seq) * length(scale_competition) * length(intra_comp_seq) * 2, 4) #Allocating
+
+for disp in disp_seq
+    for scale_comp in scale_competition
+        for aii in intra_comp_seq
+            for stress in S_seq
+                param["S"] = stress
+                for alpha_e in c_seq
+                    param["alpha_0"] = alpha_e
+                    for traj in trajec_seq
+                        if traj == "Degradation"
+                            ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
+                        else
+                            ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.05, 0.05, 0.49, 0.5])
+                        end
+
+
+                        d, state = Run_CA_2_species(; landscape=copy(ini), param=copy(param), time=3000, type_competition=scale_comp, save=false, burning=15000, N_snap=40,
+                            name_save="")
+
+                        #display(Plot_dynamics(d))
+                        CSV.write("../Table/2_species/CA/Justifying_use_PA/Dynamics_stress_" * repr(round(stress, digits=3)) *
+                                  "_trajectory_" * traj * "_alpha0_" * repr(alpha_e) * ".csv", Tables.table(d), writeheader=false)
+
+                    end
+                end
+            end
+        end
+    end
+end
+
+
+
+#endregion
+
+
+
+#region : 3-- Species pairs (Fig 3b)
+
+
+param = Get_classical_param()
+size_landscape = 100
+trajec_seq = ["Degradation"]
+count = 1
+scale_competition = ["global"]
+disp_seq = collect(range(0, stop=1, length=12))[[2 11]]
+
+for disp in disp_seq
+    param["S"] = 0
+    param["alpha_0"] = 0.2
+    param["delta"] = disp
+    ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
+
+
+    d, state = Run_CA_2_species(; landscape=copy(ini), param=copy(param), time=5000,
+        type_competition="global", save=false, burning=15000, N_snap=40,
+        name_save="")
+    CSV.write("../Table/2_species/CA/Pairs" * "_delta_" * repr(disp) * ".csv", Tables.table(state), writeheader=false)
+
+end
+
+
+
+
+#endregion
+
+
+
+#region : 4-- Clustering species dispersal (Fig 3c)
+
+
+param = Get_classical_param()
+size_landscape = 100
+trajec_seq = ["Degradation"]
+count = 1
+scale_competition = ["global"]
+disp_seq = collect(range(0, stop=1, length=12))[[2 11]]
+
+for disp in disp_seq
+    param["S"] = 0.73
+    param["alpha_0"] = 0.2
+    param["delta"] = disp
+    ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
+
+
+    d, state = Run_CA_2_species(; landscape=copy(ini), param=copy(param), time=5000,
+        type_competition="global", save=false, burning=15000, N_snap=40,
+        name_save="")
+    CSV.write("../Table/2_species/CA/Landscape_clustering" * "_delta_" * repr(disp) * ".csv", Tables.table(state), writeheader=false)
+
+end
+
+
+
+
+#endregion
+
+
+
+#region : 5-- Vegetation along dispersal gradient (SI fig)
+
+
+
+param = Get_classical_param()
+size_landscape = 100
+scale_comp = ["global"]
+param["alpha_0"] = 0.4
+disp_seq = [0 0.1 0.2 0.3 0.7 1]
+
+for disp in disp_seq
+    param["delta"] = disp
+    ini = Get_initial_lattice(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
+
+
+    d, state = Run_CA_2_species(; landscape=copy(ini), param=copy(param), time=3000, type_competition=scale_comp, save=false, burning=15000, N_snap=40,
+        name_save="")
+
+    #display(Plot_dynamics(d))
+    CSV.write("../Table/2_species/CA/Dispersal_gradient_delta_" * repr(disp) * ".csv", Tables.table(state), writeheader=false)
+
+
+end
+
+
+
+#endregion
+
+
+#region : 6-- 5species equal initial conditions PA (Fig 5)
 
 N_sim = 100
 Nsp = 5
@@ -120,7 +259,7 @@ CSV.write("../Table/N_species/PA/PA_equal_ini.csv", Tables.table(d), writeheader
 #endregion
 
 
-#region : 5sp equal initial conditions MF (Fig SI)
+#region : 7-- 5species equal initial conditions MF (Fig SI)
 
 N_sim = 100
 N_random_ini = 1
@@ -190,7 +329,7 @@ CSV.write("../Table/N_species/MF/MF_equal_ini.csv", Tables.table(d), writeheader
 #endregion
 
 
-#region: 5 species example spatially explicit (Fig 5)
+#region : 8-- Nspecies example spatially explicit (Fig 5)
 
 
 N_sim = 40
@@ -216,7 +355,7 @@ for random_ini in eachindex(1:N_random_ini)
 
         for tradeoff in tradeoff_seq
 
-            global p = Get_classical_param_dict(N_species=Nsp, type_interaction="classic",
+            global p = Get_classical_param(N_species=Nsp, type_interaction="classic",
                 alpha_0=a0, scenario_trait="spaced", cintra=0.3, h=1)
 
 
@@ -263,7 +402,7 @@ end
 #endregion
 
 
-#region: 15 species example spatially explicit (Fig 5)
+#region : 9-- 15 species example spatially explicit (Fig 5)
 
 
 Nsp = 15
@@ -272,7 +411,7 @@ a0_seq = collect(range(0, 0.4, length=3))[1]
 tmax = 20000
 branches = ["Degradation"]
 
-global p = Get_classical_param_dict(N_species=Nsp, type_interaction="classic",
+global p = Get_classical_param(N_species=Nsp, type_interaction="classic",
     alpha_0=0, scenario_trait="spaced", cintra=0.3, h=1)
 
 state = Get_initial_lattice(param=p, size_mat=100, branch="Degradation", type_ini="equal")
@@ -292,7 +431,7 @@ display(Plot_landscape(landscape))
 
 
 
-#region: Full simulations for Fig 6 & SI 
+#region : 10-- Full simulations for Fig 6 & SI 
 
 
 
