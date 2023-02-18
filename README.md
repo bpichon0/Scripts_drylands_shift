@@ -83,6 +83,7 @@ Plot_landscape_Nspecies(landscape) # spatial organization of the vegetation
 
 <p align="center">
     <b>Figure 2: Temporal dynamics of the 5 species community.</b>
+    Green lines are the more competitive species while blue lines are the most stress-tolerant (and therefore facilitating) species 
 </p>
 
 
