@@ -55,7 +55,8 @@ This strategy determines whether the species $i$ facilitates its local environme
 ### A toy example
 
 
-First, take a spatially explicit example.
+Let's take as an example a community of 5 plant species equally distributed along the strategy trade-off axis.
+We begin by the spatially explicit dynamics:
 
 ```julia
 
@@ -98,7 +99,7 @@ Plot_landscape_Nspecies(landscape) # spatial organization of the vegetation
 
 
 
-We can also simulate the temporal dynamics of this 5-species community with the pair-approximation model .
+We can also simulate the temporal dynamics of this 5-species community with the pair-approximation model (deterministic system of ODEs).
 
 
 
