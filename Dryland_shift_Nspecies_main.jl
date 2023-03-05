@@ -347,11 +347,11 @@ N_sim2 = 3
 N_random_ini = 1
 
 Nsp = 5
-S_seq = collect(range(0, 0.7, length=3))
-a0_seq = collect(range(0.1, 0.4, length=3))
+S_seq = collect(range(0, 0.6, length=2))
+a0_seq = [0.15 0.3]
 f_seq = collect(range(0, 0.9, length=3))[3]
-tmax = 50000
-branches = ["Degradation"]
+tmax = 20000
+branches = ["Restoration"]
 tradeoff_seq = collect(range(0.25, 1, length=4))[4]
 
 
@@ -368,12 +368,13 @@ for random_ini in eachindex(1:N_random_ini)
             global p = Get_classical_param_dict(N_species=Nsp,
                 alpha_e=a0, scenario_trait="spaced", cintra=0.3)
 
+            p["tau_leap"] = 0.5
 
             for facil in f_seq
 
                 p["f"] = facil
 
-                for branch_bifu in eachindex(1:2)
+                for branch_bifu in branches
 
                     if branch_bifu == 1 # Degradation
                         state = Get_initial_lattice_Nspecies(param=p, size_mat=100, branch="Degradation", type_ini="equal")

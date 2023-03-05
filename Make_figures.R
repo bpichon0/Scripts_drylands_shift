@@ -115,7 +115,6 @@ for (i in 1:length(list_dim)){
   assign(paste0("p4_",i),Plot_landscape(landscape,Nsp=2))
 }
 
-p4_2=p4_2+scale_fill_gradientn(colours = c("white","white","#858BE0"))
 
 p_top=ggarrange(p1_1+ylab("Species cover")+ggtitle(TeX("$\\alpha_e=0$")),
                 p1_2+geom_vline(xintercept = 0.2)+ggtitle(TeX("$\\alpha_e=0.4$"))+geom_text(aes(x=.24,y=.8,label="c"),state="unique"),
@@ -218,9 +217,9 @@ p1=ggplot(d2t%>%
   theme(legend.position = "bottom") +
   labs(x = TeX(r'(Stress, \ $S)'), y = TeX(r'(Strength of interspecific competition, \ $\alpha_e)'), fill = "") +
   scale_fill_manual(values=c("Coexistence" = "#D8CC7B", 
-                             "Competitive/Stress-tolerant"="#C998CE",
+                             #"Competitive/Stress-tolerant"="#C998CE",
                              "Competitive" = "#ACD87B", 
-                             "Competitive/Coexistence" = "#DDEFCA",
+                             #"Competitive/Coexistence" = "#DDEFCA",
                              "Stress-tolerant" = "#BABEFF",
                              "Stress-tolerant/Desert" ="#0F8E87",
                              "Coexistence/Stress-tolerant"="#9BBBB9",
@@ -366,10 +365,11 @@ p40=ggplot(d_pairs)+
   ggtitle(TeX(r'($\S = 0, \alpha_e = 0.2)'))+
   the_theme+
   labs(x=TeX('$\\delta$'),y=expression(paste("Pair cover")),color="")+
-  scale_color_manual(values=c("#858BE0",as.character(color_Nsp(5)[c(2)])))+
+  scale_color_manual(values=c("#858BE0",as.character(color_Nsp(5)[c(2)])),
+                     labels=c(expression(paste("Pair Stress???tol. sp./Fertile ", rho["0,+"[1]])),
+                              expression(paste("Pair Competitive sp./Fertile ", rho["0,+"[2]]))))+
   theme(legend.box = "vertical")+
   guides(color=guide_legend(ncol=1))
-
 
 
 list_landscape=list.files("../Table/2_species/CA/",pattern = "Pairs")
@@ -539,6 +539,7 @@ for (i in 1:3){
              theme(axis.title.y = element_blank(),axis.text.y = element_blank(),axis.ticks.y=element_blank(),axis.line.y = element_blank(),
                    legend.position = "none")+
              scale_y_continuous(breaks = c(0,.2,.4,.6,.8))+
+             scale_linetype_manual(values=c(1,9),labels=c("High initial cover","Low initial cover"))+
              guides(color = guide_legend(override.aes = list(size = 1.5)))+
              new_scale_color() +
              
@@ -557,6 +558,7 @@ for (i in 1:3){
                     mutate(., variable=recode_factor(variable,"Stress_tolerant"="Sp. 1","Competitive"="Sp. 2")))+
              geom_line(aes(x=Stress,y=value,color=variable,linetype=Branches))+
              scale_color_manual(values=rev(c(as.character(color_Nsp(5)[c(2)]),"#858BE0")))+
+             scale_linetype_manual(values=c(1,2),labels=c("High initial cover   ","Low initial cover"))+
              the_theme+
              labs(x="Stress (S)",y="Species cover",color="",linetype="")+
              scale_y_continuous(breaks = c(0,.2,.4,.6,.8))+
@@ -617,10 +619,8 @@ p1=d_pa_equal%>%
 
 
 
-list_nsp_sim=list.files("../Table/N_species/CA/",pattern = "Sim")[-grep(pattern = "0.4",x = list.files("../Table/N_species/CA/",pattern = "Sim"))]
-list_nsp_landscape=list.files("../Table/N_species/CA/",pattern = "Landscape")[-grep(pattern = "0.4",x = list.files("../Table/N_species/CA/",pattern = "Landscape"))]
-list_nsp_sim=list_nsp_sim[-grep(pattern = "0.35",x = list_nsp_sim)]
-list_nsp_landscape=list_nsp_landscape[-grep(pattern = "0.35",x = list_nsp_landscape)]
+list_nsp_sim=list.files("../Table/N_species/CA/",pattern = "Sim")
+list_nsp_landscape=list.files("../Table/N_species/CA/",pattern = "Landscape")
 for (k in 1:length(list_nsp_sim)){
   
   
@@ -639,7 +639,7 @@ for (k in 1:length(list_nsp_sim)){
 }
 
 #low competition
-p_left_sim=ggarrange(p_1_1+ggtitle(TeX("$\\alpha_e = 0.1$")),p_1_3+ggtitle(TeX("$\\alpha_e = 0.25$")),
+p_left_sim=ggarrange(p_1_1+ggtitle(TeX("$\\alpha_e = 0.15")),p_1_3+ggtitle(TeX("$\\alpha_e = 0.3$")),
                     nrow=2,common.legend = T,legend = "none")
 p_left_landscape=ggarrange(ggplot()+theme_void(),p_2_1+ggtitle(""),ggplot()+theme_void(),p_2_3+ggtitle(""),ggplot()+theme_void(),
                            nrow=5,heights = c(.15,1,.1,1,.25),legend="none")
@@ -648,7 +648,7 @@ p_left=ggarrange(p_left_sim,p_left_landscape,ncol=2,labels=c(letters[2],""),widt
 
 
 #higher competition
-p_right_sim=ggarrange(p_1_2+ggtitle(TeX("$\\alpha_e = 0.1$")),p_1_4+ggtitle(TeX("$\\alpha_e = 0.25$")),
+p_right_sim=ggarrange(p_1_2+ggtitle(TeX("$\\alpha_e = 0.15$")),p_1_4+ggtitle(TeX("$\\alpha_e = 0.3$")),
                        nrow=2,legend="none")
 p_right_landscape=ggarrange(ggplot()+theme_void(),
                             p_2_2,
@@ -700,10 +700,8 @@ p2=ggplot(d_tot%>%filter(., Nsp %in% c(5,25),Competition %in% c(.225,.30),Branch
 
 # >> Number ASS along the stress gradient
 
-d_tot=read.table("../Table/N_species/PA/Multistability_CSI.csv",sep=";")
+d=type_bistab=tibble()
 
-
-d=tibble()
 for (compet in unique(d_tot$Competition)){
   for (branch in unique(d_tot$Branch)){
     for (species in unique(d_tot$Nsp)){
@@ -711,10 +709,22 @@ for (compet in unique(d_tot$Competition)){
         
         d_fil=filter(d_tot,Competition==compet,Branch==branch,Nsp==species,Stress==i)
         d=rbind(d,tibble(Competition=compet,Branch=branch,Nsp=species,Stress=i,N_ASS = length(unique(round(d_fil$CSI,2)))))
+        type_bistab=rbind(type_bistab,tibble(Competition=compet,Branch=branch,Nsp=species,Stress=i,
+                                             Type = ifelse(any(d_fil$CSI==0) ,
+                                                           ifelse(length(unique(round(d_fil$CSI,2)))>1,
+                                                                  ifelse(length(unique(round(d_fil$CSI,2)))>2,"Both","Env"),"Degraded"),"Com")))
       }
     }
   }
 }
+type_bistab$Type[which(type_bistab$Stress<.7)]="Com"
+
+#to make a line, we need at least two points, therefore when there is environmental bistability 
+#we make sure there is two points at least
+type_bistab$Type[which(type_bistab$Stress==unique(type_bistab$Stress)[which(unique(d_tot$Stress)== max(type_bistab$Stress[type_bistab$Type=="Env"]))+1])]="Env"
+
+
+
 
 p3=ggplot(d%>%filter(., Branch==1))+
   geom_smooth(aes(x=Stress,y=N_ASS,color=as.factor(Competition),group=Competition),
@@ -722,9 +732,27 @@ p3=ggplot(d%>%filter(., Branch==1))+
   the_theme+
   facet_grid(Nsp~.,labeller = label_bquote(rows= "# species" ==.(Nsp)))+
   labs(x="Stress (S)",y="# of alternative states",color=TeX("$\\alpha_e \ \ $"))+
+  xlim(0,max(type_bistab$Stress[type_bistab$Type=="Env"])+.01)+ #above, it's degraded
   scale_color_viridis_d()+
   theme(strip.text.y = element_text(size=13),panel.background = element_blank(),
-        strip.background.y = element_blank(),legend.title = element_text(size=14))
+        strip.background.y = element_blank(),legend.title = element_text(size=14))+
+  new_scale_color() +
+  
+  geom_line(data=type_bistab%>%filter(., Branch==1,Competition==.35,Type !="Degraded")%>%
+              add_column(., Height=sapply(1:nrow(.),function(x){
+                if (.$Nsp[x]==5){return(9)
+                } else if (.$Nsp[x]==15){return(12)
+                }else{
+                  return(13)
+                }
+              })),
+            aes(x=Stress,y=Height,color=as.factor(Type),group=as.factor(Type)),alpha=.8,size=2,shape=15)+
+  scale_color_manual(values=c("gray50","#0F8E87"))+
+  guides(color="none")
+
+
+
+
 
 
 
@@ -2759,7 +2787,9 @@ p2=ggplot(d_tot%>%filter(., Nsp %in% c(5,25),Competition %in% c(.225,.30),Branch
 
 d_tot=read.table("../Table/N_species/MF/Multistability_CSI.csv",sep=";")
 
-d=tibble()
+
+d=type_bistab=tibble()
+
 for (compet in unique(d_tot$Competition)){
   for (branch in unique(d_tot$Branch)){
     for (species in unique(d_tot$Nsp)){
@@ -2767,12 +2797,21 @@ for (compet in unique(d_tot$Competition)){
         
         d_fil=filter(d_tot,Competition==compet,Branch==branch,Nsp==species,Stress==i)
         d=rbind(d,tibble(Competition=compet,Branch=branch,Nsp=species,Stress=i,N_ASS = length(unique(round(d_fil$CSI,2)))))
+        type_bistab=rbind(type_bistab,tibble(Competition=compet,Branch=branch,Nsp=species,Stress=i,
+                                             Type = ifelse(any(d_fil$CSI==0) ,
+                                                           ifelse(length(unique(round(d_fil$CSI,2)))>1,
+                                                                  ifelse(length(unique(round(d_fil$CSI,2)))>2,"Both","Env"),"Degraded"),"Com")))
       }
     }
   }
 }
+type_bistab$Type[which(type_bistab$Stress<.7)]="Com"
 
-d=read.table("../Table/N_species/MF/Nb_ASS_stress_gradient.csv",sep=";")
+#to make a line, we need at least two points, therefore when there is environmental bistability 
+#we make sure there is two points at least
+type_bistab$Type[which(type_bistab$Stress==unique(type_bistab$Stress)[which(unique(d_tot$Stress)== max(type_bistab$Stress[type_bistab$Type=="Env"]))+1])]="Env"
+
+
 
 p3=ggplot(d%>%filter(., Branch==1))+
   geom_smooth(aes(x=Stress,y=N_ASS,color=as.factor(Competition),group=Competition),
@@ -2782,7 +2821,22 @@ p3=ggplot(d%>%filter(., Branch==1))+
   labs(x="Stress (S)",y="# of alternative states",color=TeX("$\\alpha_e \ \ $"))+
   scale_color_viridis_d()+
   theme(strip.text.y = element_text(size=13),panel.background = element_blank(),
-        strip.background.y = element_blank(),legend.title = element_text(size=14))
+        strip.background.y = element_blank(),legend.title = element_text(size=14))+
+  new_scale_color() +
+  # xlim(0,min(type_bistab$Stress[type_bistab$Type=="Degraded"])+.01)+ #above, it's degraded
+  
+  geom_line(data=type_bistab%>%filter(., Branch==1,Competition==.35,Type !="Degraded")%>%
+              add_column(., Height=sapply(1:nrow(.),function(x){
+                if (.$Nsp[x]==5){return(6.5)
+                } else if (.$Nsp[x]==15){return(8)
+                }else{
+                  return(8)
+                }
+              })),
+            aes(x=Stress,y=Height,color=as.factor(Type),group=as.factor(Type)),alpha=.8,size=2,shape=15)+
+  scale_color_manual(values=c("red","gray50","#0F8E87"))+
+  guides(color="none")
+
 
 
 

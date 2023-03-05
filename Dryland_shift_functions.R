@@ -1088,7 +1088,10 @@ Extract_pairs_trait=function(d,Nsp,self=F,clustering=T){
 Plot_landscape = function(landscape,Nsp=15){
   color_CA = c("white","white",rev(color_Nsp(Nsp)))
   if (Nsp==2){
-    color_CA = c("white","white",c("#858BE0",as.character(color_rho[c(2)])))
+    color_CA = c("white","#D8CC7B",c("#858BE0",as.character(color_rho[c(2)])))
+  }
+  if (length(unique(as.numeric(as.matrix(landscape))))==3){
+    color_CA = c("white","#D8CC7B",c("#858BE0"))
   }
   
   state=melt(landscape)
