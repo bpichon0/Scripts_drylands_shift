@@ -38,7 +38,11 @@ de = diffeq_setup()
 
 ## >> 1) Multistability fixed traits ----
 
-
+'
+Code to generate the data used for Figure 2 and 3. A community of two species, one stress tolerant and the other
+competitive. We vary both the level of abiotic stress and the level of competition.
+Here the model used is non-spatial (mean-field approach)
+'
 
 tspan = c(0, 5000)
 t = seq(0, 5000, by = 1)
@@ -99,6 +103,13 @@ write.table(d2,paste0("../Table/2_species/MF/Multistability_MF.csv"),sep=";")
 
 
 ## >> 2) Multistability trait difference ----
+
+'
+Code to generate the data for the Figure 4. A community of 2 species with variable strategies. 
+For each combination of species strategy (psi_1, psi_2), we vary the level of abiotic stress
+to see how frequent bistability emerge in this small community.
+Here the model used is non-spatial (mean-field approach)
+'
 
 
 
@@ -206,6 +217,11 @@ de = diffeq_setup()
 
 ## >> 1) Multistability fixed traits ----
 
+'
+Code to generate the data used for Figure 2 and 3. A community of two species, one stress tolerant and the other
+competitive. We vary both the level of abiotic stress and the level of competition.
+Here the model used accounts for spatial correlations between close sites
+'
 
 
 tspan = c(0, 5000) #to avoid long transient
@@ -320,100 +336,13 @@ write.table(d2,paste0("../Table/2_species/PA/Multistability_fixed_traits_PA.csv"
 
 
 
-## >> 2) Multistability and trait difference ----
+## >> 2) Clustering between species fixed traits  ----
 
-
-tspan = c(0, 2000) #to avoid long transient
-t = seq(0, 2000, by = 1)
-julia_library("DifferentialEquations")
-julia_assign("tspan", tspan)
-
-
-N_sim=50
-S_seq =seq(0,.82, length.out = 100)
-psi_seq=seq(0,1,length.out=N_sim)
-c_inter_seq=.3
-psi1_seq=seq(0,1,length.out=N_sim)
-f_seq=c(.9)
-dispersal_scale=c(.1,.9)
-branches=c("Degradation","Restoration")
-
-for(scale_f in c("local","global")){
-  
-  for (facil in f_seq){
-    
-    for (disp in dispersal_scale){
-      
-      for (S in S_seq) { 
-        
-        for (cinter in c_inter_seq){
-          
-          for (branch in branches){
-            
-            if (branch =="Degradation"){ #doing the two branches of the bifurcation diagram
-              state = Get_PA_initial_state(Get_MF_initial_state(c(.4,.4,.1)))
-            }else {
-              state = Get_PA_initial_state(Get_MF_initial_state(c(.005,.005,.49)))
-            }
-            
-            d2 = tibble()
-            
-            
-            for (psi2 in psi_seq){
-              
-              for (psi1 in psi1_seq[which(psi1_seq>psi2)]){
-                
-                julia_assign("state", state)
-                param=Get_PA_parameters()
-                param["delta"]=disp
-                param["cintra"]=.3
-                param["alpha_0"]=cinter
-                param["S"] = S
-                param["psi_1"]=psi1
-                param["psi_2"]=psi2
-                param["f"]=facil
-                julia_assign("p", param)
-                
-                if (scale_f=="local"){
-                  prob = julia_eval("ODEProblem(PA_two_species_varying_trait, state, tspan, p)")
-                } else {
-                  prob = julia_eval("ODEProblem(PA_two_species_varying_trait_global_facilitation, state, tspan, p)")
-                }
-                
-                
-                sol = de$solve(prob, de$Tsit5(), saveat = t)
-                d = as.data.frame(t(sapply(sol$u, identity)))
-                colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
-                
-                d2 = rbind(d2, d[nrow(d), ] %>% add_column(Stress = S, Psi2 = psi2, Psi1 = psi1,alpha_0=cinter,
-                                                           Branch=branch))
-                
-              }
-            } # end trait value 2nd species
-            
-            d2[d2 < 10^-4] = 0
-            d2$rho_plus = d2$rho_1 + d2$rho_2
-            d2=d2[,c(1,2,10:15)]
-            colnames(d2) = c("Stress_tolerant", "Competitive", "Stress", "Psi2","Psi1","alpha_0","Branches","Rho_plus")
-            write.table(d2,paste0("../Table/2_species/PA/Multistability_PA/Frac_gradient/Test_interspe_comp_",
-                                  cinter,"_branch_",branch,
-                                  "_stress_",round(S,4),"_delta_",disp,"_facilitation_",facil,"_scalefacilitation_",scale_f,".csv"),sep=";")
-            
-          } # end loop interspecific competition
-          
-        } # end loop branch
-        
-      } # end loop first species trait
-      
-    } #end loop dispersal
-    
-  }#end facilitation loop
-  
-}#end facilitation scale
-
-
-
-## >> 3) Clustering between species fixed traits  ----
+'
+Code to generate the data for the Figure 3c. A community of 2 species, one stress tolerant and the other
+competitive. We vary the scale of dispersal and measure the level of vegetation clustering along the 
+dispersal scale gradient
+'
 
 
 tspan = c(0, 2000) #to avoid long transient
@@ -518,7 +447,13 @@ write.table(d_clustering,"../Table/2_species/PA/Clustering_PA.csv",sep=";")
 
 
 
-## >> 4) Threshold for invasion and extinction ----
+## >> 3) Threshold for invasion and extinction ----
+
+'
+Code to generate the data for the Figure 3d. A community of 2 species, one stress tolerant and the other
+competitive. We vary the scale of dispersal and at which level of stress does the community
+goes extinct or colonize the landscape
+'
 
 tspan = c(0, 5000) #to avoid long transient
 t = seq(0, 5000, by = 1)
@@ -634,7 +569,112 @@ write.table(d_extinction,"../Table/2_species/PA/Threshold_extinction.csv",sep=";
 
 
 
+## >> 4) Multistability and trait difference ----
+'
+Code to generate the data for the Figure 4. A community of 2 species with variable strategies. 
+For each combination of species strategy (psi_1, psi_2), we vary the level of abiotic stress
+to see how frequent bistability emerge in this small community.
+Here the model used accounts for spatial correlations between close sites
+'
+
+
+tspan = c(0, 2000) #to avoid long transient
+t = seq(0, 2000, by = 1)
+julia_library("DifferentialEquations")
+julia_assign("tspan", tspan)
+
+
+N_sim=50
+S_seq =seq(0,.82, length.out = 100)
+psi_seq=seq(0,1,length.out=N_sim)
+c_inter_seq=.3
+psi1_seq=seq(0,1,length.out=N_sim)
+f_seq=c(.9)
+dispersal_scale=c(.1,.9)
+branches=c("Degradation","Restoration")
+
+for(scale_f in c("local","global")){
+  
+  for (facil in f_seq){
+    
+    for (disp in dispersal_scale){
+      
+      for (S in S_seq) { 
+        
+        for (cinter in c_inter_seq){
+          
+          for (branch in branches){
+            
+            if (branch =="Degradation"){ #doing the two branches of the bifurcation diagram
+              state = Get_PA_initial_state(Get_MF_initial_state(c(.4,.4,.1)))
+            }else {
+              state = Get_PA_initial_state(Get_MF_initial_state(c(.005,.005,.49)))
+            }
+            
+            d2 = tibble()
+            
+            
+            for (psi2 in psi_seq){
+              
+              for (psi1 in psi1_seq[which(psi1_seq>psi2)]){
+                
+                julia_assign("state", state)
+                param=Get_PA_parameters()
+                param["delta"]=disp
+                param["cintra"]=.3
+                param["alpha_0"]=cinter
+                param["S"] = S
+                param["psi_1"]=psi1
+                param["psi_2"]=psi2
+                param["f"]=facil
+                julia_assign("p", param)
+                
+                if (scale_f=="local"){
+                  prob = julia_eval("ODEProblem(PA_two_species_varying_trait, state, tspan, p)")
+                } else {
+                  prob = julia_eval("ODEProblem(PA_two_species_varying_trait_global_facilitation, state, tspan, p)")
+                }
+                
+                
+                sol = de$solve(prob, de$Tsit5(), saveat = t)
+                d = as.data.frame(t(sapply(sol$u, identity)))
+                colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
+                
+                d2 = rbind(d2, d[nrow(d), ] %>% add_column(Stress = S, Psi2 = psi2, Psi1 = psi1,alpha_0=cinter,
+                                                           Branch=branch))
+                
+              }
+            } # end trait value 2nd species
+            
+            d2[d2 < 10^-4] = 0
+            d2$rho_plus = d2$rho_1 + d2$rho_2
+            d2=d2[,c(1,2,10:15)]
+            colnames(d2) = c("Stress_tolerant", "Competitive", "Stress", "Psi2","Psi1","alpha_0","Branches","Rho_plus")
+            write.table(d2,paste0("../Table/2_species/PA/Multistability_PA/Frac_gradient/Test_interspe_comp_",
+                                  cinter,"_branch_",branch,
+                                  "_stress_",round(S,4),"_delta_",disp,"_facilitation_",facil,"_scalefacilitation_",scale_f,".csv"),sep=";")
+            
+          } # end loop interspecific competition
+          
+        } # end loop branch
+        
+      } # end loop first species trait
+      
+    } #end loop dispersal
+    
+  }#end facilitation loop
+  
+}#end facilitation scale
+
+
+
+
 ## >> 5) Varying the trade-off shape ----
+
+'
+We perform the same analysis as in the chunk Step 2.4 but with concave and convex trade-off
+'
+
 
 rm(list = ls())
 source("./Dryland_shift_functions.R")
@@ -731,12 +771,14 @@ for (facil in f_seq){
 
 
 
-## >> 6) Thresholds: net effects----
+## >> 6) Higher restoration, lower degradation rates ----
 
-
-
-## >> 7) Higher restoration, lower degradation rates ----
-
+'
+Same analysis as in Step2.1 but with a higher restoration rate of fertile sites
+compared to its degradation rate.
+This analysis is made in order to emphasize the role of the balance of restoration and
+degradation rates in the emergence of bistability
+'
 
 
 tspan = c(0, 2000) #to avoid long transient
@@ -822,6 +864,13 @@ write.table(d2,paste0("../Table/2_species/PA/Higher_restor_lower_deg.csv"),sep="
 
 
 ## >> 1) PA N-species ----
+'
+Code to generate the aggregate the data used for Figure 6. A community of N species, each having a given strategy.
+We vary both the level of abiotic stress and the level of competition and look for multistability in the community.
+The simulations were made in the region 9 of the julia script Dryland_shift_Nspecies_main.jl 
+'
+
+
 rm(list = ls())
 source("./Dryland_shift_functions.R")
 
@@ -908,6 +957,10 @@ write.table(d_tot,"../Table/N_species/PA/Multistability_CSI.csv",sep=";")
 rm(list = ls())
 source("./Dryland_shift_functions.R")
 
+'
+Same analysis as before (Step 3.1) but with the mean-field approach.
+The simulations were made in the region 9 of the julia script Dryland_shift_Nspecies_main.jl 
+'
 
 
 d_richness=d_tot=d_trait_shift=tibble()
@@ -984,5 +1037,10 @@ for (i in c(5,15,25)){
 
 write.table(d_richness,"../Table/N_species/MF/Multistability_richness.csv",sep=";")
 write.table(d_tot,"../Table/N_species/MF/Multistability_CSI.csv",sep=";")
+
+
+
+
+
 
 

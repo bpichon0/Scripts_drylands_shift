@@ -1,13 +1,18 @@
 source('./Dryland_shift_functions.R')
 library(grid)
 
-#*****************************************************************
+
 
 #---------------------   Main figures   --------------------------
 
 #*****************************************************************
 
 ## >> Figure 2: Dynamics and landscapes ----
+"
+Code to replicate figure 2. To generate the data needed for the figure, 
+run chunk Step 2.1) of the Dryland_shift_main.R file
+"
+
 
 d2=read.table(paste0("../Table/2_species/PA/Multistability_fixed_traits_PA.csv"),sep=";")
 d2$state = sapply(1:nrow(d2), function(x) {
@@ -138,6 +143,13 @@ ggsave("../Figures/Figure_2.pdf",p_tot,width = 9,height = 7)
 
 
 ## >> Figure 3: Scale facilitation, dispersal, multistability ----
+"
+Code to replicate figure 3. To generate the data needed for the figure, 
+run chunks Step 2.1 to Step 2.3 of the Dryland_shift_main.R file.
+In addition, the landscapes needed to illustrate the change in metrics along the 
+dispersal gradient are generated using the region 2 and 4 of the julia file
+Dryland_shift_Nspecies_main.jl
+"
 
 d2=read.table(paste0("../Table/2_species/PA/Multistability_fixed_traits_PA.csv"),sep=";")
 d2$state = sapply(1:nrow(d2), function(x) {
@@ -411,6 +423,10 @@ ggsave("../Figures/Figure_3.pdf",Fig_3,width = 9,height = 9)
 
 
 ## >> Figure 4: Multistability trait ----
+"
+Code to replicate figure 4. To generate the data needed for the figure, 
+run chunk Step 2.4) of the Dryland_shift_main.R file
+"
 
 
 stress_seq=seq(0,.82, length.out = 100)
@@ -599,6 +615,11 @@ ggsave(filename = "../Figures/Figure_4.pdf",plot = p_tot,width = 7,height = 7)
 
 ## >> Figure 5: N-species spatially explicit ----
 
+"
+Code to replicate figure 5. To generate the data needed for the figure, 
+run regions 6 and 8 of the julia script Dryland_shift_Nspecies_main.R file
+"
+
 d_pa_equal=read.table("../Table/N_species/PA/PA_equal_ini.csv",sep=",")
 d_pa_equal=d_pa_equal[,c(1:5,(ncol(d_pa_equal)-2):ncol(d_pa_equal))]
 colnames(d_pa_equal)=c(paste0("Sp_",1:5),"alpha_0", "Branches", "Stress")
@@ -628,7 +649,7 @@ for (k in 1:length(list_nsp_sim)){
   d_landscape=read.table(paste0("../Table/N_species/CA/",list_nsp_landscape[k]),sep=",")
   
   assign(paste0("p_1_",k),
-         plot_dynamics(d_sim)+labs(y="Cover",x=TeX(r'(Time, x $10^5)'))+
+         plot_dynamics(d_sim)+labs(y="Cover",x=TeX(r'(Time, x $10^4)'))+
            scale_x_continuous(breaks = seq(0,50000,by=10000),
                               labels = c('0','1',"2",'3','4','5'))+theme(legend.position = "none")
   )
@@ -639,7 +660,7 @@ for (k in 1:length(list_nsp_sim)){
 }
 
 #low competition
-p_left_sim=ggarrange(p_1_1+ggtitle(TeX("$\\alpha_e = 0.15")),p_1_3+ggtitle(TeX("$\\alpha_e = 0.3$")),
+p_left_sim=ggarrange(p_1_1+ggtitle(TeX("$\\alpha_e = 0.15, S = 0")),p_1_3+ggtitle(TeX("$\\alpha_e = 0.3, S = 0$")),
                     nrow=2,common.legend = T,legend = "none")
 p_left_landscape=ggarrange(ggplot()+theme_void(),p_2_1+ggtitle(""),ggplot()+theme_void(),p_2_3+ggtitle(""),ggplot()+theme_void(),
                            nrow=5,heights = c(.15,1,.1,1,.25),legend="none")
@@ -648,7 +669,7 @@ p_left=ggarrange(p_left_sim,p_left_landscape,ncol=2,labels=c(letters[2],""),widt
 
 
 #higher competition
-p_right_sim=ggarrange(p_1_2+ggtitle(TeX("$\\alpha_e = 0.15$")),p_1_4+ggtitle(TeX("$\\alpha_e = 0.3$")),
+p_right_sim=ggarrange(p_1_2+ggtitle(TeX("$\\alpha_e = 0.15, S = 0.6$")),p_1_4+ggtitle(TeX("$\\alpha_e = 0.3, S = 0.6$")),
                        nrow=2,legend="none")
 p_right_landscape=ggarrange(ggplot()+theme_void(),
                             p_2_2,
@@ -670,6 +691,10 @@ ggsave("../Figures/Figure_5.pdf",p_tot,width=9,height=7)
 
 ## >> Figure 6: Alternative community states ----
 
+"
+Code to replicate figure 6. To generate the data needed for the figure, 
+run chunk Step 3.1) of the Dryland_shift_main.R file
+"
 
 d_tot=read.table("../Table/N_species/PA/Multistability_CSI.csv",sep=";")
 
@@ -774,6 +799,10 @@ ggsave("../Figures/Figure_6.pdf",Fig_6,width = 9,height = 8)
 
 #---------------------   SI figures 2-species  --------------------------
 ## >> Advantage of CSI compared to Rho+----
+"
+Code to illustrate the advantage of using the community index compared to the vegetation cover
+to distinguish between different alternative stable states
+"
 
 list_f=list.files("../Table/2_species/PA/Multistability_PA/Frac_gradient/",pattern = "delta_0.1_facilitation_0.9_scalefacilitation_local")
 
@@ -806,6 +835,11 @@ p=ggplot(d2_fil%>%melt(., measure.vars=c("Rho_plus","CSI"))%>%
 ggsave("../Figures/SI/Using_CSI.pdf",p,width = 6,height = 4)
 
 ## >> Competition experienced ----
+
+"
+Code to illustrate the asymetry in the competition function
+"
+
 Nsp=15
 trait=rev(seq(0,1,length.out=Nsp))
 comp=comp2=c()
@@ -874,6 +908,10 @@ ggsave("../Figures/SI/Competition_experienced.pdf",
 
 
 ## >> Comparing CA & PA ----
+"
+Code to illustrate the convergence between the pair approximation and the cellular automata
+To run the figure, the chunk 2 of the julia file Dryland_shift_Nspecies_main.jl must be ran
+"
 
 #First layer = Simulations with PA (~Fig 2)
 
@@ -983,6 +1021,11 @@ ggsave("../Figures/SI/Comparizon_CA_PA.pdf",p,width = 7,height = 6)
 
 
 ## >> Multistability fixed traits MF model ----
+
+"
+Same as figure 3 but with the mean field model.
+Please run Step 1.1 of Dryland_shift_main.R prior to generate the data needed
+"
 
 d2=read.table(paste0("../Table/2_species/MF/Multistability_MF.csv"),sep=";")
 
@@ -1109,6 +1152,12 @@ ggsave("../Figures/SI/Multistability_fixed_traits_MF.pdf",ggarrange(p+guides(pat
 
 
 ## >> Multistability varying traits MF model ----
+
+"
+Same as figure 4 but with the mean field model.
+Please run Step 1.2 of Dryland_shift_main.R prior to generate the data needed
+"
+
 
 stress_seq=c(seq(0,.82, length.out = 100),seq(0.82,.9, length.out = 10)[-1])
 
@@ -1277,6 +1326,13 @@ ggsave(filename = "../Figures/SI/Multistability_varying_traits_MF.pdf",p_tot,wid
 
 
 ## >> Multistability along competition gradient with local competition ----
+
+"
+Same as figure 2 but with local competition instead of global one
+Please run Step 2.1 of Dryland_shift_main.R prior to generate the data needed
+"
+
+
 d2=read.table(paste0("../Table/2_species/PA/Multistability_fixed_traits_PA.csv"),sep=";")
 
 d2$state = sapply(1:nrow(d2), function(x) {
@@ -1368,6 +1424,12 @@ ggsave("../Figures/SI/Multistability_fixed_traits_local_competition.pdf",Fig_2_S
 
 
 ## >> Multistability along competition gradient with global facilitation ----
+
+"
+Same as figure 2 but with global facilitation instead of local one
+Please run Step 2.1 of Dryland_shift_main.R prior to generate the data needed
+"
+
 
 d2=read.table(paste0("../Table/2_species/PA/Multistability_fixed_traits_PA.csv"),sep=";")
 d2$state = sapply(1:nrow(d2), function(x) {
@@ -1466,6 +1528,12 @@ ggsave("../Figures/SI/Multistability_fixed_traits_global_facilitation.pdf",p1,wi
 
 
 ## >> Multistability varying traits with global facilitation ----
+
+"
+Same as figure 4 but with global facilitation instead of local one
+Please run Step 2.2 of Dryland_shift_main.R prior to generate the data needed
+"
+
 
 param_space=expand.grid(Scale_facil=c("local","global"),Disp=c(.1,.9))
 
@@ -1576,6 +1644,10 @@ ggsave("../Figures/SI/Multistability_traits_scale_facil_disp.pdf",p,width = 7,he
 
 ## >> Mechanisms for global facilitation: clustering, pairs, thresholds ----
 
+"
+Same as figure 3a-d but with global facilitation instead of local one
+Please run Step 2.2 to 2.4 of Dryland_shift_main.R prior to generate the data needed
+"
 
 
 #invasion and extinction
@@ -1700,6 +1772,11 @@ ggsave(filename = "../Figures/SI/Mechanisms_global_facilitation.pdf",width = 7,h
 
 
 ## >> Multistability, varying the trade-off shape ----
+
+"
+Same as figure 4 but with different shapes of the trade-off
+Please run Step 2.5 of Dryland_shift_main.R prior to generate the data needed
+"
 
 #first: explaining trade-off
 
@@ -1913,6 +1990,7 @@ ggsave(filename = "../Figures/SI/Trade_off_multistability_PA.pdf",plot = p_tot,w
 
 
 ## >> Comparing degradation and restoration points trade-off ----
+
 
 #convex and concave trade-off
 stress_seq=seq(0,.82, length.out = 100)
@@ -2165,146 +2243,147 @@ ggsave("../Figures/SI/Comparizon_linear_non_linear_tradeoff.pdf",width = 7,heigh
 
 
 
-
-## >> Restoration & extinction points trait space----
-
-
-stress_seq=seq(0,.82, length.out = 100)
-
-d=tibble()  
-d_bistab=tibble()
-
-
-for (stress in stress_seq){
-  
-  
-  
-  d2=rbind(read.table(paste0("../Table/2_species/PA/Multistability_PA/Frac_gradient/Test_interspe_comp_",
-                             .3,"_branch_Degradation_stress_",stress,"_delta_",.1,"_facilitation_",.9,".csv"),sep=";"),
-           read.table(paste0("../Table/2_species/PA/Multistability_PA/Frac_gradient/Test_interspe_comp_",
-                             .3,"_branch_Restoration_stress_",stress,"_delta_",.1,"_facilitation_",.9,".csv"),sep=";"))
-  d=rbind(d,d2)
-  
-  
-  
-}
-
-d2=d
-d2[,1:2][d2[,1:2] < 10^-3] = 0
-d2$state = sapply(1:nrow(d2), function(x) {
-  if (d2[x, 1] > 0 & d2[x, 2] > 0) {
-    return("Coexistence")
-  }
-  if (d2[x, 1] > 0 & d2[x, 2] == 0) {
-    return("Stress_tolerant")
-  }
-  if (d2[x, 1] == 0 & d2[x, 2] > 0) {
-    return("Species 2")
-  }
-  if (d2[x, 1] == 0 & d2[x, 2] == 0) {
-    return("Desert")
-  }
-})
-d2=d2[order(d2$Psi2,d2$Stress,d2$alpha_0,d2$Psi1),]
-
-all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
-  if (d2$state[x] != d2$state[x+1]){
-    return(paste0(d2$state[x],"/", d2$state[x+1]))
-  }
-  else {return(d2$state[x])}
-})
-
-d_state=d2%>%
-  filter(., Branches=="Degradation")%>%
-  select(.,-Branches)
-d_state$all_state=all_state
-
-d_state$multistab=sapply(1:nrow(d_state),function(x){
-  if (d_state$all_state[x] %in% c( "Species 2/Stress_tolerant","Coexistence/Stress_tolerant","Species 2/Coexistence",
-                                   "Stress_tolerant/Species 2")){
-    return(1)
-  } else {return(0)}
-  
-})
-
-d_state$Stress_tolerant_reg=d2$Stress_tolerant[which(d2$Branches=="Restoration")]
-d_state$Competitive_reg=d2$Competitive[which(d2$Branches=="Restoration")]
-
-d_final=tibble()
-for (i in unique(d_state$Psi1)){
-  for (j in unique(d_state$Psi2)){
-    for (a0 in unique(d_state$alpha_0)){
-      d_fil=filter(d_state,Psi1==i,Psi2==j,alpha_0==a0)
-      
-      if (i>j){
-        d_final=rbind(d_final,tibble(Psi1=i,Psi2=j,alpha_0=a0,
-                                     Frac_multi=sum(d_fil$multistab)/length(which(d_fil$state!="Desert")),
-                                     Frac_multi_raw=sum(d_fil$multistab),
-                                     Deg=d_fil$Stress[min(which(d_fil$Competitive==0))-1],
-                                     Deg2=d_fil$Stress[max(which(d_fil$Stress_tolerant>0))+1],
-                                     Rest=d_fil$Stress[min(which(d_fil$Competitive_reg==0))],
-                                     Niche_1 = length(which(d_fil$Stress_tolerant>0))/length(which(d_fil$state!="Desert"))  ,
-                                     Niche_2 = length(which(d_fil$Competitive>0))/length(which(d_fil$state!="Desert"))
-        ))
-      }
-    }
-  }
-}
-
-
-
-# Niche least competitive species
-p1=ggplot(d_final)+
-  geom_tile(aes(x=Psi1,y=Psi2,fill=Niche_1))+
-  the_theme+labs(x=TeX(r'(Species 1 trait, $\psi_1$)'),y=TeX(r'(Species 2 trait, $\psi_2$)'),
-                 fill="Fraction of vegetation states \n where species 1 has a positive cover")+
-  scale_fill_gradientn(colors=colorRampPalette(c("#F9F4E7","#E6CC8B","#E2A472","#B50F02"))(100))+
-  guides(shape=F)
-
-
-ggsave("../Figures/SI/Niche_least_competitive_species.pdf",p1,width = 6,height = 5)
-
-
-#Degradation and restoration points
-
-p1=ggplot(d_final)+
-  geom_tile(aes(x=Psi1,y=Psi2,fill=Deg))+
-  the_theme+labs(x=TeX(r'(Species 1 trait, $\psi_1$)'),y=TeX(r'(Species 2 trait, $\psi_1$)'),fill="Species 2 extinction point")+
-  scale_fill_gradientn(colors=colorRampPalette(c("#F9F4E7","#E6CC8B","#E2A472","#B50F02"))(100))+
-  guides(shape=F)
-
-
-
-#Restoration point traits
-p2=ggplot(d_final)+
-  geom_tile(aes(x=Psi1,y=Psi2,fill=Rest))+
-  the_theme+labs(x=TeX(r'(Species 1 trait, $\psi_1$)'),y=TeX(r'(Species 2 trait, $\psi_2$)'),fill="Species 2 restoration point")+
-  scale_fill_gradientn(colors=colorRampPalette(c("#F9F4E7","#E6CC8B","#E2A472","#B50F02"))(100),
-                       breaks=c(0,.1,.2))+
-  geom_line(data=tibble(x=c(0,1,1,1),y=c(0,0,0,1),group=c(1,1,2,2)),aes(x=x,y=y,group=group),lwd=1)+
-  geom_text(data=tibble(x=c(.5,1.05),
-                        y=c(0.05,.55),
-                        txt=c("(c)","(d)")),aes(x=x,y=y,label=txt),size=4.5)+
-  guides(shape=F)
-
-
-
-p3=ggplot(d_final%>%filter(Psi2==0))+
-  geom_smooth(aes(x=Psi1,y=Rest),se = F,color="black")+ggtitle(TeX("$\\psi_2 = 0$"))+
-  the_theme+labs(x=TeX(r'(Species 1 trait, $\psi_1$)'),y="Species 2 restoration point")
-
-p4=ggplot(d_final%>%filter(Psi1==unique(d_final$Psi1)[49]))+
-  geom_smooth(aes(x=Psi2,y=Rest),se = F,color="black")+ggtitle(TeX("$\\psi_1 = 1$"))+
-  the_theme+labs(x=TeX(r'(Species 2 trait, $\psi_2$)'),y="Species 2 restoration point")
-
-p_bottom=ggarrange(p3,p4,labels = letters[3:4])
-p_tot=ggarrange(ggarrange(p1,p2,ncol=2,labels = letters[1:2]),
-                p_bottom,nrow=2,heights = c(1.5,1))
-
-ggsave("../Figures/SI/Restoration_degration.pdf",p_tot,width = 9,height = 7)
-
-
-
+# 
+# ## >> Restoration & extinction points trait space----
+# 
+# 
+# 
+# stress_seq=seq(0,.82, length.out = 100)
+# 
+# d=tibble()  
+# d_bistab=tibble()
+# 
+# 
+# for (stress in stress_seq){
+#   
+#   
+#   
+#   d2=rbind(read.table(paste0("../Table/2_species/PA/Multistability_PA/Frac_gradient/Test_interspe_comp_",
+#                              .3,"_branch_Degradation_stress_",stress,"_delta_",.1,"_facilitation_",.9,".csv"),sep=";"),
+#            read.table(paste0("../Table/2_species/PA/Multistability_PA/Frac_gradient/Test_interspe_comp_",
+#                              .3,"_branch_Restoration_stress_",stress,"_delta_",.1,"_facilitation_",.9,".csv"),sep=";"))
+#   d=rbind(d,d2)
+#   
+#   
+#   
+# }
+# 
+# d2=d
+# d2[,1:2][d2[,1:2] < 10^-3] = 0
+# d2$state = sapply(1:nrow(d2), function(x) {
+#   if (d2[x, 1] > 0 & d2[x, 2] > 0) {
+#     return("Coexistence")
+#   }
+#   if (d2[x, 1] > 0 & d2[x, 2] == 0) {
+#     return("Stress_tolerant")
+#   }
+#   if (d2[x, 1] == 0 & d2[x, 2] > 0) {
+#     return("Species 2")
+#   }
+#   if (d2[x, 1] == 0 & d2[x, 2] == 0) {
+#     return("Desert")
+#   }
+# })
+# d2=d2[order(d2$Psi2,d2$Stress,d2$alpha_0,d2$Psi1),]
+# 
+# all_state =sapply(seq(1, nrow(d2) , by = 2),function(x){
+#   if (d2$state[x] != d2$state[x+1]){
+#     return(paste0(d2$state[x],"/", d2$state[x+1]))
+#   }
+#   else {return(d2$state[x])}
+# })
+# 
+# d_state=d2%>%
+#   filter(., Branches=="Degradation")%>%
+#   select(.,-Branches)
+# d_state$all_state=all_state
+# 
+# d_state$multistab=sapply(1:nrow(d_state),function(x){
+#   if (d_state$all_state[x] %in% c( "Species 2/Stress_tolerant","Coexistence/Stress_tolerant","Species 2/Coexistence",
+#                                    "Stress_tolerant/Species 2")){
+#     return(1)
+#   } else {return(0)}
+#   
+# })
+# 
+# d_state$Stress_tolerant_reg=d2$Stress_tolerant[which(d2$Branches=="Restoration")]
+# d_state$Competitive_reg=d2$Competitive[which(d2$Branches=="Restoration")]
+# 
+# d_final=tibble()
+# for (i in unique(d_state$Psi1)){
+#   for (j in unique(d_state$Psi2)){
+#     for (a0 in unique(d_state$alpha_0)){
+#       d_fil=filter(d_state,Psi1==i,Psi2==j,alpha_0==a0)
+#       
+#       if (i>j){
+#         d_final=rbind(d_final,tibble(Psi1=i,Psi2=j,alpha_0=a0,
+#                                      Frac_multi=sum(d_fil$multistab)/length(which(d_fil$state!="Desert")),
+#                                      Frac_multi_raw=sum(d_fil$multistab),
+#                                      Deg=d_fil$Stress[min(which(d_fil$Competitive==0))-1],
+#                                      Deg2=d_fil$Stress[max(which(d_fil$Stress_tolerant>0))+1],
+#                                      Rest=d_fil$Stress[min(which(d_fil$Competitive_reg==0))],
+#                                      Niche_1 = length(which(d_fil$Stress_tolerant>0))/length(which(d_fil$state!="Desert"))  ,
+#                                      Niche_2 = length(which(d_fil$Competitive>0))/length(which(d_fil$state!="Desert"))
+#         ))
+#       }
+#     }
+#   }
+# }
+# 
+# 
+# 
+# # Niche least competitive species
+# p1=ggplot(d_final)+
+#   geom_tile(aes(x=Psi1,y=Psi2,fill=Niche_1))+
+#   the_theme+labs(x=TeX(r'(Species 1 trait, $\psi_1$)'),y=TeX(r'(Species 2 trait, $\psi_2$)'),
+#                  fill="Fraction of vegetation states \n where species 1 has a positive cover")+
+#   scale_fill_gradientn(colors=colorRampPalette(c("#F9F4E7","#E6CC8B","#E2A472","#B50F02"))(100))+
+#   guides(shape=F)
+# 
+# 
+# ggsave("../Figures/SI/Niche_least_competitive_species.pdf",p1,width = 6,height = 5)
+# 
+# 
+# #Degradation and restoration points
+# 
+# p1=ggplot(d_final)+
+#   geom_tile(aes(x=Psi1,y=Psi2,fill=Deg))+
+#   the_theme+labs(x=TeX(r'(Species 1 trait, $\psi_1$)'),y=TeX(r'(Species 2 trait, $\psi_1$)'),fill="Species 2 extinction point")+
+#   scale_fill_gradientn(colors=colorRampPalette(c("#F9F4E7","#E6CC8B","#E2A472","#B50F02"))(100))+
+#   guides(shape=F)
+# 
+# 
+# 
+# #Restoration point traits
+# p2=ggplot(d_final)+
+#   geom_tile(aes(x=Psi1,y=Psi2,fill=Rest))+
+#   the_theme+labs(x=TeX(r'(Species 1 trait, $\psi_1$)'),y=TeX(r'(Species 2 trait, $\psi_2$)'),fill="Species 2 restoration point")+
+#   scale_fill_gradientn(colors=colorRampPalette(c("#F9F4E7","#E6CC8B","#E2A472","#B50F02"))(100),
+#                        breaks=c(0,.1,.2))+
+#   geom_line(data=tibble(x=c(0,1,1,1),y=c(0,0,0,1),group=c(1,1,2,2)),aes(x=x,y=y,group=group),lwd=1)+
+#   geom_text(data=tibble(x=c(.5,1.05),
+#                         y=c(0.05,.55),
+#                         txt=c("(c)","(d)")),aes(x=x,y=y,label=txt),size=4.5)+
+#   guides(shape=F)
+# 
+# 
+# 
+# p3=ggplot(d_final%>%filter(Psi2==0))+
+#   geom_smooth(aes(x=Psi1,y=Rest),se = F,color="black")+ggtitle(TeX("$\\psi_2 = 0$"))+
+#   the_theme+labs(x=TeX(r'(Species 1 trait, $\psi_1$)'),y="Species 2 restoration point")
+# 
+# p4=ggplot(d_final%>%filter(Psi1==unique(d_final$Psi1)[49]))+
+#   geom_smooth(aes(x=Psi2,y=Rest),se = F,color="black")+ggtitle(TeX("$\\psi_1 = 1$"))+
+#   the_theme+labs(x=TeX(r'(Species 2 trait, $\psi_2$)'),y="Species 2 restoration point")
+# 
+# p_bottom=ggarrange(p3,p4,labels = letters[3:4])
+# p_tot=ggarrange(ggarrange(p1,p2,ncol=2,labels = letters[1:2]),
+#                 p_bottom,nrow=2,heights = c(1.5,1))
+# 
+# ggsave("../Figures/SI/Restoration_degration.pdf",p_tot,width = 9,height = 7)
+# 
+# 
+# 
 
 
 
@@ -2313,6 +2392,12 @@ ggsave("../Figures/SI/Restoration_degration.pdf",p_tot,width = 9,height = 7)
 
 
 ## >> Landscapes along dispersal gradient ----
+
+"
+Illustration of how dispersal modulates competitive hierarchy between competitive and stress-tolerant 
+species.
+Please run chunk 5 of the julia file Dryland_shift_Nspecies_function.jl prior to generate the data needed
+"
 
 list_landscape=list.files("../Table/2_species/CA/",pattern = "Dispersal")
 for (i in 1:length(list_landscape)){
@@ -2328,6 +2413,12 @@ p=ggarrange(p_land_1+ggtitle(TeX("$\\delta = 0$")),p_land_2+ggtitle(TeX("$\\delt
 ggsave("../Figures/SI/Dynamics_landscape_dispersal.pdf",p,width = 7,height = 4)
 
 ## >> Bifurcation diagrams effect of competition ----
+
+"
+Code to illustrate the change in the bifurcation diagram with the interspecific competition
+"
+
+
 julia_setup()
 de = diffeq_setup()
 
@@ -2460,6 +2551,10 @@ ggsave("../Figures/SI/Mechanism_priority.pdf",p_tot_w_legend,width=10,height = 5
 
 
 ## >> Net effect between and whithin species before the shift ----
+
+"
+Compute the net effect and within species effect before the community turnover happens
+"
 
 tspan = c(0, 30000)
 t = seq(0, 30000, by = 1)
@@ -2600,6 +2695,12 @@ ggsave("../Figures/SI/Net_effet_prior_shift.pdf",p_tot,width = 8,height = 5)
 
 ## >> State diagram lower degradation, higher restoration ----
 
+"
+Same as figure 3 but with a higher degradation rate compare to te restoration rate
+Please run Step 2.6 of Dryland_shift_main.R prior to generate the data needed
+"
+
+
 d2=read.table(paste0("../Table/2_species/PA/Higher_restor_lower_deg.csv"),sep=";")
 d2$state = sapply(1:nrow(d2), function(x) {
   if (d2[x, 1] > 0 & d2[x, 2] > 0) {
@@ -2731,6 +2832,14 @@ ggsave("../Figures/SI/Equal_ini_MF.pdf",p1,width=8,height=3)
 
 
 ## >> Colored by number of species ----
+
+"
+Same as figure 6a-b but colored with the number of species coexisting.
+As for Figure 6, you need to run the Step 3.1 of the Dryland_shift_main.R R file
+to generate the data needed here
+"
+
+
 d_tot=read.table("../Table/N_species/PA/Multistability_CSI.csv",sep=";")
 
 for (i in 1:4){
@@ -2755,6 +2864,13 @@ ggsave("../Figures/SI/Nsp_CSI_colored_nbspecies.pdf",p,width = 7,height =6 )
 
 
 ## >> Main fig N-species with mean-field model ----
+
+"
+Same as figure 6 but with the mean-field model
+As for Figure 6, you need to run the Step 3.2 of the Dryland_shift_main.R R file
+to generate the data needed here
+"
+
 
 d_tot=read.table("../Table/N_species/MF/Multistability_CSI.csv",sep=";")
 
@@ -2827,8 +2943,8 @@ p3=ggplot(d%>%filter(., Branch==1))+
   
   geom_line(data=type_bistab%>%filter(., Branch==1,Competition==.35,Type !="Degraded")%>%
               add_column(., Height=sapply(1:nrow(.),function(x){
-                if (.$Nsp[x]==5){return(6.5)
-                } else if (.$Nsp[x]==15){return(8)
+                if (.$Nsp[x]==5){return(6)
+                } else if (.$Nsp[x]==15){return(9)
                 }else{
                   return(8)
                 }

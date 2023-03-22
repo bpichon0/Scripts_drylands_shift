@@ -13,19 +13,26 @@ Here is the different steps to reproduce the figures:
 
 To install julia dependancies go into your working directory, press "]" and enter "activate .". Once activating the local folder, all dependancies can be loaded using "] instantiate".
 
+## `Installing R dependancies`
+
+To install the pacakges needed for the analyses and create the folder architecture used to save the data sets, please load the file `Dryland_shift_function.R` using: 
+
+```R
+source(Dryland_shift_function.R)
+```
 
 ## `Replicating the figures`
 
 **0.** The file `Dryland_shift_function.R` and `Dryland_shift_Nspecies_function.jl` contain all functions necessary to run the code for the ODEs models and the spatially explicit one. 
 
-**1.** To run all analyses made with two species, you cade run the codes:
+**1.** To run all analyses made with two species, you can run the codes:
     - `Dryland_shift_main.R` for the non-spatial simulations
     - For the spatially explicit simulations done with 2 species, run the code `Dryland_shift_Nspecies_main.jl` (**regions 1 to 5**). 
 
 **3.** To run the analysis for N-species, you can run the file `Dryland_shift_Nspecies_main.jl` (**regions 6 to 9**). Note that simulations with 15 and 25 species using pair approximation takes some time run. It took about **1.5 days on a 25 cores CPU**. The code is nevertheness parallalized: you can change the number of cores used in the file. 
 Simulatations are then post-processed using `Dryland_shift_main.R` script.
 
-**4.** Once simulations are made and post-processed, all figures can be generated using the same file `Make_figures.R`. The code is organized by figures: a figure per chunk of code.
+**4.** Once simulations are made and post-processed, all figures can be generated using the same file `Make_figures.R`. The code is organized by figures: a figure per chunk of code. If you want to generate only a part of the results, we indicate in each chunk in Make_figure.R file the script and step to simulate in order to replicate the given figure. 
 
 
 

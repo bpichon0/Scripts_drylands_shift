@@ -2,17 +2,6 @@ include("Dryland_shift_Nspecies_function.jl")
 
 
 
-
-
-
-
-
-
-
-
-
-
-
 #region : 1-- Illustration competitive exclusion 2 species (Fig 2) 
 
 
@@ -116,7 +105,6 @@ end
 #endregion
 
 
-
 #region : 3-- Species pairs (Fig 3b)
 
 
@@ -147,7 +135,6 @@ end
 #endregion
 
 
-
 #region : 4-- Clustering species dispersal (Fig 3c)
 
 
@@ -176,7 +163,6 @@ end
 
 
 #endregion
-
 
 
 #region : 5-- Vegetation along dispersal gradient (SI fig)
@@ -409,9 +395,6 @@ for random_ini in eachindex(1:N_random_ini)
 end
 
 #endregion
-
-
-
 
 
 #region : 9-- Full simulations for Fig 6 & SI 

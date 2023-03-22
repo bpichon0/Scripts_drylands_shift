@@ -755,8 +755,12 @@ function Gillespie_CA_N_species(; param, landscape, tmax, type_competition)
 
 end
 
-function Plot_dynamics_Nspecies(; d, Nsp, name_x_axis="time", PA=false)
-    plot(xlabel=name_x_axis, ylabel="Densities", legend=false)
+function Plot_dynamics_Nspecies(; d, Nsp, name_x_axis="time", PA=false, black=false)
+    if black
+        plot(xlabel=name_x_axis, ylabel="Densities", legend=false, bg="black")
+    else
+        plot(xlabel=name_x_axis, ylabel="Densities", legend=false)
+    end
 
     colors = palette([colorant"#077D10", colorant"#2A9026", colorant"#4DA33D", colorant"#71B754",
             colorant"#94CB6B", colorant"#A8D881", colorant"#9ED894", colorant"#93D8A7", colorant"#89D8B9",
@@ -769,15 +773,28 @@ function Plot_dynamics_Nspecies(; d, Nsp, name_x_axis="time", PA=false)
     if PA
         d = d[:, vec(hcat(transpose([k for k in 1:Nsp]), transpose([Nsp + 1, Nsp + 2, size(d, 2)])))]
     end
-
-    for k in 1:(size(d, 2)-1)
-        if k != (size(d, 2) - 1) && k <= Nsp
-            plot!(d[:, size(d, 2)], d[:, k], label=names[k], lw=1.5, thickness_scaling=1, color=colors[k])
-        elseif k == Nsp + 1
-            plot!(d[:, size(d, 2)], d[:, k], label=names[k], lw=1.5, thickness_scaling=1, color="#F5D592")
-        else
-            display(plot!(d[:, size(d, 2)], d[:, k], label=names[k], lw=1.5, thickness_scaling=1, color="black", legend=:bottomright))
+    if black
+        for k in 1:(size(d, 2)-1)
+            if k != (size(d, 2) - 1) && k <= Nsp
+                plot!(d[:, size(d, 2)], d[:, k], label=names[k], lw=5, thickness_scaling=1, color=colors[k])
+            elseif k == Nsp + 1
+                plot!(d[:, size(d, 2)], d[:, k], label=names[k], lw=5, thickness_scaling=1, color="#F5D592")
+            else
+                display(plot!(d[:, size(d, 2)], d[:, k], label=names[k], lw=5, thickness_scaling=1, color="black", legend=false))
+            end
         end
+    else
+
+        for k in 1:(size(d, 2)-1)
+            if k != (size(d, 2) - 1) && k <= Nsp
+                plot!(d[:, size(d, 2)], d[:, k], label=names[k], lw=1.5, thickness_scaling=1, color=colors[k])
+            elseif k == Nsp + 1
+                plot!(d[:, size(d, 2)], d[:, k], label=names[k], lw=1.5, thickness_scaling=1, color="#F5D592")
+            else
+                display(plot!(d[:, size(d, 2)], d[:, k], label=names[k], lw=1.5, thickness_scaling=1, color="black", legend=:bottomright))
+            end
+        end
+
     end
 end
 

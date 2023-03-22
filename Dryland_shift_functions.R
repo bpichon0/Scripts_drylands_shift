@@ -1,7 +1,16 @@
-x = c("tidyverse", "ggpubr", "latex2exp", "deSolve", "reshape2", 
-      "JuliaCall", "diffeqr", "simecol", "tseries","phaseR","ggpattern",
-      "ggquiver", "scales","boot","spatialwarnings","hillR","RColorBrewer","ggnewscale")
+packages=x = c("tidyverse", "ggpubr", "latex2exp", "deSolve", "reshape2", "RCall","simecol",
+      "JuliaCall", "diffeqr", "tseries","phaseR","ggpattern",
+      "ggquiver", "scales","boot","RColorBrewer","ggnewscale")
+
+#install pacakges if not installed already
+install.packages(setdiff(packages, rownames(installed.packages())))
+
+
+x = c("tidyverse", "ggpubr", "latex2exp", "deSolve", "reshape2","RCall","simecol", 
+      "JuliaCall", "diffeqr", "tseries","phaseR","ggpattern",
+      "ggquiver", "scales","boot","RColorBrewer","ggnewscale")
 lapply(x, require, character.only = TRUE)
+
 
 
 the_theme = theme_classic() + theme(
@@ -17,7 +26,6 @@ color_rho = c("coexistence" = "#D8CC7B", "competitive" = "#ACD87B", "desert" = "
 color_Nsp=colorRampPalette(c("#077D10",as.character(color_rho[2]),as.character(color_rho[4]),"#2A39EF"))
 color_hys=colorRampPalette(c("#C7B6C8", "#74B6BA" ,"#7783C4" ,"#B56D4E", "#F28E47", "#FCE269"))
 
-
 #creating folders
 
 ## For simulations
@@ -25,8 +33,13 @@ color_hys=colorRampPalette(c("#C7B6C8", "#74B6BA" ,"#7783C4" ,"#B56D4E", "#F28E4
 dir.create("../",showWarnings = F)
 dir.create("../Table",showWarnings = F)
 dir.create("../Table/2_species",showWarnings = F)
-dir.create("../Table/2_species/Illustration",showWarnings = F)
 for (i in c("PA","MF","CA")) dir.create(paste0("../Table/2_species/",i),showWarnings = F)
+dir.create("../Table/2_species/CA/Illustration",showWarnings = F)
+dir.create("../Table/2_species/CA/Justifying_use_PA",showWarnings = F)
+dir.create("../Table/2_species/PA/Multistability_PA",showWarnings = F)
+dir.create("../Table/2_species/PA/Multistability_PA/Fixed_traits",showWarnings = F)
+dir.create("../Table/2_species/PA/Multistability_PA/Frac_gradient",showWarnings = F)
+dir.create("../Table/2_species/PA/Multistability_PA/Varying_tradeoff",showWarnings = F)
 
 
 dir.create("../Table/N_species",showWarnings = F)
@@ -39,6 +52,7 @@ for (i in c(5,15,25)){
 #For figures
 dir.create("../Figures",showWarnings = F)
 dir.create("../Figures/SI",showWarnings = F)
+
 
 #***********************************************************
 
