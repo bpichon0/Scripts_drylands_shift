@@ -1,14 +1,11 @@
-packages=x = c("tidyverse", "ggpubr", "latex2exp", "deSolve", "reshape2","simecol",
+x = c("tidyverse", "ggpubr", "latex2exp", "deSolve", "reshape2","simecol",
       "JuliaCall", "diffeqr", "tseries","phaseR","ggpattern",
-      "ggquiver", "scales","boot","RColorBrewer","ggnewscale")
+      "ggquiver", "scales","boot","RColorBrewer","ggnewscale","wesanderson","viridis")
 
 #install pacakges if not installed already
-install.packages(setdiff(packages, rownames(installed.packages())))
+install.packages(setdiff(x, rownames(installed.packages())))
 
-
-x = c("tidyverse", "ggpubr", "latex2exp", "deSolve", "reshape2","simecol", 
-      "JuliaCall", "diffeqr", "tseries","phaseR","ggpattern",
-      "ggquiver", "scales","boot","RColorBrewer","ggnewscale")
+#load it
 lapply(x, require, character.only = TRUE)
 
 

@@ -877,7 +877,6 @@ source("./Dryland_shift_functions.R")
 
 
 d_richness=d_tot=d_trait_shift=tibble()
-# pdf(paste0("../Figures/N_species/PA/Dyn_Nspecies.pdf"),width = 6,height = 4)
 
 for (i in c(5,15,25)){
   
@@ -906,19 +905,7 @@ for (i in c(5,15,25)){
                             Richness=length(which(colSums(d2[((nrow(d2)/2)+1):(nrow(d2)),])[1:Nsp] !=0))))
     
     
-    # print(
-    #   ggplot(d2%>%melt(., measure.vars=paste0("Sp_",1:Nsp))%>%
-    #            mutate(., Branch=recode_factor(Branch,"1"="Degradation","2"="Restoration")))+
-    #     geom_line(aes(x=Stress,y=value,color=variable,linetype=as.factor(Branch),
-    #                   group=interaction(variable,Branch))
-    #               ,size=.8)+
-    #     ggtitle(paste0("Nsp = ",i,", aij = ",
-    #                    strsplit(list_csv[k],split = "_")[[1]][5]))+
-    #     the_theme+labs(y="",color=expression(paste(bar(psi),"    ")),linetype="")+
-    #     scale_color_manual(values=rev(color_Nsp(Nsp)))+
-    #     theme(legend.box = "vertical")
-    # )
-    
+
     d2$Entropy = sapply(1:nrow(d2),function(x){
       return(sum(d2[x,1:Nsp]*log(d2[x,1:Nsp]),na.rm = T))
     })
@@ -944,14 +931,107 @@ for (i in c(5,15,25)){
       return(length(which(d2[x,1:Nsp] != 0)))
     })
     
+    d2$Name_sp = sapply(1:nrow(d2),function(x){
+      return(paste0(which(d2[x,1:Nsp]>0),collapse = "_"))
+    })
+    
+    
     d_tot=rbind(d_tot,d2[,-c(1:Nsp)]%>%add_column(., Nsp=Nsp,Competition=strsplit(list_csv[k],split = "_")[[1]][5]))
     
   }
 }
-# dev.off()
 
 write.table(d_richness,"../Table/N_species/PA/Multistability_richness.csv",sep=";")
-write.table(d_tot,"../Table/N_species/PA/Multistability_CSI.csv",sep=";")
+write.table(d_tot%>%filter(., Random_ini>0),
+            "../Table/N_species/PA/Multistability_CSI.csv",sep=";")
+
+
+# >> Number ASS along the stress gradient
+d_tot=read.table("../Table/N_species/PA/Multistability_CSI.csv",sep=";")
+d=type_bistab=d_cover_cliques=tibble()
+
+for (compet in unique(d_tot$Competition)){
+  
+  if (compet <.225){
+    for (species in unique(d_tot$Nsp)){
+      for (i in unique(d_tot$Stress)){
+        
+        d_fil=filter(d_tot,Competition==compet,Nsp==species,Stress==i)
+        
+        d2=tibble(Competition=compet,Nsp=species,Stress=i,N_ASS = length(unique(d_fil$Name_sp)))
+        
+        type_bistab2=tibble(Competition=compet,Nsp=species,Stress=i,
+                            Type = ifelse(all(d_fil$CSI==0),"Degraded",
+                                          ifelse(any(d_fil$CSI==0),"Env",
+                                                 ifelse(length(unique(d_fil$Name_sp))>2,
+                                                        ifelse(any(d_fil$Nb_sp>1),"Cliques","Mutual exclusion"),"No bistab"))),
+                            Freq_cliques=ifelse(length(unique(d_fil$Name_sp))>1,
+                                                ifelse(any(d_fil$Nb_sp>1),
+                                                       length(which(d_fil$Nb_sp>1))/nrow(d_fil),
+                                                       0),
+                                                0))
+        
+        
+        if (type_bistab2$Type !="No bistab"){
+          d_fil=d_fil%>%add_column(., ID_ASS=sapply(1:nrow(.),function(x){
+            return(which(round(d_fil$CSI[x],2)==unique(round(d_fil$CSI,2))))
+          }))%>%
+            group_by(., ID_ASS)%>%
+            slice_sample(n=1)
+          d_cover_cliques=rbind(d_cover_cliques,d_fil%>%
+                                  add_column(., Type=type_bistab2$Type))
+        }
+        
+        d=rbind(d,d2)
+        type_bistab=rbind(type_bistab,type_bistab2)
+      }
+      
+    }
+    
+  } else {
+    for (species in unique(d_tot$Nsp)){
+      for (i in unique(d_tot$Stress)){
+        
+        d_fil=filter(d_tot,Competition==compet,Nsp==species,Stress==i)
+        
+        d2=tibble(Competition=compet,Nsp=species,Stress=i,N_ASS = length(unique(d_fil$Name_sp)))
+        
+        type_bistab2=tibble(Competition=compet,Nsp=species,Stress=i,
+                            Type = ifelse(all(d_fil$CSI==0),"Degraded",
+                                          ifelse(any(d_fil$CSI==0),"Env",
+                                                 ifelse(length(unique(d_fil$Name_sp))>2,
+                                                        ifelse(any(d_fil$Nb_sp>1),"Cliques","Mutual exclusion"),"No bistab"))),
+                            Freq_cliques=ifelse(length(unique(d_fil$Name_sp))>1,
+                                                ifelse(any(d_fil$Nb_sp>1),
+                                                       length(which(d_fil$Nb_sp>1))/nrow(d_fil),
+                                                       0),
+                                                0))
+        
+        
+        if (type_bistab2$Type !="No bistab"){
+          d_fil=d_fil%>%add_column(., ID_ASS=sapply(1:nrow(.),function(x){
+            return(which(round(d_fil$CSI[x],2)==unique(round(d_fil$CSI,2))))
+          }))%>%
+            group_by(., ID_ASS)%>%
+            slice_sample(n=1)
+          d_cover_cliques=rbind(d_cover_cliques,d_fil%>%
+                                  add_column(., Type=type_bistab2$Type))
+        }
+        
+        d=rbind(d,d2)
+        type_bistab=rbind(type_bistab,type_bistab2)
+      }
+    }
+    
+    
+  }
+  
+}
+
+
+write.table(d,"../Table/N_species/PA/post_proc_sim1.csv",sep=";")
+write.table(type_bistab,"../Table/N_species/PA/post_proc_sim2.csv",sep=";")
+write.table(d_cover_cliques,"../Table/N_species/PA/post_proc_sim3.csv",sep=";")
 
 ## >> 2) MF N-species ----
 rm(list = ls())
@@ -964,7 +1044,6 @@ The simulations were made in the region 9 of the julia script Dryland_shift_Nspe
 
 
 d_richness=d_tot=d_trait_shift=tibble()
-# pdf(paste0("../Figures/N_species/MF/Dyn_Nspecies.pdf"),width = 6,height = 4)
 
 for (i in c(5,15,25)){
   
@@ -989,19 +1068,7 @@ for (i in c(5,15,25)){
                             Richness=length(which(colSums(d2[((nrow(d2)/2)+1):(nrow(d2)),])[1:Nsp] !=0))))
     
     
-    # print(
-    #   ggplot(d2%>%melt(., measure.vars=paste0("Sp_",1:Nsp))%>%
-    #            mutate(., Branch=recode_factor(Branch,"1"="Degradation","2"="Restoration")))+
-    #     geom_line(aes(x=Stress,y=value,color=variable,linetype=as.factor(Branch),
-    #                   group=interaction(variable,Branch))
-    #               ,size=.8)+
-    #     ggtitle(paste0("Nsp = ",i,", aij = ",
-    #                    strsplit(list_csv[k],split = "_")[[1]][5]))+
-    #     the_theme+labs(y="",color=expression(paste(bar(psi),"    ")),linetype="")+
-    #     scale_color_manual(values=rev(color_Nsp(Nsp)))+
-    #     theme(legend.box = "vertical")
-    # )
-    
+
     d2$CSI = sapply(1:nrow(d2),function(x){
       set.seed(432)
       u=runif(Nsp)
@@ -1033,13 +1100,43 @@ for (i in c(5,15,25)){
     
   }
 }
-# dev.off()
 
 write.table(d_richness,"../Table/N_species/MF/Multistability_richness.csv",sep=";")
-write.table(d_tot,"../Table/N_species/MF/Multistability_CSI.csv",sep=";")
+write.table(d_tot%>%filter(., Random_ini>0),
+            "../Table/N_species/MF/Multistability_CSI.csv",sep=";")
 
 
+d=type_bistab=tibble()
+d_tot=read.table("../Table/N_species/MF/Multistability_CSI.csv",sep=";")
 
+for (compet in unique(d_tot$Competition)){
+  for (branch in unique(d_tot$Branch)){
+    for (species in unique(d_tot$Nsp)){
+      for (i in unique(d_tot$Stress)){
+        
+        d_fil=filter(d_tot,Competition==compet,Nsp==species,Stress==i)
+        
+        if (i<.7){d_fil=filter(d_fil,!is.na(Psi_normalized))}
+        
+        d=rbind(d,tibble(Competition=compet,Nsp=species,Stress=i,N_ASS = length(unique(d_fil$Name_sp))))
+        type_bistab2=tibble(Competition=compet,Nsp=species,Stress=i,
+                            Type = ifelse(all(d_fil$CSI==0),"Degraded",
+                                          ifelse(any(d_fil$CSI==0),"Env",
+                                                 ifelse(length(unique(d_fil$Name_sp))>2,
+                                                        ifelse(any(d_fil$Nb_sp>1),"Cliques","Mutual exclusion"),"No bistab"))),
+                            Freq_cliques=ifelse(length(unique(d_fil$Name_sp))>1,
+                                                ifelse(any(d_fil$Nb_sp>1),
+                                                       length(which(d_fil$Nb_sp>1))/nrow(d_fil),
+                                                       0),
+                                                0))
+        
+        type_bistab=rbind(type_bistab,type_bistab2)
+      }
+    }
+  }
+}
+
+write.table(type_bistab,"../Table/N_species/MF/Type_bistab.csv",sep=";")
 
 
 

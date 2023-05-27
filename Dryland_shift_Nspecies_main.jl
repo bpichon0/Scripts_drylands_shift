@@ -429,7 +429,7 @@ end
 
 
     S_seq = collect(range(0, 0.9, length=N_sim_S))
-    a0_seq = collect(range(0.225, 0.35, length=length_aij_seq))
+    a0_seq = cat(collect(range(0.225, 0.35, length=length_aij_seq)), [0, 0.075, .15],dims=1)
     facil = 0.9
     tspan = (0.0, 1000000)
 
@@ -439,7 +439,7 @@ end
             d = zeros(N_sim_S * 2, Nsp + 2 + 5)
             dt = 1
 
-            for direction in 1:2
+            for direction in 1
 
                 if direction == 1
                     branches = "Degradation"
@@ -486,7 +486,7 @@ pmap(Run_sim_MF, 1:250)
 
 
     S_seq = collect(range(0, 0.9, length=N_sim_S))
-    a0_seq = collect(range(0.225, 0.35, length=length_aij_seq))
+    a0_seq = cat(collect(range(0.225, 0.35, length=length_aij_seq)), [0, 0.075, .15],dims=1)
     facil = 0.9
     tspan = (0.0, 1000000)
 
@@ -496,7 +496,7 @@ pmap(Run_sim_MF, 1:250)
             d = zeros(N_sim_S * 2, Nsp + 2 + 5)
             dt = 1
 
-            for direction in 1:2
+            for direction in 1
 
                 if direction == 1
                     branches = "Degradation"
@@ -547,7 +547,7 @@ pmap(Run_sim_MF, 1:250)
 
 
     S_seq = collect(range(0, 0.9, length=N_sim_S))
-    a0_seq = collect(range(0.225, 0.35, length=length_aij_seq))
+    a0_seq = cat(collect(range(0.225, 0.35, length=length_aij_seq)), [0, 0.075, .15],dims=1)
     facil = 0.9
     tspan = (0.0, 1000000)
 
@@ -557,7 +557,7 @@ pmap(Run_sim_MF, 1:250)
             d = zeros(N_sim_S * 2, Nsp + 2 + 5)
             dt = 1
 
-            for direction in 1:2
+            for direction in 1
 
                 if direction == 1
                     branches = "Degradation"
@@ -608,7 +608,7 @@ pmap(Run_sim_MF, 1:250)
 
 
     S_seq = collect(range(0, 0.9, length=N_sim_S))
-    a0_seq = collect(range(0.225, 0.35, length=length_aij_seq))
+    a0_seq = a0_seq = cat(collect(range(0.225, 0.35, length=length_aij_seq)), [0, 0.075, .15],dims=1)
     facil = 0.9
     tspan = (0.0, 1000000)
 
@@ -618,7 +618,7 @@ pmap(Run_sim_MF, 1:250)
             d = zeros(N_sim_S * 2, Int(((Nsp^2 + 7 * Nsp) / 2) + 5) + 5)
             dt = 1
 
-            for direction in 1:2
+            for direction in 1
 
                 if direction == 1
                     branches = "Degradation"
@@ -668,7 +668,7 @@ pmap(Run_sim_PA, 1:250)
 
 
     S_seq = collect(range(0, 0.9, length=N_sim_S))
-    a0_seq = collect(range(0.225, 0.35, length=length_aij_seq))
+    a0_seq = a0_seq = cat(collect(range(0.225, 0.35, length=length_aij_seq)), [0, 0.075, .15],dims=1)
     facil = 0.9
     tspan = (0.0, 1000000)
 
@@ -678,7 +678,7 @@ pmap(Run_sim_PA, 1:250)
             d = zeros(N_sim_S * 2, Int(((Nsp^2 + 7 * Nsp) / 2) + 5) + 5)
             dt = 1
 
-            for direction in 1:2
+            for direction in 1
                 if direction == 1
                     branches = "Degradation"
                 else
@@ -727,7 +727,7 @@ pmap(Run_sim_PA, 1:250)
 
 
     S_seq = collect(range(0, 0.9, length=N_sim_S))
-    a0_seq = collect(range(0.225, 0.35, length=length_aij_seq))
+    a0_seq = a0_seq = cat(collect(range(0.225, 0.35, length=length_aij_seq)), [0, 0.075, .15],dims=1)
     facil = 0.9
     tspan = (0.0, 1000000)
 
@@ -737,7 +737,7 @@ pmap(Run_sim_PA, 1:250)
             d = zeros(N_sim_S * 2, Int(((Nsp^2 + 7 * Nsp) / 2) + 5) + 5)
             dt = 1
 
-            for direction in 1:2
+            for direction in 1
 
                 if direction == 1
                     branches = "Degradation"
