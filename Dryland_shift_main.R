@@ -1106,8 +1106,10 @@ write.table(d_tot%>%filter(., Random_ini>0),
             "../Table/N_species/MF/Multistability_CSI.csv",sep=";")
 
 
-d=type_bistab=tibble()
+d=type_bistab=d_cover_cliques=tibble()
 d_tot=read.table("../Table/N_species/MF/Multistability_CSI.csv",sep=";")
+d_tot$Stress=round(d_tot$Stress,4)
+
 
 for (compet in unique(d_tot$Competition)){
   for (branch in unique(d_tot$Branch)){
@@ -1115,10 +1117,10 @@ for (compet in unique(d_tot$Competition)){
       for (i in unique(d_tot$Stress)){
         
         d_fil=filter(d_tot,Competition==compet,Nsp==species,Stress==i)
-        
         if (i<.7){d_fil=filter(d_fil,!is.na(Psi_normalized))}
         
-        d=rbind(d,tibble(Competition=compet,Nsp=species,Stress=i,N_ASS = length(unique(d_fil$Name_sp))))
+        d2=tibble(Competition=compet,Nsp=species,Stress=i,N_ASS = length(unique(d_fil$Name_sp)))
+        
         type_bistab2=tibble(Competition=compet,Nsp=species,Stress=i,
                             Type = ifelse(all(d_fil$CSI==0),"Degraded",
                                           ifelse(any(d_fil$CSI==0),"Env",
@@ -1130,13 +1132,29 @@ for (compet in unique(d_tot$Competition)){
                                                        0),
                                                 0))
         
+        
+        if (type_bistab2$Type !="No bistab"){
+          d_fil=d_fil%>%add_column(., ID_ASS=sapply(1:nrow(.),function(x){
+            return(which(round(d_fil$CSI[x],2)==unique(round(d_fil$CSI,2))))
+          }))%>%
+            group_by(., ID_ASS)%>%
+            slice_sample(n=1)
+          d_cover_cliques=rbind(d_cover_cliques,d_fil%>%
+                                  add_column(., Type=type_bistab2$Type))
+        }
+        
+        d=rbind(d,d2)
         type_bistab=rbind(type_bistab,type_bistab2)
+        
+        
       }
     }
   }
 }
 
-write.table(type_bistab,"../Table/N_species/MF/Type_bistab.csv",sep=";")
+write.table(d,"../Table/N_species/MF/post_proc_sim1.csv",sep=";")
+write.table(type_bistab,"../Table/N_species/MF/post_proc_sim2.csv",sep=";")
+write.table(d_cover_cliques,"../Table/N_species/MF/post_proc_sim3.csv",sep=";")
 
 
 
