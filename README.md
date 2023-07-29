@@ -27,14 +27,14 @@ source(Dryland_shift_function.R)
 
 **1.** To run all analyses made with two species, you can run the codes:
     - `Dryland_shift_main.R` for the non-spatial simulations
-    - For the spatially explicit simulations done with 2 species, run the code `Dryland_shift_Nspecies_main.jl` (**regions 1 to 5**). 
+    - For the illustrations using the spatially explicit simulations done with 2 species, run the code `Dryland_shift_Nspecies_main.jl` (**regions 1 to 5**). 
 
-**3.** To run the analysis for N-species, you can run the file `Dryland_shift_Nspecies_main.jl` (**regions 6 to 9**). Note that simulations with 15 and 25 species using pair approximation takes some time run. It took about **1.5 days on a 25 cores CPU**. The code is nevertheness parallalized: you can change the number of cores used in the file. 
+**3.** To run the analysis for N-species, you can run the file `Dryland_shift_Nspecies_main.jl` (**regions 6 to 9**). Note that simulations with 15 and 25 species using pair approximation takes some times run. It took about **1.5 days on a 25 cores CPU**. The code is nevertheness parallalized: you can change the number of cores used in the file. 
 Simulatations are then post-processed using `Dryland_shift_main.R` script.
 
 **4.** Once simulations are made and post-processed, all figures can be generated using the same file `Make_figures.R`. The code is organized by figures: a figure per chunk of code. **If you want to generate only a part of the results, please go in the Make_figures.R file and follow the instructions indicated prior to the generation of each figure.**
 
-
+If you have any issues replicating the figures, please contact me by email.
 
 ## `Exploring the model`
 
@@ -138,6 +138,7 @@ Plot_dynamics_Nspecies(d=dyn, Nsp=Nsp)
 <p align="center">
     <b>Figure 3: Temporal dynamics with the pair-approximation model.</b>
 </p>
+
 
 
 
