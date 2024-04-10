@@ -199,10 +199,6 @@ for (facil in f_seq){
 
 
 
-
-
-#***********************************************************
-
 # --------   Step 2) Pair approximation (PA) ----------------
 
 #***********************************************************
@@ -218,7 +214,7 @@ de = diffeq_setup()
 ## >> 1) Multistability fixed traits ----
 
 '
-Code to generate the data used for Figure 2 and 3. A community of two species, one stress tolerant and the other
+Code to generate the data used for Figure 2. A community of two species, one stress tolerant and the other
 competitive. We vary both the level of abiotic stress and the level of competition.
 Here the model used accounts for spatial correlations between close sites
 '
@@ -339,7 +335,7 @@ write.table(d2,paste0("../Table/2_species/PA/Multistability_fixed_traits_PA.csv"
 ## >> 2) Clustering between species fixed traits  ----
 
 '
-Code to generate the data for the Figure 3c. A community of 2 species, one stress tolerant and the other
+Code to generate the data for the Figure 2c. A community of 2 species, one stress tolerant and the other
 competitive. We vary the scale of dispersal and measure the level of vegetation clustering along the 
 dispersal scale gradient
 '
@@ -351,7 +347,7 @@ julia_library("DifferentialEquations")
 julia_assign("tspan", tspan)
 
 N_rep = 12
-S_seq = c(0,.1,.73,.77)
+S_seq = c(0,.1,.3,.5,.73)
 alpha_seq = c(.2)
 f_seq=.9
 delta_seq=seq(0,1,length.out=N_rep)
@@ -450,7 +446,7 @@ write.table(d_clustering,"../Table/2_species/PA/Clustering_PA.csv",sep=";")
 ## >> 3) Threshold for invasion and extinction ----
 
 '
-Code to generate the data for the Figure 3d. A community of 2 species, one stress tolerant and the other
+Code to generate the data for the Figure 2d. A community of 2 species, one stress tolerant and the other
 competitive. We vary the scale of dispersal and at which level of stress does the community
 goes extinct or colonize the landscape
 '
@@ -571,7 +567,7 @@ write.table(d_extinction,"../Table/2_species/PA/Threshold_extinction.csv",sep=";
 
 ## >> 4) Multistability and trait difference ----
 '
-Code to generate the data for the Figure 4. A community of 2 species with variable strategies. 
+Code to generate the data for the SI fig about differences in traits. A community of 2 species with variable strategies. 
 For each combination of species strategy (psi_1, psi_2), we vary the level of abiotic stress
 to see how frequent bistability emerge in this small community.
 Here the model used accounts for spatial correlations between close sites
@@ -858,6 +854,108 @@ write.table(d2,paste0("../Table/2_species/PA/Higher_restor_lower_deg.csv"),sep="
 
 #***********************************************************
 
+## >> 7) Understanding community bistability ----
+'
+A community of 2 species, one stress tolerant and the other
+competitive. We vary the intensity of compettion and measure the level of vegetation clustering along the 
+dispersal scale gradient
+'
+
+
+tspan = c(0, 2000) #to avoid long transient
+t = seq(0, 2000, by = 1)
+julia_library("DifferentialEquations")
+julia_assign("tspan", tspan)
+
+N_rep = 12
+S_seq = 0
+alpha_seq = seq(0,.4, length.out=N_rep)
+f_seq=.9
+delta_seq=.1
+cintra_seq=c(.3)
+
+
+
+d_clustering=tibble() #initializing the tibble
+
+for (scena_ID in 1:2){ 
+  
+  for (disp in delta_seq){ #varying dispersal scale
+    
+    for (aii in cintra_seq){ #varying intraspecific competition strength
+      
+      for (f in f_seq){ #varying facilitation strength
+        
+        for (alpha0 in alpha_seq) { #varying competition
+          
+          
+          #Setting the parameters
+          param=Get_PA_parameters()
+          param["cintra"]=aii
+          param["f"]=f
+          param["delta"]=disp
+          param["alpha_0"]=alpha0
+          
+          
+          #varying the global interspecific competition
+          
+          d2 = tibble()
+          
+          for (S in S_seq) { #varying the stress 
+            
+            param["S"] = S
+            param["alpha_0"] = alpha0
+            julia_assign("p", param)
+            
+            if (scena_ID==1){
+              state =Get_PA_initial_state(Get_MF_initial_state(c(.4,.4,.1)))
+            }else {
+              state =Get_PA_initial_state(Get_MF_initial_state(c(.005,.005,.49)))
+            }
+            julia_assign("state", state)
+            
+            
+            
+            prob = julia_eval("ODEProblem(PA_two_species_global_C_local_F, state, tspan, p)")
+            
+            sol = de$solve(prob, de$Tsit5(), saveat = t)
+            d = as.data.frame(t(sapply(sol$u, identity)))
+            
+            colnames(d) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm")
+            
+            d2 = rbind(d2, d[nrow(d),] %>% add_column(S = S, alpha_0=alpha0))
+            
+          }
+          d2[d2 < 10^-4] = 0
+          colnames(d2) = c("rho_1", "rho_2", "rho_m", "rho_12", "rho_1m", "rho_2m", "rho_11", "rho_22", "rho_mm", "S", "alpha_0")
+          d2$rho_plus = d2$rho_1 + d2$rho_2
+          
+          
+          
+          d_clustering=rbind(d_clustering,tibble(
+            Rho_1=d2$rho_1,Rho_2=d2$rho_2,Rho_12=d2$rho_12,
+            Rho_22=d2$rho_22,Rho_11=d2$rho_11,Rho_10=d2$rho_1 - d2$rho_11 - d2$rho_12 - d2$rho_1m,
+            Rho_20=d2$rho_2 - d2$rho_22 - d2$rho_12 - d2$rho_2m,
+            Rho_0=1-d2$rho_1-d2$rho_1-d2$rho_m,
+            S   = d2$S,alpha_0 = d2$alpha_0,
+            f=f,delta=disp,Scena=c("High initial state","Low initial state")[scena_ID],
+            cintra=aii
+          ))
+          
+          
+        } #end competition loop
+        
+      } #end facilitation loop
+      
+    } #end h loop
+    
+  } #end dispersal loop
+  
+} #end scenario loop
+
+write.table(d_clustering,"../Table/2_species/PA/Clustering_PA2.csv",sep=";")
+
+
 # --------   Step 3) N-species analysis ----------------
 
 #***********************************************************
@@ -865,11 +963,10 @@ write.table(d2,paste0("../Table/2_species/PA/Higher_restor_lower_deg.csv"),sep="
 
 ## >> 1) PA N-species ----
 '
-Code to generate the aggregate the data used for Figure 6. A community of N species, each having a given strategy.
+Code to generate the aggregate the data used for Figures 4-5. A community of N species, each having a given strategy.
 We vary both the level of abiotic stress and the level of competition and look for multistability in the community.
 The simulations were made in the region 9 of the julia script Dryland_shift_Nspecies_main.jl 
 '
-
 
 rm(list = ls())
 source("./Dryland_shift_functions.R")
@@ -1159,3 +1256,171 @@ write.table(d_cover_cliques,"../Table/N_species/MF/post_proc_sim3.csv",sep=";")
 
 
 
+
+## >> 3) Sensitivity competition kernel ----
+
+'
+Code to generate the aggregate the data used for the Appendix on the shape of the competition kernel. A community of 15 species, each having a given strategy.
+We vary both the level of abiotic stress and the level of competition and look for multistability in the community.
+The simulations were made in the region 9 of the julia script Dryland_shift_Nspecies_main.jl 
+'
+
+rm(list = ls())
+source("./Dryland_shift_functions.R")
+
+
+
+d_richness=d_tot=d_trait_shift=tibble()
+
+Nsp=15;i=Nsp
+list_csv=list.files(paste0('./Table/N_species/PA/Kernel_competition'))
+
+for ( k in 1:length(list_csv)){
+  print(k)
+  d2=read.table(paste0("./Table/N_species/PA/Kernel_competition/",list_csv[k]),sep=",")
+  d2=d2[,c(1:i,(ncol(d2)-4):ncol(d2))]
+  colnames(d2)=c(paste0("Sp_",1:Nsp),"Random_ini","Competition","Facilitation","Branch","Stress")
+  
+  d2[d2<10^(-4)]=0
+  
+  
+  #high initial cover    
+  d_richness=rbind(d_richness,
+                   tibble(Nsp=Nsp,Random_ini=k,Competition=strsplit(list_csv[k],split = "_")[[1]][5],
+                          Branch="Degradation",
+                          Richness=length(which(colSums(d2[1:(nrow(d2)/2),])[1:Nsp] !=0))))
+  
+  #low initial cover
+  d_richness=rbind(d_richness,
+                   tibble(Nsp=Nsp,Random_ini=k,Competition=strsplit(list_csv[k],split = "_")[[1]][5],
+                          Branch="Restoration",
+                          Richness=length(which(colSums(d2[((nrow(d2)/2)+1):(nrow(d2)),])[1:Nsp] !=0))))
+  
+  
+  
+  d2$Entropy = sapply(1:nrow(d2),function(x){
+    return(sum(d2[x,1:Nsp]*log(d2[x,1:Nsp]),na.rm = T))
+  })
+  
+  d2$CSI = sapply(1:nrow(d2),function(x){
+    set.seed(432)
+    u=runif(Nsp)
+    return(sum(d2[x,1:Nsp]*u))
+  })
+  
+  d2$Psi_normalized = sapply(1:nrow(d2),function(x){
+    trait=rev(seq(0,1,length.out=Nsp))
+    if (d2$CSI[x]==0){return(NA)
+    }else{  return(sum(d2[x,1:Nsp]*trait)/rowSums(d2[x,1:Nsp]))
+    }
+  })
+  
+  d2$Rho_plus = sapply(1:nrow(d2),function(x){
+    return(sum(d2[x,1:Nsp]))
+  })
+  
+  d2$Nb_sp = sapply(1:nrow(d2),function(x){
+    return(length(which(d2[x,1:Nsp] != 0)))
+  })
+  
+  d2$Name_sp = sapply(1:nrow(d2),function(x){
+    return(paste0(which(d2[x,1:Nsp]>0),collapse = "_"))
+  })
+  
+  
+  d_tot=rbind(d_tot,d2[,-c(1:Nsp)]%>%add_column(., Nsp=Nsp,Competition=strsplit(list_csv[k],split = "_")[[1]][5]))
+  
+}
+
+
+write.table(d_richness,"./Table/N_species/PA/Multistability_richness_kernel_competition.csv",sep=";")
+write.table(d_tot%>%filter(., Random_ini>0),
+            "./Table/N_species/PA/Multistability_CSI_kernel_competition.csv",sep=";")
+
+
+# >> Number ASS along the stress gradient
+d_tot=read.table("./Table/N_species/PA/Multistability_CSI_kernel_competition.csv",sep=";")
+d=type_bistab=d_cover_cliques=tibble()
+
+for (compet in unique(d_tot$Competition)){
+  
+  if (compet <.15){
+    for (species in unique(d_tot$Nsp)){
+      for (i in unique(d_tot$Stress)){
+        
+        d_fil=filter(d_tot,Competition==compet,Nsp==species,Stress==i)
+        
+        d2=tibble(Competition=compet,Nsp=species,Stress=i,N_ASS = length(unique(d_fil$Name_sp)))
+        
+        type_bistab2=tibble(Competition=compet,Nsp=species,Stress=i,
+                            Type = ifelse(all(d_fil$CSI==0),"Degraded",
+                                          ifelse(any(d_fil$CSI==0),"Env",
+                                                 ifelse(length(unique(d_fil$Name_sp))>2,
+                                                        ifelse(any(d_fil$Nb_sp>1),"Cliques","Mutual exclusion"),"No bistab"))),
+                            Freq_cliques=ifelse(length(unique(d_fil$Name_sp))>1,
+                                                ifelse(any(d_fil$Nb_sp>1),
+                                                       length(which(d_fil$Nb_sp>1))/nrow(d_fil),
+                                                       0),
+                                                0))
+        
+        
+        if (type_bistab2$Type !="No bistab"){
+          d_fil=d_fil%>%add_column(., ID_ASS=sapply(1:nrow(.),function(x){
+            return(which(round(d_fil$CSI[x],2)==unique(round(d_fil$CSI,2))))
+          }))%>%
+            group_by(., ID_ASS)%>%
+            slice_sample(n=1)
+          d_cover_cliques=rbind(d_cover_cliques,d_fil%>%
+                                  add_column(., Type=type_bistab2$Type))
+        }
+        
+        d=rbind(d,d2)
+        type_bistab=rbind(type_bistab,type_bistab2)
+      }
+      
+    }
+    
+  } else {
+    for (species in unique(d_tot$Nsp)){
+      for (i in unique(d_tot$Stress)){
+        
+        d_fil=filter(d_tot,Competition==compet,Nsp==species,Stress==i)
+        
+        d2=tibble(Competition=compet,Nsp=species,Stress=i,N_ASS = length(unique(d_fil$Name_sp)))
+        
+        type_bistab2=tibble(Competition=compet,Nsp=species,Stress=i,
+                            Type = ifelse(all(d_fil$CSI==0),"Degraded",
+                                          ifelse(any(d_fil$CSI==0),"Env",
+                                                 ifelse(length(unique(d_fil$Name_sp))>2,
+                                                        ifelse(any(d_fil$Nb_sp>1),"Cliques","Mutual exclusion"),"No bistab"))),
+                            Freq_cliques=ifelse(length(unique(d_fil$Name_sp))>1,
+                                                ifelse(any(d_fil$Nb_sp>1),
+                                                       length(which(d_fil$Nb_sp>1))/nrow(d_fil),
+                                                       0),
+                                                0))
+        
+        
+        if (type_bistab2$Type !="No bistab"){
+          d_fil=d_fil%>%add_column(., ID_ASS=sapply(1:nrow(.),function(x){
+            return(which(round(d_fil$CSI[x],2)==unique(round(d_fil$CSI,2))))
+          }))%>%
+            group_by(., ID_ASS)%>%
+            slice_sample(n=1)
+          d_cover_cliques=rbind(d_cover_cliques,d_fil%>%
+                                  add_column(., Type=type_bistab2$Type))
+        }
+        
+        d=rbind(d,d2)
+        type_bistab=rbind(type_bistab,type_bistab2)
+      }
+    }
+    
+    
+  }
+  
+}
+
+
+write.table(d,"./Table/N_species/PA/post_proc_sim1_kernel_competition.csv",sep=";")
+write.table(type_bistab,"./Table/N_species/PA/post_proc_sim2_kernel_competition.csv",sep=";")
+write.table(d_cover_cliques,"./Table/N_species/PA/post_proc_sim3_kernel_competition.csv",sep=";")

@@ -130,6 +130,48 @@ for disp in disp_seq
 end
 
 
+#Same but convergence with the different types of scale_competition
+
+
+S_seq = collect(range(0, stop=0.8, length=10)) #the point where there is bistability in PA
+c_seq = collect(range(0, stop=0.4, length=10))
+intra_comp_seq = [0.3]
+param = Get_classical_param_2species()
+size_landscape = 100
+trajec_seq = ["Degradation" "Restoration"]
+count = 1
+scale_competition = ["local","medium"]
+disp_seq = [0.1]
+d2 = zeros(length(S_seq) * length(c_seq) * length(scale_competition) * length(intra_comp_seq) * 2, 4) #Allocating
+
+for disp in disp_seq
+    for scale_comp in scale_competition
+        for aii in intra_comp_seq
+            for stress in S_seq
+                param["S"] = stress
+                for alpha_e in c_seq
+                    param["alpha_e"] = alpha_e
+                    for traj in trajec_seq
+                        if traj == "Degradation"
+                            ini = Get_initial_lattice_2species(size_mat=size_landscape, frac=[0.4, 0.4, 0.1, 0.1])
+                        else
+                            ini = Get_initial_lattice_2species(size_mat=size_landscape, frac=[0.05, 0.05, 0.49, 0.5])
+                        end
+
+
+                        d, state = Run_CA_2_species(; landscape=copy(ini), param=copy(param), time=3000, type_competition=scale_comp, save=false, burning=15000, N_snap=40,
+                            name_save="")
+
+                        #display(Plot_dynamics(d))
+                        CSV.write("../Table/2_species/CA/Types_competition/Dynamics_stress_" * repr(round(stress, digits=3)) *
+                                  "_trajectory_" * traj * "_alpha0_" * repr(alpha_e) * repr(scale_comp) *".csv", Tables.table(d), writeheader=false)
+
+                    end
+                end
+            end
+        end
+    end
+end
 
 
 #endregion
@@ -780,6 +822,63 @@ pmap(Run_sim_PA, 1:250)
 
 
 
+
+
+@everywhere function Run_sim_PA(N_random_ini)
+
+    Nsp = 15
+    N_sim_S = 100
+    length_aij_seq = 6
+
+
+    S_seq = collect(range(0, 0.9, length=N_sim_S))
+    a0_seq = a0_seq = cat(collect(range(0.225, 0.35, length=length_aij_seq)), [0, 0.075, .15],dims=1)
+    facil = 0.9
+    tspan = (0.0, 1000000)
+
+    for random_ini in N_random_ini
+
+        for a0 in a0_seq
+            d = zeros(N_sim_S * 2, Int(((Nsp^2 + 7 * Nsp) / 2) + 5) + 5)
+            dt = 1
+
+            for direction in 1
+                if direction == 1
+                    branches = "Degradation"
+                else
+                    branches = "Restoration"
+                end
+
+                global p = Get_classical_param_Nspecies(N_species=Nsp,
+                    alpha_e=a0, scenario_trait="spaced", cintra=0.3, trade_off=1,type_kernel="")
+
+
+                Random.seed!(random_ini)
+                state = Get_initial_state(Nsp=Nsp, type="random", branch=branches, PA=true)
+
+                for stress in S_seq
+
+                    p[9] = stress
+
+                    prob = ODEProblem(PA_N_species, state, tspan, p)
+                    sol = solve(prob, callback=TerminateSteadyState(1e-10))
+                    d2 = Reorder_dynamics(sol)
+
+
+                    d[dt, :] = push!(d2[size(d2)[1], 1:(Int(((Nsp^2 + 7 * Nsp) / 2) + 5))], random_ini, a0, facil, direction, stress)
+                    dt = dt + 1
+                end
+            end
+            CSV.write("./Table/N_species/PA/Kernel_competition/Sim_Nrandom_" * repr(random_ini) *
+                      "_a0_" * repr(a0) * "_Nsp_" * repr(Nsp) *
+                      "_f_" * repr(facil) * ".csv", Tables.table(d), writeheader=false)
+
+        end
+    end
+end
+
+
+pmap(Run_sim_PA, 1:250)
 
 
 

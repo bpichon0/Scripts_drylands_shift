@@ -4,6 +4,7 @@ x = c("tidyverse", "ggpubr", "latex2exp", "deSolve", "reshape2","simecol",
 
 #install pacakges if not installed already
 install.packages(setdiff(x, rownames(installed.packages())))
+# options(JULIA_HOME = "C:\\Users\\Benoi\\AppData\\Local\\Programs\\Julia-1.9.2\\bin")
 
 #load it
 lapply(x, require, character.only = TRUE)
@@ -12,7 +13,7 @@ lapply(x, require, character.only = TRUE)
 
 the_theme = theme_classic() + theme(
     legend.position = "bottom",
-    strip.background = element_rect(fill = "#CCE8D8"),
+    strip.background = element_rect(fill = "transparent",color="transparent"),
     strip.text.y = element_text(size = 10, angle = -90),
     strip.text.x = element_text(size = 8), axis.text = element_text(size = 11), axis.title = element_text(size = 13),
     legend.text = element_text(size = 10), text = element_text(family = "NewCenturySchoolbook")
@@ -89,54 +90,54 @@ Get_MF_initial_state = function(type="equal") {
 
 
 # normal function
-MF_two_species_julia = julia_eval("
-
-function MF_two_species(du,u,p,t)
-
-  r,d,f,beta,m,e,cintra,alpha_0,S,h=p
-  rho_1,rho_2,rho_d,rho_0=u
-  
-  du[1] = rho_0 * ( rho_1 *  (beta * ( 1 - S * (1 - e)) - (cintra*rho_1 + alpha_0 * (1+h*exp(-1)) * rho_2))) - rho_1 * m
-  du[2] = rho_0 * ( rho_2 *  (beta *( 1 - S) - (cintra*rho_2 + alpha_0*rho_1 ))) - rho_2 * m
-  du[3] = d*rho_0 - rho_d*(r+f*(rho_1))
-  du[4] = -d*rho_0 + rho_d*(r+f*(rho_1)) - rho_0 * ( rho_1 *  (beta * ( 1 - S * (1 - e)) - (cintra*rho_1 + alpha_0 * (1+h*exp(-1)) * rho_2 ))) -
-      rho_0 * ( rho_2 *  (beta *( 1 - S) - (cintra*rho_2 + alpha_0*rho_1 ))) + rho_2 * m + rho_1 * m
-
-end")
+# MF_two_species_julia = julia_eval("
+# 
+# function MF_two_species(du,u,p,t)
+# 
+#   r,d,f,beta,m,e,cintra,alpha_0,S,h=p
+#   rho_1,rho_2,rho_d,rho_0=u
+#   
+#   du[1] = rho_0 * ( rho_1 *  (beta * ( 1 - S * (1 - e)) - (cintra*rho_1 + alpha_0 * (1+h*exp(-1)) * rho_2))) - rho_1 * m
+#   du[2] = rho_0 * ( rho_2 *  (beta *( 1 - S) - (cintra*rho_2 + alpha_0*rho_1 ))) - rho_2 * m
+#   du[3] = d*rho_0 - rho_d*(r+f*(rho_1))
+#   du[4] = -d*rho_0 + rho_d*(r+f*(rho_1)) - rho_0 * ( rho_1 *  (beta * ( 1 - S * (1 - e)) - (cintra*rho_1 + alpha_0 * (1+h*exp(-1)) * rho_2 ))) -
+#       rho_0 * ( rho_2 *  (beta *( 1 - S) - (cintra*rho_2 + alpha_0*rho_1 ))) + rho_2 * m + rho_1 * m
+# 
+# end")
 
 
 # function of press perturbation
-MF_two_species_julia_press = julia_eval("
-
-function MF_two_species_press(du,u,p,t)
-
-  r,d,f,beta1,beta2,m,e,cintra,alpha_0,S,h=p
-  rho_1,rho_2,rho_d,rho_0=u
-  
-  du[1] = rho_0 * ( rho_1 *  (beta1 * ( 1 - S * (1 - e)) - (cintra*rho_1 + alpha_0 * (1+h*exp(-1)) * rho_2))) - rho_1 * m
-  du[2] = rho_0 * ( rho_2 *  (beta2 *( 1 - S) - (cintra*rho_2 + alpha_0*rho_1 ))) - rho_2 * m
-  du[3] = d*rho_0 - rho_d*(r+f*(rho_1))
-  du[4] = -d*rho_0 + rho_d*(r+f*(rho_1)) - rho_0 * ( rho_1 *  (beta1 * ( 1 - S * (1 - e)) - (cintra*rho_1 + alpha_0 * (1+h*exp(-1)) * rho_2 ))) -
-      rho_0 * ( rho_2 *  (beta2 *( 1 - S) - (cintra*rho_2 + alpha_0*rho_1 ))) + rho_2 * m + rho_1 * m
-
-end")
+# MF_two_species_julia_press = julia_eval("
+# 
+# function MF_two_species_press(du,u,p,t)
+# 
+#   r,d,f,beta1,beta2,m,e,cintra,alpha_0,S,h=p
+#   rho_1,rho_2,rho_d,rho_0=u
+#   
+#   du[1] = rho_0 * ( rho_1 *  (beta1 * ( 1 - S * (1 - e)) - (cintra*rho_1 + alpha_0 * (1+h*exp(-1)) * rho_2))) - rho_1 * m
+#   du[2] = rho_0 * ( rho_2 *  (beta2 *( 1 - S) - (cintra*rho_2 + alpha_0*rho_1 ))) - rho_2 * m
+#   du[3] = d*rho_0 - rho_d*(r+f*(rho_1))
+#   du[4] = -d*rho_0 + rho_d*(r+f*(rho_1)) - rho_0 * ( rho_1 *  (beta1 * ( 1 - S * (1 - e)) - (cintra*rho_1 + alpha_0 * (1+h*exp(-1)) * rho_2 ))) -
+#       rho_0 * ( rho_2 *  (beta2 *( 1 - S) - (cintra*rho_2 + alpha_0*rho_1 ))) + rho_2 * m + rho_1 * m
+# 
+# end")
 
 
 #MF varying trait
-MF_two_species_julia_varying_trait = julia_eval("
-
-function MF_two_species_varying_trait(du,u,p,t)
-
-  r,d,f,beta,m,e,cintra,alpha_0,S,h,psi_1,psi_2=p
-  rho_1,rho_2,rho_d,rho_0=u
-  
-  du[1] = rho_0 * ( rho_1 *  (beta * ( 1 - S * (1 - psi_1 * e)) - (cintra*rho_1 + alpha_0 * (1 + psi_1 * h * exp( - abs(psi_1 - psi_2))) * rho_2))) - rho_1 * m
-  du[2] = rho_0 * ( rho_2 *  (beta * ( 1 - S * (1 - psi_2 * e)) - (cintra*rho_2 + alpha_0 * (1 + psi_2 * h * exp( - abs(psi_1 - psi_2))) * rho_1))) - rho_2 * m
-  du[3] = d*rho_0 - rho_d*(r+f*(psi_1*rho_1+psi_2*rho_2))
-  du[4] = -d*rho_0 + rho_d*(r+f*(psi_1*rho_1+psi_2*rho_2)) - rho_0 * ( rho_1 *  (beta * ( 1 - S * (1 - psi_1 * e)) - (cintra*rho_1 + alpha_0 * (1 + psi_1 * h * exp( - abs(psi_1 - psi_2))) * rho_2 ))) -
-      rho_0 * ( rho_2 *  (beta *( 1 - S * (1 - psi_2 * e)) - (cintra*rho_2 + alpha_0 * (1 + psi_2 * h * exp( - abs(psi_1 - psi_2))) * rho_1 ))) + rho_2 * m + rho_1 * m
-
-end")
+# MF_two_species_julia_varying_trait = julia_eval("
+# 
+# function MF_two_species_varying_trait(du,u,p,t)
+# 
+#   r,d,f,beta,m,e,cintra,alpha_0,S,h,psi_1,psi_2=p
+#   rho_1,rho_2,rho_d,rho_0=u
+#   
+#   du[1] = rho_0 * ( rho_1 *  (beta * ( 1 - S * (1 - psi_1 * e)) - (cintra*rho_1 + alpha_0 * (1 + psi_1 * h * exp( - abs(psi_1 - psi_2))) * rho_2))) - rho_1 * m
+#   du[2] = rho_0 * ( rho_2 *  (beta * ( 1 - S * (1 - psi_2 * e)) - (cintra*rho_2 + alpha_0 * (1 + psi_2 * h * exp( - abs(psi_1 - psi_2))) * rho_1))) - rho_2 * m
+#   du[3] = d*rho_0 - rho_d*(r+f*(psi_1*rho_1+psi_2*rho_2))
+#   du[4] = -d*rho_0 + rho_d*(r+f*(psi_1*rho_1+psi_2*rho_2)) - rho_0 * ( rho_1 *  (beta * ( 1 - S * (1 - psi_1 * e)) - (cintra*rho_1 + alpha_0 * (1 + psi_1 * h * exp( - abs(psi_1 - psi_2))) * rho_2 ))) -
+#       rho_0 * ( rho_2 *  (beta *( 1 - S * (1 - psi_2 * e)) - (cintra*rho_2 + alpha_0 * (1 + psi_2 * h * exp( - abs(psi_1 - psi_2))) * rho_1 ))) + rho_2 * m + rho_1 * m
+# 
+# end")
 
 
 # Hysteresis functions
@@ -310,730 +311,730 @@ get_mean_densities = function(d) {
 
 ## >> a) local facilitation ----
 
-PA_two_species_local_C_local_F = julia_eval("
-
-function PA_two_species_local_C_local_F(du,u,p,t)
-
-
-r,d,f,beta,m,e,cintra,alpha_0,S,delta,z,h=p
-rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
-
-rho_0=(1- rho_1-rho_2-rho_m)
-rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
-rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
-rho_0m = rho_m - rho_mm - rho_1m - rho_2m 
-
-
-
-#rho_1
-du[1] =  rho_0 *  (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
-( (cintra * (rho_10/rho_0) + alpha_0 * (1+h*exp(-1)) *(rho_20/rho_0)) ) ) - rho_1 * m
-
-#rho_2
-du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 - S)  - 
-( (cintra * (rho_20/rho_0) + alpha_0 * (rho_10/rho_0))  )  ) - rho_2 * m
-
-#rho_m
-du[3] =  rho_0 * d - rho_m * (r + f * (rho_1m / rho_m))
-
-#rho_12
-du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * 
-        (beta * (1 - S ) - ( (cintra * ((z - 1) / z)*(rho_20/rho_0) + (alpha_0/z) + alpha_0 *((z - 1) / z)*(rho_10/rho_0)) )   )  +
-        rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * 
-        (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
-        ( (cintra * ((z - 1) / z) * (rho_10/rho_0) + ((alpha_0 * (1+h*exp(-1)))/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *(rho_20/rho_0)) )  ) -
-        2 * rho_12 * m
-
-#rho_1m
-du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
-        (cintra * ((z - 1) / z) * (rho_10/rho_0) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *(rho_20/rho_0))     ) -
-        rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (rho_1m / rho_m) ))
-
-#rho_2m
-du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S  ) - 
-        ( (cintra * ((z - 1) / z) * (rho_20/rho_0) + alpha_0 *  ((z - 1) / z) *(rho_10/rho_0)) )) -
-        rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (rho_1m / rho_m )))
-
-#rho_11
-du[7] = 2* rho_10 *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0 )) * 
-        (beta *  (1 - S * (1-e )) - (cintra * ((z - 1) / z) * (rho_10/rho_0) + (cintra/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *(rho_20/rho_0))  ) -
-        2 * rho_11 * m
-
-#rho_22
-du[8] = 2* rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0 )) * (beta *  
-        (1 - S ) - ( (cintra * ((z - 1) / z)*(rho_20/rho_0) + (cintra/z) + alpha_0 *((z - 1) / z)*(rho_10/rho_0)) )    ) -
-        2 * rho_22 * m
-
-#rho_mm
-du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * ((z - 1) / z) * (rho_1m / rho_m))
-
-
-end
-
-
-")
-
-PA_two_species_global_C_local_F = julia_eval("
-
-function PA_two_species_global_C_local_F(du,u,p,t)
-
-r,d,f,beta,m,e,cintra,alpha_0,S,delta,z,h=p
-rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
-
-rho_0=(1- rho_1-rho_2-rho_m)
-rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
-rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
-rho_0m = rho_m - rho_mm - rho_1m - rho_2m 
-
-
-#rho_1
-du[1] =  rho_0 *  (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
-(cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) ) - rho_1 * m
-
-#rho_2
-du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 - S)  - 
-(cintra *rho_2 + alpha_0 * rho_1)) - rho_2 * m
-
-#rho_m
-du[3] =  rho_0 * d - rho_m * (r + f * (rho_1m / rho_m))
-
-#rho_12
-du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * 
-        (beta * (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1))  +
-        rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * 
-        (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
-        (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) )-
-        2 * rho_12 * m
-
-#rho_1m
-du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
-        (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
-        rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (rho_1m / rho_m) ))
-
-#rho_2m
-du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S  ) - 
-        ((cintra *rho_2 + alpha_0 *rho_1) )) -
-        rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (rho_1m / rho_m )))
-
-#rho_11
-du[7] = 2* rho_10 *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0 )) * 
-        (beta *  (1 - S * (1-e )) - (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
-        2 * rho_11 * m
-
-#rho_22
-du[8] = 2* rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0 )) * (beta *  
-        (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1)) -
-        2 * rho_22 * m
-
-#rho_mm
-du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * ((z - 1) / z) * (rho_1m / rho_m))
-
-end
-
-
-")
-
-
-
-
-
-PA_two_species_local_C_local_F_press = julia_eval("
-
-function PA_two_species_local_C_local_F_press(du,u,p,t)
-
-r,d,f,beta1,beta2,m,e,cintra,alpha_0,S,delta,z,h=p
-rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
-
-rho_0  = (1- rho_1-rho_2-rho_m)
-rho_10 = (rho_1 - rho_11 - rho_12 - rho_1m)
-rho_20 = (rho_2 - rho_22 - rho_12 - rho_2m)
-rho_0m = (rho_m - rho_mm - rho_1m - rho_2m)
-
-#rho_1
-du[1] =  rho_0 * (delta * rho_1 + (1 - delta) * ((rho_10) / rho_0)) * (beta1 * (1 - S * e ) - ( (alpha_0 *(rho_10/rho_0) + alpha_0 * (1+h*exp(-1)) *(rho_20/rho_0)) )) - rho_1 * m
-
-#rho_2
-du[2] =  rho_0 * (delta * rho_2 + (1 - delta) * ((rho_20) / rho_0)) * (beta2 * (1 - S)  - ( (cintra *(rho_20/rho_0) + alpha_0 *(rho_10/rho_0)) )) - rho_2 * m
-
-#rho_m
-du[3] =  rho_0 * d - rho_m * (r + f * (rho_1m / rho_m))
-
-#rho_12
-du[4] = (rho_10) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * ((rho_20) / rho_0)) * (beta2 * (1 - S ) - ( (cintra *((z - 1) / z)*(rho_20/rho_0) + (alpha_0/z) + alpha_0 *((z - 1) / z)*(rho_10/rho_0)) ))  +
-        (rho_20) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * ((rho_10) / rho_0)) * (beta1 * (1 - S * e ) - ( (alpha_0 * ((z - 1) / z) * (rho_10/rho_0) + (alpha_0 * (1+h*exp(-1))/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *(rho_20/rho_0)) ))-
-        2 * rho_12 * m
-
-#rho_1m
-du[5] = (rho_10) * d + rho_0m * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * ((rho_10) / rho_0)) * (beta1 * (1 - S * e ) - ( (alpha_0 *(rho_10/rho_0) + alpha_0 * (1+h*exp(-1)) *(rho_20/rho_0)) )) -
-        rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (rho_1m / rho_m) ))
-
-#rho_2m
-du[6] = (rho_20) * d + rho_0m * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * ((rho_20) / rho_0) * (beta2 * (1 - S  ) - ( (cintra *(rho_20/rho_0) + alpha_0 *(rho_10/rho_0)) ))) -
-        rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (rho_1m / rho_m )))
-
-#rho_11
-du[7] = 2* (rho_10) * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * ((rho_10) / rho_0 )) * ( beta1 * (1 - S * e ) - ( (alpha_0 *(rho_10/rho_0) * ((z - 1) / z) + (alpha_0/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) * (rho_20/rho_0)) )) -
-        2 * rho_11 * m
-
-#rho_22
-du[8] = 2* (rho_20) * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * ((rho_20) / rho_0 )) * (beta2 * (1 - S ) - ( (cintra *(rho_20/rho_0) * ((z - 1) / z) + (cintra/z) + alpha_0 * ((z - 1) / z) * (rho_10/rho_0)) )) -
-        2 * rho_22 * m
-
-#rho_mm
-du[9] = 2 * rho_0m * d - 2* rho_mm * (r + f * ((z - 1) / z) * (rho_1m / rho_m))
-
-end
-
-
-")
-
-
-
-
-PA_two_species_global_C_local_F_press = julia_eval("
-
-function PA_two_species_global_C_local_F_press(du,u,p,t)
-
-r,d,f,beta1,beta2,m,e,cintra,alpha_0,S,delta,z,h=p
-rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
-
-rho_0=(1- rho_1-rho_2-rho_m)
-rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
-rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
-rho_0m = rho_m - rho_mm - rho_1m - rho_2m 
-
-
-#rho_1
-du[1] =  rho_0 *  (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta1 * (1 - S * (1-e )) - 
-(cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) ) - rho_1 * m
-
-#rho_2
-du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta2 * (1 - S)  - 
-(cintra *rho_2 + alpha_0 * rho_1)) - rho_2 * m
-
-#rho_m
-du[3] =  rho_0 * d - rho_m * (r + f * (rho_1m / rho_m))
-
-#rho_12
-du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * 
-        (beta2 * (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1))  +
-        rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * 
-        (rho_10 / rho_0)) * (beta1 * (1 - S * (1-e )) - 
-        (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) )-
-        2 * rho_12 * m
-
-#rho_1m
-du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta1 * (1 - S * (1-e )) - 
-        (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
-        rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (rho_1m / rho_m) ))
-
-#rho_2m
-du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta2 * (1 - S  ) - 
-        ((cintra *rho_2 + alpha_0 *rho_1) )) -
-        rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (rho_1m / rho_m )))
-
-#rho_11
-du[7] = 2* rho_10 *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0 )) * 
-        (beta1 *  (1 - S * (1-e )) - (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
-        2 * rho_11 * m
-
-#rho_22
-du[8] = 2* rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0 )) * (beta2 *  
-        (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1)) -
-        2 * rho_22 * m
-
-#rho_mm
-du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * ((z - 1) / z) * (rho_1m / rho_m))
-
-end
-
-
-")
+# PA_two_species_local_C_local_F = julia_eval("
+# 
+# function PA_two_species_local_C_local_F(du,u,p,t)
+# 
+# 
+# r,d,f,beta,m,e,cintra,alpha_0,S,delta,z,h=p
+# rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
+# 
+# rho_0=(1- rho_1-rho_2-rho_m)
+# rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
+# rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
+# rho_0m = rho_m - rho_mm - rho_1m - rho_2m 
+# 
+# 
+# 
+# #rho_1
+# du[1] =  rho_0 *  (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
+# ( (cintra * (rho_10/rho_0) + alpha_0 * (1+h*exp(-1)) *(rho_20/rho_0)) ) ) - rho_1 * m
+# 
+# #rho_2
+# du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 - S)  - 
+# ( (cintra * (rho_20/rho_0) + alpha_0 * (rho_10/rho_0))  )  ) - rho_2 * m
+# 
+# #rho_m
+# du[3] =  rho_0 * d - rho_m * (r + f * (rho_1m / rho_m))
+# 
+# #rho_12
+# du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * 
+#         (beta * (1 - S ) - ( (cintra * ((z - 1) / z)*(rho_20/rho_0) + (alpha_0/z) + alpha_0 *((z - 1) / z)*(rho_10/rho_0)) )   )  +
+#         rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * 
+#         (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
+#         ( (cintra * ((z - 1) / z) * (rho_10/rho_0) + ((alpha_0 * (1+h*exp(-1)))/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *(rho_20/rho_0)) )  ) -
+#         2 * rho_12 * m
+# 
+# #rho_1m
+# du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
+#         (cintra * ((z - 1) / z) * (rho_10/rho_0) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *(rho_20/rho_0))     ) -
+#         rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (rho_1m / rho_m) ))
+# 
+# #rho_2m
+# du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S  ) - 
+#         ( (cintra * ((z - 1) / z) * (rho_20/rho_0) + alpha_0 *  ((z - 1) / z) *(rho_10/rho_0)) )) -
+#         rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (rho_1m / rho_m )))
+# 
+# #rho_11
+# du[7] = 2* rho_10 *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0 )) * 
+#         (beta *  (1 - S * (1-e )) - (cintra * ((z - 1) / z) * (rho_10/rho_0) + (cintra/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *(rho_20/rho_0))  ) -
+#         2 * rho_11 * m
+# 
+# #rho_22
+# du[8] = 2* rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0 )) * (beta *  
+#         (1 - S ) - ( (cintra * ((z - 1) / z)*(rho_20/rho_0) + (cintra/z) + alpha_0 *((z - 1) / z)*(rho_10/rho_0)) )    ) -
+#         2 * rho_22 * m
+# 
+# #rho_mm
+# du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * ((z - 1) / z) * (rho_1m / rho_m))
+# 
+# 
+# end
+# 
+# 
+# ")
+
+# PA_two_species_global_C_local_F = julia_eval("
+# 
+# function PA_two_species_global_C_local_F(du,u,p,t)
+# 
+# r,d,f,beta,m,e,cintra,alpha_0,S,delta,z,h=p
+# rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
+# 
+# rho_0=(1- rho_1-rho_2-rho_m)
+# rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
+# rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
+# rho_0m = rho_m - rho_mm - rho_1m - rho_2m 
+# 
+# 
+# #rho_1
+# du[1] =  rho_0 *  (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
+# (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) ) - rho_1 * m
+# 
+# #rho_2
+# du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 - S)  - 
+# (cintra *rho_2 + alpha_0 * rho_1)) - rho_2 * m
+# 
+# #rho_m
+# du[3] =  rho_0 * d - rho_m * (r + f * (rho_1m / rho_m))
+# 
+# #rho_12
+# du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * 
+#         (beta * (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1))  +
+#         rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * 
+#         (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
+#         (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) )-
+#         2 * rho_12 * m
+# 
+# #rho_1m
+# du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
+#         (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
+#         rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (rho_1m / rho_m) ))
+# 
+# #rho_2m
+# du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S  ) - 
+#         ((cintra *rho_2 + alpha_0 *rho_1) )) -
+#         rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (rho_1m / rho_m )))
+# 
+# #rho_11
+# du[7] = 2* rho_10 *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0 )) * 
+#         (beta *  (1 - S * (1-e )) - (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
+#         2 * rho_11 * m
+# 
+# #rho_22
+# du[8] = 2* rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0 )) * (beta *  
+#         (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1)) -
+#         2 * rho_22 * m
+# 
+# #rho_mm
+# du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * ((z - 1) / z) * (rho_1m / rho_m))
+# 
+# end
+# 
+# 
+# ")
+
+
+
+
+
+# PA_two_species_local_C_local_F_press = julia_eval("
+# 
+# function PA_two_species_local_C_local_F_press(du,u,p,t)
+# 
+# r,d,f,beta1,beta2,m,e,cintra,alpha_0,S,delta,z,h=p
+# rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
+# 
+# rho_0  = (1- rho_1-rho_2-rho_m)
+# rho_10 = (rho_1 - rho_11 - rho_12 - rho_1m)
+# rho_20 = (rho_2 - rho_22 - rho_12 - rho_2m)
+# rho_0m = (rho_m - rho_mm - rho_1m - rho_2m)
+# 
+# #rho_1
+# du[1] =  rho_0 * (delta * rho_1 + (1 - delta) * ((rho_10) / rho_0)) * (beta1 * (1 - S * e ) - ( (alpha_0 *(rho_10/rho_0) + alpha_0 * (1+h*exp(-1)) *(rho_20/rho_0)) )) - rho_1 * m
+# 
+# #rho_2
+# du[2] =  rho_0 * (delta * rho_2 + (1 - delta) * ((rho_20) / rho_0)) * (beta2 * (1 - S)  - ( (cintra *(rho_20/rho_0) + alpha_0 *(rho_10/rho_0)) )) - rho_2 * m
+# 
+# #rho_m
+# du[3] =  rho_0 * d - rho_m * (r + f * (rho_1m / rho_m))
+# 
+# #rho_12
+# du[4] = (rho_10) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * ((rho_20) / rho_0)) * (beta2 * (1 - S ) - ( (cintra *((z - 1) / z)*(rho_20/rho_0) + (alpha_0/z) + alpha_0 *((z - 1) / z)*(rho_10/rho_0)) ))  +
+#         (rho_20) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * ((rho_10) / rho_0)) * (beta1 * (1 - S * e ) - ( (alpha_0 * ((z - 1) / z) * (rho_10/rho_0) + (alpha_0 * (1+h*exp(-1))/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *(rho_20/rho_0)) ))-
+#         2 * rho_12 * m
+# 
+# #rho_1m
+# du[5] = (rho_10) * d + rho_0m * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * ((rho_10) / rho_0)) * (beta1 * (1 - S * e ) - ( (alpha_0 *(rho_10/rho_0) + alpha_0 * (1+h*exp(-1)) *(rho_20/rho_0)) )) -
+#         rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (rho_1m / rho_m) ))
+# 
+# #rho_2m
+# du[6] = (rho_20) * d + rho_0m * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * ((rho_20) / rho_0) * (beta2 * (1 - S  ) - ( (cintra *(rho_20/rho_0) + alpha_0 *(rho_10/rho_0)) ))) -
+#         rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (rho_1m / rho_m )))
+# 
+# #rho_11
+# du[7] = 2* (rho_10) * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * ((rho_10) / rho_0 )) * ( beta1 * (1 - S * e ) - ( (alpha_0 *(rho_10/rho_0) * ((z - 1) / z) + (alpha_0/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) * (rho_20/rho_0)) )) -
+#         2 * rho_11 * m
+# 
+# #rho_22
+# du[8] = 2* (rho_20) * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * ((rho_20) / rho_0 )) * (beta2 * (1 - S ) - ( (cintra *(rho_20/rho_0) * ((z - 1) / z) + (cintra/z) + alpha_0 * ((z - 1) / z) * (rho_10/rho_0)) )) -
+#         2 * rho_22 * m
+# 
+# #rho_mm
+# du[9] = 2 * rho_0m * d - 2* rho_mm * (r + f * ((z - 1) / z) * (rho_1m / rho_m))
+# 
+# end
+# 
+# 
+# ")
+
+
+
+
+# PA_two_species_global_C_local_F_press = julia_eval("
+# 
+# function PA_two_species_global_C_local_F_press(du,u,p,t)
+# 
+# r,d,f,beta1,beta2,m,e,cintra,alpha_0,S,delta,z,h=p
+# rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
+# 
+# rho_0=(1- rho_1-rho_2-rho_m)
+# rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
+# rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
+# rho_0m = rho_m - rho_mm - rho_1m - rho_2m 
+# 
+# 
+# #rho_1
+# du[1] =  rho_0 *  (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta1 * (1 - S * (1-e )) - 
+# (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) ) - rho_1 * m
+# 
+# #rho_2
+# du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta2 * (1 - S)  - 
+# (cintra *rho_2 + alpha_0 * rho_1)) - rho_2 * m
+# 
+# #rho_m
+# du[3] =  rho_0 * d - rho_m * (r + f * (rho_1m / rho_m))
+# 
+# #rho_12
+# du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * 
+#         (beta2 * (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1))  +
+#         rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * 
+#         (rho_10 / rho_0)) * (beta1 * (1 - S * (1-e )) - 
+#         (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) )-
+#         2 * rho_12 * m
+# 
+# #rho_1m
+# du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta1 * (1 - S * (1-e )) - 
+#         (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
+#         rho_1m * m - rho_1m * (r + f*( (1 / z) + ((z - 1) / z) * (rho_1m / rho_m) ))
+# 
+# #rho_2m
+# du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta2 * (1 - S  ) - 
+#         ((cintra *rho_2 + alpha_0 *rho_1) )) -
+#         rho_2m * m - rho_2m * (r + f*( ((z - 1) / z) * (rho_1m / rho_m )))
+# 
+# #rho_11
+# du[7] = 2* rho_10 *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0 )) * 
+#         (beta1 *  (1 - S * (1-e )) - (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
+#         2 * rho_11 * m
+# 
+# #rho_22
+# du[8] = 2* rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0 )) * (beta2 *  
+#         (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1)) -
+#         2 * rho_22 * m
+# 
+# #rho_mm
+# du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * ((z - 1) / z) * (rho_1m / rho_m))
+# 
+# end
+# 
+# 
+# ")
 
 
 ## >> b) global facilitation ----
 
-PA_two_species_local_C_global_F = julia_eval("
-
-function PA_two_species_local_C_global_F(du,u,p,t)
-
-
-r,d,f,beta,m,e,cintra,alpha_0,S,delta,z,h=p
-rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
-
-rho_0=(1- rho_1-rho_2-rho_m)
-rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
-rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
-rho_0m = rho_m - rho_mm - rho_1m - rho_2m 
-
-
-
-#rho_1
-du[1] =  rho_0 *  (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
-( (cintra * (rho_10/rho_0) + alpha_0 * (1+h*exp(-1)) *(rho_20/rho_0)) ) ) - rho_1 * m
-
-#rho_2
-du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 - S)  - 
-( (cintra * (rho_20/rho_0) + alpha_0 *(rho_10/rho_0))  )  ) - rho_2 * m
-
-#rho_m
-du[3] =  rho_0 * d - rho_m * (r + f * rho_1)
-
-#rho_12
-du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * 
-        (beta * (1 - S ) - ( (cintra * ((z - 1) / z)*(rho_20/rho_0) + (alpha_0/z) + alpha_0 *((z - 1) / z)*(rho_10/rho_0)) )   )  +
-        rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * 
-        (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
-        ( (cintra * ((z - 1) / z) * (rho_10/rho_0) + ((alpha_0 * (1+h*exp(-1)))/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *(rho_20/rho_0)) )  ) -
-        2 * rho_12 * m
-
-#rho_1m
-du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
-        (cintra * ((z - 1) / z) * (rho_10/rho_0) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *(rho_20/rho_0))     ) -
-        rho_1m * m - rho_1m * (r + f*rho_1)
-
-#rho_2m
-du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S  ) - 
-        ( (cintra * ((z - 1) / z) * (rho_20/rho_0) + alpha_0 *  ((z - 1) / z) *(rho_10/rho_0)) )) -
-        rho_2m * m - rho_2m * (r + f*rho_1)
-
-#rho_11
-du[7] = 2* rho_10 *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0 )) * 
-        (beta *  (1 - S * (1-e )) - (cintra * ((z - 1) / z) * (rho_10/rho_0) + (cintra/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *(rho_20/rho_0))  ) -
-        2 * rho_11 * m
-
-#rho_22
-du[8] = 2* rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0 )) * (beta *  
-        (1 - S ) - ( (cintra * ((z - 1) / z)*(rho_20/rho_0) + (cintra/z) + alpha_0 *((z - 1) / z)*(rho_10/rho_0)) )    ) -
-        2 * rho_22 * m
-
-#rho_mm
-du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * rho_1)
-
-
-end
-
-
-")
-
-PA_two_species_global_C_global_F = julia_eval("
-
-function PA_two_species_global_C_global_F(du,u,p,t)
-
-r,d,f,beta,m,e,cintra,alpha_0,S,delta,z,h=p
-rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
-
-rho_0=(1- rho_1-rho_2-rho_m)
-rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
-rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
-rho_0m = rho_m - rho_mm - rho_1m - rho_2m 
-
-
-#rho_1
-du[1] =  rho_0 *  (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) ) - rho_1 * m
-
-#rho_2
-du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 - S)  - 
-(cintra *rho_2 + alpha_0 * rho_1)) - rho_2 * m
-
-#rho_m
-du[3] =  rho_0 * d - rho_m * (r + f * rho_1)
-
-#rho_12
-du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * 
-        (beta * (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1))  +
-        rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * 
-        (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
-        (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) )-
-        2 * rho_12 * m
-
-#rho_1m
-du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
-        (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
-        rho_1m * m - rho_1m * (r + f*rho_1)
-
-#rho_2m
-du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S  ) - 
-        ((cintra *rho_2 + alpha_0 *rho_1) )) -
-        rho_2m * m - rho_2m * (r + f*rho_1)
-
-#rho_11
-du[7] = 2* rho_10 *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0 )) * 
-        (beta *  (1 - S * (1-e )) - (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
-        2 * rho_11 * m
-
-#rho_22
-du[8] = 2* rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0 )) * (beta *  
-        (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1)) -
-        2 * rho_22 * m
-
-#rho_mm
-du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * rho_1)
-
-end
-
-
-")
-
-
-
-
-PA_two_species_local_C_global_F_press = julia_eval("
-
-function PA_two_species_local_C_global_F_press(du,u,p,t)
-
-r,d,f,beta1,beta2,m,e,cintra,alpha_0,S,delta,z,h=p
-rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
-
-#rho_1
-du[1] =  rho_0 * (delta * rho_1 + (1 - delta) * ((rho_10) / rho_0)) * (beta1 * (1 - S * e ) - ( (alpha_0 *(rho_10/rho_0) + alpha_0 * (1+h*exp(-1)) *(rho_20/rho_0)) )) - rho_1 * m
-
-#rho_2
-du[2] =  rho_0 * (delta * rho_2 + (1 - delta) * ((rho_20) / rho_0)) * (beta2 * (1 - S)  - ( (cintra *(rho_20/rho_0) + alpha_0 *(rho_10/rho_0)) )) - rho_2 * m
-
-#rho_m
-du[3] =  rho_0 * d - rho_m * (r + f * rho_1)
-
-#rho_12
-du[4] = (rho_10) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * ((rho_20) / rho_0)) * (beta2 * (1 - S ) - ( (cintra *((z - 1) / z)*(rho_20/rho_0) + (alpha_0/z) + alpha_0 *((z - 1) / z)*(rho_10/rho_0)) ))  +
-        (rho_20) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * ((rho_10) / rho_0)) * (beta1 * (1 - S * e ) - ( (alpha_0 * ((z - 1) / z) * (rho_10/rho_0) + (alpha_0 * (1+h*exp(-1))/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *(rho_20/rho_0)) ))-
-        2 * rho_12 * m
-
-#rho_1m
-du[5] = (rho_10) * d + rho_0m * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * ((rho_10) / rho_0)) * (beta1 * (1 - S * e ) - ( (alpha_0 *(rho_10/rho_0) + alpha_0 * (1+h*exp(-1)) *(rho_20/rho_0)) )) -
-        rho_1m * m - rho_1m * (r + f*rho_1)
-
-#rho_2m
-du[6] = (rho_20) * d + rho_0m * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * ((rho_20) / rho_0) * (beta2 * (1 - S  ) - ( (cintra *(rho_20/rho_0) + alpha_0 *(rho_10/rho_0)) ))) -
-        rho_2m * m - rho_2m * (r + f*rho_1)
-
-#rho_11
-du[7] = 2* (rho_10) *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * ((rho_10) / rho_0 )) * (beta1 * (1 - S * e ) - ( (alpha_0 *(rho_10/rho_0) * ((z - 1) / z) + (alpha_0/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) * (rho_20/rho_0)) )) -
-        2 * rho_11 * m
-
-#rho_22
-du[8] = 2* (rho_20) * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * ((rho_20) / rho_0 )) * (beta2 * (1 - S ) - ( (cintra *(rho_20/rho_0) * ((z - 1) / z) + (cintra/z) + alpha_0 * ((z - 1) / z) * (rho_10/rho_0)) )) -
-        2 * rho_22 * m
-
-#rho_mm
-du[9] = 2 * rho_0m * d - 2* rho_mm * (r + f * rho_1)
-
-end
-
-
-")
-
-
-
-PA_two_species_global_C_global_F_press = julia_eval("
-
-function PA_two_species_global_C_global_F_press(du,u,p,t)
-
-r,d,f,beta1,beta2,m,e,cintra,alpha_0,S,delta,z,h=p
-rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
-
-rho_0=(1- rho_1-rho_2-rho_m)
-rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
-rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
-rho_0m = rho_m - rho_mm - rho_1m - rho_2m 
-
-
-#rho_1
-du[1] =  rho_0 *  (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta1 * (1 - S * (1-e )) - 
-(cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) ) - rho_1 * m
-
-#rho_2
-du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta2 * (1 - S)  - 
-(cintra *rho_2 + alpha_0 * rho_1)) - rho_2 * m
-
-#rho_m
-du[3] =  rho_0 * d - rho_m * (r + f * rho_1)
-
-#rho_12
-du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * 
-        (beta2 * (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1))  +
-        rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * 
-        (rho_10 / rho_0)) * (beta1 * (1 - S * (1-e )) - 
-        (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) )-
-        2 * rho_12 * m
-
-#rho_1m
-du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta1 * (1 - S * (1-e )) - 
-        (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
-        rho_1m * m - rho_1m * (r + f*rho_1)
-
-#rho_2m
-du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0) * (beta2 * (1 - S  ) - 
-        ((cintra *rho_2 + alpha_0 *rho_1) ))) -
-        rho_2m * m - rho_2m * (r + f*rho_1)
-
-#rho_11
-du[7] = 2* rho_10 *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0 )) * 
-        (beta1 *  (1 - S * (1-e )) - (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
-        2 * rho_11 * m
-
-#rho_22
-du[8] = 2* rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0 )) * (beta2 *  
-        (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1)) -
-        2 * rho_22 * m
-
-#rho_mm
-du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * rho_1)
-
-end
-
-
-")
+# PA_two_species_local_C_global_F = julia_eval("
+# 
+# function PA_two_species_local_C_global_F(du,u,p,t)
+# 
+# 
+# r,d,f,beta,m,e,cintra,alpha_0,S,delta,z,h=p
+# rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
+# 
+# rho_0=(1- rho_1-rho_2-rho_m)
+# rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
+# rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
+# rho_0m = rho_m - rho_mm - rho_1m - rho_2m 
+# 
+# 
+# 
+# #rho_1
+# du[1] =  rho_0 *  (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
+# ( (cintra * (rho_10/rho_0) + alpha_0 * (1+h*exp(-1)) *(rho_20/rho_0)) ) ) - rho_1 * m
+# 
+# #rho_2
+# du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 - S)  - 
+# ( (cintra * (rho_20/rho_0) + alpha_0 *(rho_10/rho_0))  )  ) - rho_2 * m
+# 
+# #rho_m
+# du[3] =  rho_0 * d - rho_m * (r + f * rho_1)
+# 
+# #rho_12
+# du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * 
+#         (beta * (1 - S ) - ( (cintra * ((z - 1) / z)*(rho_20/rho_0) + (alpha_0/z) + alpha_0 *((z - 1) / z)*(rho_10/rho_0)) )   )  +
+#         rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * 
+#         (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
+#         ( (cintra * ((z - 1) / z) * (rho_10/rho_0) + ((alpha_0 * (1+h*exp(-1)))/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *(rho_20/rho_0)) )  ) -
+#         2 * rho_12 * m
+# 
+# #rho_1m
+# du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
+#         (cintra * ((z - 1) / z) * (rho_10/rho_0) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *(rho_20/rho_0))     ) -
+#         rho_1m * m - rho_1m * (r + f*rho_1)
+# 
+# #rho_2m
+# du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S  ) - 
+#         ( (cintra * ((z - 1) / z) * (rho_20/rho_0) + alpha_0 *  ((z - 1) / z) *(rho_10/rho_0)) )) -
+#         rho_2m * m - rho_2m * (r + f*rho_1)
+# 
+# #rho_11
+# du[7] = 2* rho_10 *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0 )) * 
+#         (beta *  (1 - S * (1-e )) - (cintra * ((z - 1) / z) * (rho_10/rho_0) + (cintra/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *(rho_20/rho_0))  ) -
+#         2 * rho_11 * m
+# 
+# #rho_22
+# du[8] = 2* rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0 )) * (beta *  
+#         (1 - S ) - ( (cintra * ((z - 1) / z)*(rho_20/rho_0) + (cintra/z) + alpha_0 *((z - 1) / z)*(rho_10/rho_0)) )    ) -
+#         2 * rho_22 * m
+# 
+# #rho_mm
+# du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * rho_1)
+# 
+# 
+# end
+# 
+# 
+# ")
+
+# PA_two_species_global_C_global_F = julia_eval("
+# 
+# function PA_two_species_global_C_global_F(du,u,p,t)
+# 
+# r,d,f,beta,m,e,cintra,alpha_0,S,delta,z,h=p
+# rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
+# 
+# rho_0=(1- rho_1-rho_2-rho_m)
+# rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
+# rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
+# rho_0m = rho_m - rho_mm - rho_1m - rho_2m 
+# 
+# 
+# #rho_1
+# du[1] =  rho_0 *  (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) ) - rho_1 * m
+# 
+# #rho_2
+# du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 - S)  - 
+# (cintra *rho_2 + alpha_0 * rho_1)) - rho_2 * m
+# 
+# #rho_m
+# du[3] =  rho_0 * d - rho_m * (r + f * rho_1)
+# 
+# #rho_12
+# du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * 
+#         (beta * (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1))  +
+#         rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * 
+#         (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
+#         (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) )-
+#         2 * rho_12 * m
+# 
+# #rho_1m
+# du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1-e )) - 
+#         (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
+#         rho_1m * m - rho_1m * (r + f*rho_1)
+# 
+# #rho_2m
+# du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S  ) - 
+#         ((cintra *rho_2 + alpha_0 *rho_1) )) -
+#         rho_2m * m - rho_2m * (r + f*rho_1)
+# 
+# #rho_11
+# du[7] = 2* rho_10 *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0 )) * 
+#         (beta *  (1 - S * (1-e )) - (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
+#         2 * rho_11 * m
+# 
+# #rho_22
+# du[8] = 2* rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0 )) * (beta *  
+#         (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1)) -
+#         2 * rho_22 * m
+# 
+# #rho_mm
+# du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * rho_1)
+# 
+# end
+# 
+# 
+# ")
+
+
+
+
+# PA_two_species_local_C_global_F_press = julia_eval("
+# 
+# function PA_two_species_local_C_global_F_press(du,u,p,t)
+# 
+# r,d,f,beta1,beta2,m,e,cintra,alpha_0,S,delta,z,h=p
+# rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
+# 
+# #rho_1
+# du[1] =  rho_0 * (delta * rho_1 + (1 - delta) * ((rho_10) / rho_0)) * (beta1 * (1 - S * e ) - ( (alpha_0 *(rho_10/rho_0) + alpha_0 * (1+h*exp(-1)) *(rho_20/rho_0)) )) - rho_1 * m
+# 
+# #rho_2
+# du[2] =  rho_0 * (delta * rho_2 + (1 - delta) * ((rho_20) / rho_0)) * (beta2 * (1 - S)  - ( (cintra *(rho_20/rho_0) + alpha_0 *(rho_10/rho_0)) )) - rho_2 * m
+# 
+# #rho_m
+# du[3] =  rho_0 * d - rho_m * (r + f * rho_1)
+# 
+# #rho_12
+# du[4] = (rho_10) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * ((rho_20) / rho_0)) * (beta2 * (1 - S ) - ( (cintra *((z - 1) / z)*(rho_20/rho_0) + (alpha_0/z) + alpha_0 *((z - 1) / z)*(rho_10/rho_0)) ))  +
+#         (rho_20) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * ((rho_10) / rho_0)) * (beta1 * (1 - S * e ) - ( (alpha_0 * ((z - 1) / z) * (rho_10/rho_0) + (alpha_0 * (1+h*exp(-1))/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) *(rho_20/rho_0)) ))-
+#         2 * rho_12 * m
+# 
+# #rho_1m
+# du[5] = (rho_10) * d + rho_0m * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * ((rho_10) / rho_0)) * (beta1 * (1 - S * e ) - ( (alpha_0 *(rho_10/rho_0) + alpha_0 * (1+h*exp(-1)) *(rho_20/rho_0)) )) -
+#         rho_1m * m - rho_1m * (r + f*rho_1)
+# 
+# #rho_2m
+# du[6] = (rho_20) * d + rho_0m * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * ((rho_20) / rho_0) * (beta2 * (1 - S  ) - ( (cintra *(rho_20/rho_0) + alpha_0 *(rho_10/rho_0)) ))) -
+#         rho_2m * m - rho_2m * (r + f*rho_1)
+# 
+# #rho_11
+# du[7] = 2* (rho_10) *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * ((rho_10) / rho_0 )) * (beta1 * (1 - S * e ) - ( (alpha_0 *(rho_10/rho_0) * ((z - 1) / z) + (alpha_0/z) + alpha_0 * (1+h*exp(-1)) * ((z - 1) / z) * (rho_20/rho_0)) )) -
+#         2 * rho_11 * m
+# 
+# #rho_22
+# du[8] = 2* (rho_20) * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * ((rho_20) / rho_0 )) * (beta2 * (1 - S ) - ( (cintra *(rho_20/rho_0) * ((z - 1) / z) + (cintra/z) + alpha_0 * ((z - 1) / z) * (rho_10/rho_0)) )) -
+#         2 * rho_22 * m
+# 
+# #rho_mm
+# du[9] = 2 * rho_0m * d - 2* rho_mm * (r + f * rho_1)
+# 
+# end
+# 
+# 
+# ")
+
+
+
+# PA_two_species_global_C_global_F_press = julia_eval("
+# 
+# function PA_two_species_global_C_global_F_press(du,u,p,t)
+# 
+# r,d,f,beta1,beta2,m,e,cintra,alpha_0,S,delta,z,h=p
+# rho_1,rho_2,rho_m,rho_12,rho_1m,rho_2m,rho_11,rho_22,rho_mm=u
+# 
+# rho_0=(1- rho_1-rho_2-rho_m)
+# rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
+# rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
+# rho_0m = rho_m - rho_mm - rho_1m - rho_2m 
+# 
+# 
+# #rho_1
+# du[1] =  rho_0 *  (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta1 * (1 - S * (1-e )) - 
+# (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) ) - rho_1 * m
+# 
+# #rho_2
+# du[2] =  rho_0 *  (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta2 * (1 - S)  - 
+# (cintra *rho_2 + alpha_0 * rho_1)) - rho_2 * m
+# 
+# #rho_m
+# du[3] =  rho_0 * d - rho_m * (r + f * rho_1)
+# 
+# #rho_12
+# du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * 
+#         (beta2 * (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1))  +
+#         rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * 
+#         (rho_10 / rho_0)) * (beta1 * (1 - S * (1-e )) - 
+#         (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2) )-
+#         2 * rho_12 * m
+# 
+# #rho_1m
+# du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta1 * (1 - S * (1-e )) - 
+#         (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
+#         rho_1m * m - rho_1m * (r + f*rho_1)
+# 
+# #rho_2m
+# du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0) * (beta2 * (1 - S  ) - 
+#         ((cintra *rho_2 + alpha_0 *rho_1) ))) -
+#         rho_2m * m - rho_2m * (r + f*rho_1)
+# 
+# #rho_11
+# du[7] = 2* rho_10 *  (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0 )) * 
+#         (beta1 *  (1 - S * (1-e )) - (cintra *rho_1 + alpha_0 * (1+h*exp(-1))*rho_2)) -
+#         2 * rho_11 * m
+# 
+# #rho_22
+# du[8] = 2* rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0 )) * (beta2 *  
+#         (1 - S ) - (cintra *rho_2 + alpha_0 *rho_1)) -
+#         2 * rho_22 * m
+# 
+# #rho_mm
+# du[9] = 2 * (rho_0m) * d - 2* rho_mm * (r + f * rho_1)
+# 
+# end
+# 
+# 
+# ")
 
 
 
 
 ## >> c) varying trait ----
 
-PA_two_species_varying_trait = julia_eval("
-
-function PA_two_species_varying_trait(du,u,p,t)
-
-r, d, f, beta, m, e, cintra, alpha_0, S, delta, z, h, psi_1,psi_2 = p
-rho_1, rho_2, rho_m, rho_12, rho_1m, rho_2m, rho_11, rho_22, rho_mm = u
-
-rho_0 = (1 - rho_1 - rho_2 - rho_m)
-rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
-rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
-rho_0m = rho_m - rho_mm - rho_1m - rho_2m
-
-
-#rho_1
-du[1] = rho_0 * (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
-                                                                        (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) - rho_1 * m
-
-#rho_2
-du[2] = rho_0 * (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 - S * (1 - e * psi_2)) -
-                                                                        (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) - rho_2 * m
-
-#rho_m
-du[3] = rho_0 * d - rho_m * (r + f * ( psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m)))
-
-#rho_12
-du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) *
-        (beta * (1 - S * (1 - e * psi_2)) - (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) +
-        rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) *
-                                      (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
-                                                               (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
-        2 * rho_12 * m
-
-#rho_1m
-du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
-                                                                                                            (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
-        rho_1m * m - rho_1m * (r + f * ((1 / z) * psi_1 + ((z - 1) / z) * (psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m)) ))
-
-#rho_2m
-du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S * (1 - e * psi_2)) -
-                                                                                                           (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) -
-        rho_2m * m - rho_2m * (r + f * ((1 / z) * psi_2 + ((z - 1) / z) * (psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m))))
-
-#rho_11
-du[7] = 2 * rho_10 * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) *
-        (beta * (1 - S * (1 - e * psi_1 )) - (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
-        2 * rho_11 * m
-
-#rho_22
-du[8] = 2 * rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta *
-                                                                                                                     (1 - S * (1 - e * psi_2)) - (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) -
-        2 * rho_22 * m
-
-#rho_mm
-du[9] = 2 * (rho_0m) * d - 2 * rho_mm * (r + f * ((z - 1) / z) * (psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m)))
-
-end
-
-
-")
-
-
-
-
-PA_two_species_varying_trait_global_facilitation = julia_eval("
-
-function PA_two_species_varying_trait_global_facilitation(du,u,p,t)
-
-r, d, f, beta, m, e, cintra, alpha_0, S, delta, z, h, psi_1,psi_2 = p
-rho_1, rho_2, rho_m, rho_12, rho_1m, rho_2m, rho_11, rho_22, rho_mm = u
-
-rho_0 = (1 - rho_1 - rho_2 - rho_m)
-rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
-rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
-rho_0m = rho_m - rho_mm - rho_1m - rho_2m
-
-
-#rho_1
-du[1] = rho_0 * (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
-                                                                        (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) - rho_1 * m
-
-#rho_2
-du[2] = rho_0 * (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 - S * (1 - e * psi_2)) -
-                                                                        (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) - rho_2 * m
-
-#rho_m
-du[3] = rho_0 * d - rho_m * (r + f * ( psi_1 * rho_1 + psi_2 * rho_2))
-
-#rho_12
-du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) *
-        (beta * (1 - S * (1 - e * psi_2)) - (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) +
-        rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) *
-                                      (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
-                                                               (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
-        2 * rho_12 * m
-
-#rho_1m
-du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
-                                                                                                            (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
-        rho_1m * m - rho_1m * (r + f * ( psi_1 * rho_1 + psi_2 * rho_2))
-
-#rho_2m
-du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S * (1 - e * psi_2)) -
-                                                                                                           (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) -
-        rho_2m * m - rho_2m * (r + f * ( psi_1 * rho_1 + psi_2 * rho_2))
-
-#rho_11
-du[7] = 2 * rho_10 * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) *
-        (beta * (1 - S * (1 - e * psi_1 )) - (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
-        2 * rho_11 * m
-
-#rho_22
-du[8] = 2 * rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta *
-                                                                                                                     (1 - S * (1 - e * psi_2)) - (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) -
-        2 * rho_22 * m
-
-#rho_mm
-du[9] = 2 * (rho_0m) * d - 2 * rho_mm * (r + f * ( psi_1 * rho_1 + psi_2 * rho_2))
-
-end
-
-
-")
-
-
-PA_two_species_varying_trait_trade_off = julia_eval("
-
-function PA_two_species_varying_trait_trade_off(du,u,p,t)
-
-r, d, f, beta, m, e, cintra, alpha_0, S, delta, z, h, psi_1,psi_2,shape = p
-rho_1, rho_2, rho_m, rho_12, rho_1m, rho_2m, rho_11, rho_22, rho_mm = u
-
-rho_0 = (1 - rho_1 - rho_2 - rho_m)
-rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
-rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
-rho_0m = rho_m - rho_mm - rho_1m - rho_2m
-
-
-#rho_1
-du[1] = rho_0 * (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1^shape)) -
-                                                                        (cintra * rho_1 + alpha_0 * (1 + psi_1^shape * h * exp(-abs(psi_1 - psi_2))) * rho_2)) - rho_1 * m
-
-#rho_2
-du[2] = rho_0 * (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 - S * (1 - e * psi_2^shape)) -
-                                                                        (cintra * rho_2 + alpha_0 * (1 + psi_2^shape * h * exp(-abs(psi_1 - psi_2))) * rho_1)) - rho_2 * m
-
-#rho_m
-du[3] = rho_0 * d - rho_m * (r + f * ( psi_1^shape * (rho_1m / rho_m) + psi_2^shape * (rho_2m / rho_m)))
-
-#rho_12
-du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) *
-        (beta * (1 - S * (1 - e * psi_2^shape)) - (cintra * rho_2 + alpha_0 * (1 + psi_2^shape * h * exp(-abs(psi_1 - psi_2))) * rho_1)) +
-        rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) *
-                                      (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1^shape)) -
-                                                               (cintra * rho_1 + alpha_0 * (1 + psi_1^shape * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
-        2 * rho_12 * m
-
-#rho_1m
-du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1^shape)) -
-                                                                                                            (cintra * rho_1 + alpha_0 * (1 + psi_1^shape * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
-        rho_1m * m - rho_1m * (r + f * ((1 / z) * psi_1^shape + ((z - 1) / z) * (psi_1^shape * (rho_1m / rho_m) + psi_2^shape * (rho_2m / rho_m)) ))
-
-#rho_2m
-du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S * (1 - e * psi_2^shape)) -
-                                                                                                           (cintra * rho_2 + alpha_0 * (1 + psi_2^shape * h * exp(-abs(psi_1 - psi_2))) * rho_1)) -
-        rho_2m * m - rho_2m * (r + f * ((1 / z) * psi_2^shape + ((z - 1) / z) * (psi_1^shape * (rho_1m / rho_m) + psi_2^shape * (rho_2m / rho_m))))
-
-#rho_11
-du[7] = 2 * rho_10 * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) *
-        (beta * (1 - S * (1 - e * psi_1^shape )) - (cintra * rho_1 + alpha_0 * (1 + psi_1^shape * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
-        2 * rho_11 * m
-
-#rho_22
-du[8] = 2 * rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta *
-                                                                                                                     (1 - S * (1 - e * psi_2^shape)) - (cintra * rho_2 + alpha_0 * (1 + psi_2^shape * h * exp(-abs(psi_1 - psi_2))) * rho_1)) -
-        2 * rho_22 * m
-
-#rho_mm
-du[9] = 2 * (rho_0m) * d - 2 * rho_mm * (r + f * ((z - 1) / z) * (psi_1^shape * (rho_1m / rho_m) + psi_2^shape * (rho_2m / rho_m)))
-
-end
-
-
-")
-
-
-PA_two_species_varying_trait_press = julia_eval("
-
-function PA_two_species_varying_trait_press(du,u,p,t)
-
-r, d, f, beta, m, e, cintra, alpha_0, S, delta, z, h, psi_1,psi_2 = p
-rho_1, rho_2, rho_m, rho_12, rho_1m, rho_2m, rho_11, rho_22, rho_mm = u
-
-rho_0 = (1 - rho_1 - rho_2 - rho_m)
-rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
-rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
-rho_0m = rho_m - rho_mm - rho_1m - rho_2m
-
-
-#rho_1
-du[1] = rho_0 * (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
-                                                                        (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) - rho_1 * m
-
-#rho_2
-du[2] = rho_0 * (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 - S * (1 - e * psi_2)) -
-                                                                        (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) - rho_2 * m
-
-#rho_m
-du[3] = rho_0 * d - rho_m * (r + f * ( psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m)))
-
-#rho_12
-du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) *
-        (beta * (1 - S * (1 - e * psi_2)) - (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) +
-        rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) *
-                                      (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
-                                                               (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
-        2 * rho_12 * m
-
-#rho_1m
-du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
-                                                                                                            (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
-        rho_1m * m - rho_1m * (r + f * ((1 / z) * psi_1 + ((z - 1) / z) * (psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m)) ))
-
-#rho_2m
-du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S * (1 - e * psi_2)) -
-                                                                                                           (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) -
-        rho_2m * m - rho_2m * (r + f * ((1 / z) * psi_2 + ((z - 1) / z) * (psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m))))
-
-#rho_11
-du[7] = 2 * rho_10 * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) *
-        (beta * (1 - S * (1 - e * psi_1 )) - (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
-        2 * rho_11 * m
-
-#rho_22
-du[8] = 2 * rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta *
-                                                                                                                     (1 - S * (1 - e * psi_2)) - (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) -
-        2 * rho_22 * m
-
-#rho_mm
-du[9] = 2 * (rho_0m) * d - 2 * rho_mm * (r + f * ((z - 1) / z) * (psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m)))
-
-end
-
-
-")
+# PA_two_species_varying_trait = julia_eval("
+# 
+# function PA_two_species_varying_trait(du,u,p,t)
+# 
+# r, d, f, beta, m, e, cintra, alpha_0, S, delta, z, h, psi_1,psi_2 = p
+# rho_1, rho_2, rho_m, rho_12, rho_1m, rho_2m, rho_11, rho_22, rho_mm = u
+# 
+# rho_0 = (1 - rho_1 - rho_2 - rho_m)
+# rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
+# rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
+# rho_0m = rho_m - rho_mm - rho_1m - rho_2m
+# 
+# 
+# #rho_1
+# du[1] = rho_0 * (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
+#                                                                         (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) - rho_1 * m
+# 
+# #rho_2
+# du[2] = rho_0 * (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 - S * (1 - e * psi_2)) -
+#                                                                         (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) - rho_2 * m
+# 
+# #rho_m
+# du[3] = rho_0 * d - rho_m * (r + f * ( psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m)))
+# 
+# #rho_12
+# du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) *
+#         (beta * (1 - S * (1 - e * psi_2)) - (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) +
+#         rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) *
+#                                       (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
+#                                                                (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
+#         2 * rho_12 * m
+# 
+# #rho_1m
+# du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
+#                                                                                                             (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
+#         rho_1m * m - rho_1m * (r + f * ((1 / z) * psi_1 + ((z - 1) / z) * (psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m)) ))
+# 
+# #rho_2m
+# du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S * (1 - e * psi_2)) -
+#                                                                                                            (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) -
+#         rho_2m * m - rho_2m * (r + f * ((1 / z) * psi_2 + ((z - 1) / z) * (psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m))))
+# 
+# #rho_11
+# du[7] = 2 * rho_10 * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) *
+#         (beta * (1 - S * (1 - e * psi_1 )) - (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
+#         2 * rho_11 * m
+# 
+# #rho_22
+# du[8] = 2 * rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta *
+#                                                                                                                      (1 - S * (1 - e * psi_2)) - (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) -
+#         2 * rho_22 * m
+# 
+# #rho_mm
+# du[9] = 2 * (rho_0m) * d - 2 * rho_mm * (r + f * ((z - 1) / z) * (psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m)))
+# 
+# end
+# 
+# 
+# ")
+
+
+
+
+# PA_two_species_varying_trait_global_facilitation = julia_eval("
+# 
+# function PA_two_species_varying_trait_global_facilitation(du,u,p,t)
+# 
+# r, d, f, beta, m, e, cintra, alpha_0, S, delta, z, h, psi_1,psi_2 = p
+# rho_1, rho_2, rho_m, rho_12, rho_1m, rho_2m, rho_11, rho_22, rho_mm = u
+# 
+# rho_0 = (1 - rho_1 - rho_2 - rho_m)
+# rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
+# rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
+# rho_0m = rho_m - rho_mm - rho_1m - rho_2m
+# 
+# 
+# #rho_1
+# du[1] = rho_0 * (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
+#                                                                         (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) - rho_1 * m
+# 
+# #rho_2
+# du[2] = rho_0 * (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 - S * (1 - e * psi_2)) -
+#                                                                         (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) - rho_2 * m
+# 
+# #rho_m
+# du[3] = rho_0 * d - rho_m * (r + f * ( psi_1 * rho_1 + psi_2 * rho_2))
+# 
+# #rho_12
+# du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) *
+#         (beta * (1 - S * (1 - e * psi_2)) - (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) +
+#         rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) *
+#                                       (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
+#                                                                (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
+#         2 * rho_12 * m
+# 
+# #rho_1m
+# du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
+#                                                                                                             (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
+#         rho_1m * m - rho_1m * (r + f * ( psi_1 * rho_1 + psi_2 * rho_2))
+# 
+# #rho_2m
+# du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S * (1 - e * psi_2)) -
+#                                                                                                            (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) -
+#         rho_2m * m - rho_2m * (r + f * ( psi_1 * rho_1 + psi_2 * rho_2))
+# 
+# #rho_11
+# du[7] = 2 * rho_10 * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) *
+#         (beta * (1 - S * (1 - e * psi_1 )) - (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
+#         2 * rho_11 * m
+# 
+# #rho_22
+# du[8] = 2 * rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta *
+#                                                                                                                      (1 - S * (1 - e * psi_2)) - (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) -
+#         2 * rho_22 * m
+# 
+# #rho_mm
+# du[9] = 2 * (rho_0m) * d - 2 * rho_mm * (r + f * ( psi_1 * rho_1 + psi_2 * rho_2))
+# 
+# end
+# 
+# 
+# ")
+
+
+# PA_two_species_varying_trait_trade_off = julia_eval("
+# 
+# function PA_two_species_varying_trait_trade_off(du,u,p,t)
+# 
+# r, d, f, beta, m, e, cintra, alpha_0, S, delta, z, h, psi_1,psi_2,shape = p
+# rho_1, rho_2, rho_m, rho_12, rho_1m, rho_2m, rho_11, rho_22, rho_mm = u
+# 
+# rho_0 = (1 - rho_1 - rho_2 - rho_m)
+# rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
+# rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
+# rho_0m = rho_m - rho_mm - rho_1m - rho_2m
+# 
+# 
+# #rho_1
+# du[1] = rho_0 * (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1^shape)) -
+#                                                                         (cintra * rho_1 + alpha_0 * (1 + psi_1^shape * h * exp(-abs(psi_1 - psi_2))) * rho_2)) - rho_1 * m
+# 
+# #rho_2
+# du[2] = rho_0 * (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 - S * (1 - e * psi_2^shape)) -
+#                                                                         (cintra * rho_2 + alpha_0 * (1 + psi_2^shape * h * exp(-abs(psi_1 - psi_2))) * rho_1)) - rho_2 * m
+# 
+# #rho_m
+# du[3] = rho_0 * d - rho_m * (r + f * ( psi_1^shape * (rho_1m / rho_m) + psi_2^shape * (rho_2m / rho_m)))
+# 
+# #rho_12
+# du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) *
+#         (beta * (1 - S * (1 - e * psi_2^shape)) - (cintra * rho_2 + alpha_0 * (1 + psi_2^shape * h * exp(-abs(psi_1 - psi_2))) * rho_1)) +
+#         rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) *
+#                                       (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1^shape)) -
+#                                                                (cintra * rho_1 + alpha_0 * (1 + psi_1^shape * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
+#         2 * rho_12 * m
+# 
+# #rho_1m
+# du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1^shape)) -
+#                                                                                                             (cintra * rho_1 + alpha_0 * (1 + psi_1^shape * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
+#         rho_1m * m - rho_1m * (r + f * ((1 / z) * psi_1^shape + ((z - 1) / z) * (psi_1^shape * (rho_1m / rho_m) + psi_2^shape * (rho_2m / rho_m)) ))
+# 
+# #rho_2m
+# du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S * (1 - e * psi_2^shape)) -
+#                                                                                                            (cintra * rho_2 + alpha_0 * (1 + psi_2^shape * h * exp(-abs(psi_1 - psi_2))) * rho_1)) -
+#         rho_2m * m - rho_2m * (r + f * ((1 / z) * psi_2^shape + ((z - 1) / z) * (psi_1^shape * (rho_1m / rho_m) + psi_2^shape * (rho_2m / rho_m))))
+# 
+# #rho_11
+# du[7] = 2 * rho_10 * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) *
+#         (beta * (1 - S * (1 - e * psi_1^shape )) - (cintra * rho_1 + alpha_0 * (1 + psi_1^shape * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
+#         2 * rho_11 * m
+# 
+# #rho_22
+# du[8] = 2 * rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta *
+#                                                                                                                      (1 - S * (1 - e * psi_2^shape)) - (cintra * rho_2 + alpha_0 * (1 + psi_2^shape * h * exp(-abs(psi_1 - psi_2))) * rho_1)) -
+#         2 * rho_22 * m
+# 
+# #rho_mm
+# du[9] = 2 * (rho_0m) * d - 2 * rho_mm * (r + f * ((z - 1) / z) * (psi_1^shape * (rho_1m / rho_m) + psi_2^shape * (rho_2m / rho_m)))
+# 
+# end
+# 
+# 
+# ")
+
+
+# PA_two_species_varying_trait_press = julia_eval("
+# 
+# function PA_two_species_varying_trait_press(du,u,p,t)
+# 
+# r, d, f, beta, m, e, cintra, alpha_0, S, delta, z, h, psi_1,psi_2 = p
+# rho_1, rho_2, rho_m, rho_12, rho_1m, rho_2m, rho_11, rho_22, rho_mm = u
+# 
+# rho_0 = (1 - rho_1 - rho_2 - rho_m)
+# rho_20 = rho_2 - rho_22 - rho_12 - rho_2m
+# rho_10 = rho_1 - rho_11 - rho_12 - rho_1m
+# rho_0m = rho_m - rho_mm - rho_1m - rho_2m
+# 
+# 
+# #rho_1
+# du[1] = rho_0 * (delta * rho_1 + (1 - delta) * (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
+#                                                                         (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) - rho_1 * m
+# 
+# #rho_2
+# du[2] = rho_0 * (delta * rho_2 + (1 - delta) * (rho_20 / rho_0)) * (beta * (1 - S * (1 - e * psi_2)) -
+#                                                                         (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) - rho_2 * m
+# 
+# #rho_m
+# du[3] = rho_0 * d - rho_m * (r + f * ( psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m)))
+# 
+# #rho_12
+# du[4] = rho_10 * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) *
+#         (beta * (1 - S * (1 - e * psi_2)) - (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) +
+#         rho_20 * (delta * rho_1 + (1 - delta) * ((z - 1) / z) *
+#                                       (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
+#                                                                (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
+#         2 * rho_12 * m
+# 
+# #rho_1m
+# du[5] = rho_10 * d + (rho_0m) * (delta * rho_1 + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) * (beta * (1 - S * (1 - e * psi_1)) -
+#                                                                                                             (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
+#         rho_1m * m - rho_1m * (r + f * ((1 / z) * psi_1 + ((z - 1) / z) * (psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m)) ))
+# 
+# #rho_2m
+# du[6] = rho_20 * d + (rho_0m) * (delta * rho_2 + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta * (1 - S * (1 - e * psi_2)) -
+#                                                                                                            (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) -
+#         rho_2m * m - rho_2m * (r + f * ((1 / z) * psi_2 + ((z - 1) / z) * (psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m))))
+# 
+# #rho_11
+# du[7] = 2 * rho_10 * (delta * rho_1 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_10 / rho_0)) *
+#         (beta * (1 - S * (1 - e * psi_1 )) - (cintra * rho_1 + alpha_0 * (1 + psi_1 * h * exp(-abs(psi_1 - psi_2))) * rho_2)) -
+#         2 * rho_11 * m
+# 
+# #rho_22
+# du[8] = 2 * rho_20 * (delta * rho_2 + ((1 - delta) / z) + (1 - delta) * ((z - 1) / z) * (rho_20 / rho_0)) * (beta *
+#                                                                                                                      (1 - S * (1 - e * psi_2)) - (cintra * rho_2 + alpha_0 * (1 + psi_2 * h * exp(-abs(psi_1 - psi_2))) * rho_1)) -
+#         2 * rho_22 * m
+# 
+# #rho_mm
+# du[9] = 2 * (rho_0m) * d - 2 * rho_mm * (r + f * ((z - 1) / z) * (psi_1 * (rho_1m / rho_m) + psi_2 * (rho_2m / rho_m)))
+# 
+# end
+# 
+# 
+# ")
 
 
 
@@ -1096,7 +1097,7 @@ Extract_pairs_trait=function(d,Nsp,self=F,clustering=T){
 }
 
 
-Plot_landscape = function(landscape,Nsp=15){
+Plot_landscape = function(landscape,Nsp=15,size=100){
   color_CA = c("white","white",rev(color_Nsp(Nsp)))
   if (Nsp==2){
     color_CA = c("white","#D8CC7B",c("#858BE0",as.character(color_rho[c(2)])))
@@ -1106,7 +1107,7 @@ Plot_landscape = function(landscape,Nsp=15){
   }
   
   state=melt(landscape)
-  state$Var2=paste0("V",1:100)
+  state$Var2=paste0("V",1:size)
   colnames(state)[1:2]=c("Var1","value")
   ggplot(state) +
     geom_tile(aes(x = Var1, y = Var2, fill = value)) +

@@ -50,7 +50,6 @@ end
 
 
 
-
 function Ca_2_species_global(; landscape, param)
 
 
@@ -140,18 +139,88 @@ function Ca_2_species_local(; landscape, param)
     beta = param["beta"]
     m = param["m"]
     e = param["e"]
-    cg = param["cg"]
     cintra = param["cintra"]
     alpha_e = param["alpha_e"]
     S = param["S"]
     delta = param["delta"]
     z = param["z"]
 
-    colonization1 = @. (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(beta * (1 - S * (1 - e)) - (cg * (rho_1 + rho_2) + (cintra * (neigh_1 / z) + alpha_e * (1 + exp(-1)) * (neigh_2 / z))))
-    colonization2 = @. (delta * rho_2 + (1 - delta) * neigh_2 / z) * @.(beta * (1 - S) - (cg * (rho_1 + rho_2) + (cintra * (neigh_2 / z) + alpha_e * (neigh_1 / z))))
+    colonization1 = @. (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(beta * (1 - S * (1 - e)) - (cintra * neigh_1 / z + alpha_e * (1 + exp(-1)) * neigh_2 / z))
+    colonization2 = @. (delta * rho_2 + (1 - delta) * neigh_2 / z) * @.(beta * (1 - S) - (cintra * neigh_2 / z + alpha_e * neigh_1 / z))
     # calculate regeneration, degradation & mortality rate
     death = m
-    regeneration = @.(r + f * neigh_1 / z)
+    regeneration = (@.(r + f * neigh_1 / z)) .* (landscape .== -1)
+    degradation = d
+
+    # Apply rules
+    rnum = reshape(rand(length(landscape)), Int64(sqrt(length(landscape))), Int64(sqrt(length(landscape))))# one random number between 0 and 1 for each cell
+    landscape_update = copy(landscape)
+
+    ## New vegetation
+    landscape_update[findall((landscape .== 0) .& (rnum .<= colonization1))] .= 1
+    landscape_update[findall((landscape .== 0) .& (rnum .> colonization1) .& (rnum .<= colonization1 .+ colonization2))] .= 2
+
+    ## New fertile
+    landscape_update[findall((landscape .== 1) .& (rnum .<= death))] .= 0
+    landscape_update[findall((landscape .== 2) .& (rnum .<= death))] .= 0
+    landscape_update[findall((landscape .== -1) .& (rnum .<= regeneration))] .= 0
+
+    ## New degraded 
+    landscape_update[findall((landscape .== 0) .& (rnum .> colonization1 .+ colonization2) .& (rnum .<= (colonization1 .+ colonization2 .+ degradation)))] .= -1
+
+    rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
+    rho_2 = length(findall((landscape .== 2))) / length(landscape) #fraction competitive
+    rho_f = length(findall((landscape .== 0))) / length(landscape) #fraction fertile
+    rho_d = 1 - rho_1 - rho_2 - rho_f # fraction degraded
+
+    return rho_1, rho_2, rho_f, rho_d, landscape_update
+
+end
+
+
+
+
+function Ca_2_species_medium(; landscape, param)
+
+
+    rho_1 = length(findall((landscape .== 1))) / length(landscape) #fraction stress_tol
+    rho_2 = length(findall((landscape .== 2))) / length(landscape) #fraction competitive
+    rho_f = length(findall((landscape .== 0))) / length(landscape) #fraction fertile
+    rho_d = 1 - rho_1 - rho_2 - rho_f # fraction degraded
+
+
+    # Neighbors :
+
+    #using simcol package from R 
+    @rput landscape
+    R"neigh_1= simecol::neighbors(x =landscape,state = 1, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
+    R"neigh_2= simecol::neighbors(x =landscape,state = 2, wdist =  matrix( c(0, 1, 0,1, 0, 1, 0, 1, 0), nrow = 3),bounds = 1)"
+    R"neigh_1_comp= simecol::neighbors(x =landscape,state = 1, wdist =  matrix(c(rep(1,12),0,rep(1,12)),5,5),bounds = 1)"
+    R"neigh_2_comp= simecol::neighbors(x =landscape,state = 2, wdist =  matrix(c(rep(1,12),0,rep(1,12)),5,5),bounds = 1)"
+
+
+    @rget neigh_1
+    @rget neigh_2
+    @rget neigh_1_comp
+    @rget neigh_2_comp
+
+    r = param["r"]
+    d = param["d"]
+    f = param["f"]
+    beta = param["beta"]
+    m = param["m"]
+    e = param["e"]
+    cintra = param["cintra"]
+    alpha_e = param["alpha_e"]
+    S = param["S"]
+    delta = param["delta"]
+    z = param["z"]
+
+    colonization1 = @. (delta * rho_1 + (1 - delta) * neigh_1 / z) * @.(beta * (1 - S * (1 - e)) - (cintra * neigh_1_comp / 24 + alpha_e * (1 + exp(-1)) * neigh_2_comp / 24))
+    colonization2 = @. (delta * rho_2 + (1 - delta) * neigh_2 / z) * @.(beta * (1 - S) - (cintra * neigh_2_comp / 24 + alpha_e * neigh_1_comp / 24))
+    # calculate regeneration, degradation & mortality rate
+    death = m
+    regeneration = (@.(r + f * neigh_1 / z)) .* (landscape .== -1)
     degradation = d
 
     # Apply rules
@@ -183,7 +252,6 @@ end
 
 
 
-
 function Run_CA_2_species(; time, param, landscape, save, name_save="", burning=1500, N_snap=25, type_competition)
 
     d = Array{Float64}(undef, time + 1, 5) #Allocating
@@ -200,6 +268,19 @@ function Run_CA_2_species(; time, param, landscape, save, name_save="", burning=
         @inbounds for k in 1:time
 
             rho_1, rho_2, rho_f, rho_d, landscape = Ca_2_species_global(landscape=copy(landscape), param=param)
+            @views d[k+1, :] = [k + 1 rho_1 rho_2 rho_f rho_d]
+
+            if save && k > burning && k % round(((time - burning) / N_snap)) == 0
+                CSV.write(name_save * "_nsave_" * repr(n_save) * ".csv", Tables.table(landscape), writeheader=false)
+                n_save += 1
+
+            end
+        end
+    elseif type_competition=="medium"#medium competition
+
+        @inbounds for k in 1:time
+
+            rho_1, rho_2, rho_f, rho_d, landscape = Ca_2_species_medium(landscape=copy(landscape), param=param)
             @views d[k+1, :] = [k + 1 rho_1 rho_2 rho_f rho_d]
 
             if save && k > burning && k % round(((time - burning) / N_snap)) == 0
@@ -228,6 +309,9 @@ function Run_CA_2_species(; time, param, landscape, save, name_save="", burning=
     return d, landscape
 
 end
+
+
+
 function Plot_dynamics_2species(d)
 
     plot(d[:, 1], d[:, 2], seriescolor=:lightgreen, label="stress_tol")
@@ -251,7 +335,7 @@ end
 ## N species functions
 #Parameters functions 
 
-function Get_classical_param_Nspecies(; N_species=4, alpha_e=0.1, cintra=0.2, scenario_trait="spaced", trade_off=1)
+function Get_classical_param_Nspecies(; N_species=4, alpha_e=0.1, cintra=0.2, scenario_trait="spaced", trade_off=1,type_kernel="both")
 
     r = 0.01
     d = 0.025
@@ -267,7 +351,7 @@ function Get_classical_param_Nspecies(; N_species=4, alpha_e=0.1, cintra=0.2, sc
     trait = Get_species_traits(Nsp=N_species, scena=scenario_trait)
     trade_off = trade_off
 
-    Interaction_mat = Get_interaction_matrix(Nsp=N_species, alpha_e=alpha_e, cintra=cintra, trait_sp=trait, trade_off=1)
+    Interaction_mat = Get_interaction_matrix(Nsp=N_species, alpha_e=alpha_e, cintra=cintra, trait_sp=trait, trade_off=1,type_kernel=type_kernel)
 
     return [N_species, r, d, f, beta, m, e, cg, S, delta, z, tau_leap, trait, Interaction_mat, trade_off]
 
@@ -310,21 +394,32 @@ function Get_classical_param_dict(; N_species=4, alpha_e=0.1, cintra=0.2, scenar
 end
 
 
-function Get_interaction_matrix(; Nsp, trait_sp, cintra=0.5, alpha_e, trade_off=1)
+function Get_interaction_matrix(; Nsp, trait_sp, cintra=0.5, alpha_e, trade_off=1,type_kernel="both")
 
     Interaction_mat = zeros(Nsp, Nsp)
     for i in 1:Nsp
         Interaction_mat[i, i] = cintra
     end
-    for i in 1:(Nsp-1)
+    
+    if type_kernel=="both"
+      for i in 1:(Nsp-1)
+          for j in (i+1):Nsp
+              if i != j
+                  Interaction_mat[i, j] = alpha_e * (1 + exp(-abs(trait_sp[i] - trait_sp[j])) * trait_sp[i]^trade_off) #j on i
+                  Interaction_mat[j, i] = alpha_e * (1 + exp(-abs(trait_sp[i] - trait_sp[j])) * trait_sp[j]^trade_off) #i on j
+              end
+          end
+      end
+    else 
+      for i in 1:(Nsp-1)
         for j in (i+1):Nsp
             if i != j
-                Interaction_mat[i, j] = alpha_e * (1 + exp(-abs(trait_sp[i] - trait_sp[j])) * trait_sp[i]^trade_off) #j on i
-                Interaction_mat[j, i] = alpha_e * (1 + exp(-abs(trait_sp[i] - trait_sp[j])) * trait_sp[j]^trade_off) #i on j
+                Interaction_mat[i, j] = alpha_e * (1 + trait_sp[i]^trade_off) #j on i
+                Interaction_mat[j, i] = alpha_e * (1 + trait_sp[j]^trade_off) #i on j
             end
         end
+      end
     end
-
 
     return Interaction_mat
 end
